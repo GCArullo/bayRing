@@ -1,3 +1,9 @@
+|pypi| |version| |pipeline status| |license| |DOI| 
+
+=======
+bayRing
+=======
+
 # Description
 
 Inference package targeting ringdown modeling of numerical relativity waveforms, using Bayesian sampling algorithm for parameters extraction.  
@@ -53,3 +59,12 @@ For additional questions, feedback and suggestions feel free to reach by email t
 ## How to add a new NR catalog
 
 Instructions coming soon...
+
+.. |pypi| image:: https://badge.fury.io/py/bayRing.svg
+   :target: https://pypi.org/project/bayRing/1.0.0/
+.. |version| image:: https://img.shields.io/pypi/pyversions/bayRing.svg
+   :target: https://pypi.org/project/bayRing/
+.. |license| image:: https://img.shields.io/badge/License-MIT-red.svg
+   :target: https://opensource.org/licenses/MIT
+.. |DOI| image:: https://zenodo.org/badge/DOI/10.5281/zenodo.8284026.svg
+   :target: https://doi.org/10.5281/zenodo.8284026
