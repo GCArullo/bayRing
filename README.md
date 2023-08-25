@@ -37,6 +37,26 @@ To run the simplest example:
   bayRing --config-file config_SXS_0305_Kerr_220_quick.ini
   ```
 
+# Citing
+
+When referencing ``bayRing`` in your publications, please cite the software Zenodo release:
+   
+  ```
+      @software{carullo_gregorio_2023_8284026,
+      author       = {Carullo, Gregorio and
+                     De Amicis, Marina and
+                     Redondo-Yuste, Jaime},
+      title        = {bayRing},
+      month        = aug,
+      year         = 2023,
+      publisher    = {Zenodo},
+      version      = {1.0.0},
+      doi          = {10.5281/zenodo.8284026},
+      url          = {https://doi.org/10.5281/zenodo.8284026},
+      howpublished = "\href{https://github.com/GCArullo/bayRing}{github.com/GCArullo/bayRing}",
+      }
+  ```
+
 # Contributing
 
 If you have a request for an additional feature, spot any mistake or find any problem with using the code, please open an issue.
