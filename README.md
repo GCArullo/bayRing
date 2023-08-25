@@ -1,4 +1,4 @@
-[![pypi](https://badge.fury.io/py/bayRing.svg)](https://pypi.org/project/bayRing/1.0.0/) |[![version](https://img.shields.io/pypi/pyversions/bayRing.svg)](https://pypi.org/project/bayRing/)| |[![license](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT)| |[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8284026.svg)](https://doi.org/10.5281/zenodo.8284026)| 
+[![pypi](https://badge.fury.io/py/bayRing.svg)](https://pypi.org/project/bayRing/1.0.0/) [![version](https://img.shields.io/pypi/pyversions/bayRing.svg)](https://pypi.org/project/bayRing/) [![license](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8284026.svg)](https://doi.org/10.5281/zenodo.8284026)
 
 bayRing
 =======
