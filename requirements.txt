@@ -1,0 +1,9 @@
+cpnest
+matplotlib
+numpy
+pyRingGW
+qnm
+raynest
+seaborn
+scipy
+sxs
