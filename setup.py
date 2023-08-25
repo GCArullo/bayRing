@@ -97,7 +97,6 @@ setup(
     },
     # requirements
     python_requires='>=3',
-    setup_requires=['setuptools_scm'],
     install_requires=requirements,
 )
 
