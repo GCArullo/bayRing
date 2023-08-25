@@ -1,4 +1,4 @@
-|pypi| |version| |license| |DOI| 
+![pypi](https://badge.fury.io/py/bayRing.svg)
 
 =======
 bayRing
@@ -59,6 +59,8 @@ For additional questions, feedback and suggestions feel free to reach by email t
 ## How to add a new NR catalog
 
 Instructions coming soon...
+
+ |version| |license| |DOI| 
 
 .. |pypi| image:: https://badge.fury.io/py/bayRing.svg
    :target: https://pypi.org/project/bayRing/1.0.0/
