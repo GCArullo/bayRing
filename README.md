@@ -42,13 +42,13 @@ For additional questions, feedback and suggestions feel free to reach by email t
 
 ## How to add a new waveform
 
-1. Add the model to the list of available templates [here](https://github.com/GCArullo/bayRing/blob/4496ce476658a6518716d018deaba227b21662d8/bayRing/initialise.py#L260).
-2. Add any model-specific structures or compatibility checks [here](https://github.com/GCArullo/bayRing/blob/4496ce476658a6518716d018deaba227b21662d8/bayRing/initialise.py#L201).
-3. Declare prior default bounds for model calibration parameters [here](https://github.com/GCArullo/bayRing/blob/4496ce476658a6518716d018deaba227b21662d8/bayRing/inference.py#L77).
-4. Add the model-specific parser structure [here](https://github.com/GCArullo/bayRing/blob/4496ce476658a6518716d018deaba227b21662d8/bayRing/inference.py#L252).
-5. Construct the waveform template [here](https://github.com/GCArullo/bayRing/blob/4496ce476658a6518716d018deaba227b21662d8/bayRing/template_waveforms.py#L101).
-6. Add the call to the waveform template [here](https://github.com/GCArullo/bayRing/blob/4496ce476658a6518716d018deaba227b21662d8/bayRing/template_waveforms.py#L203).
-7. Add an example configuration file, similar to e.g. [this](https://github.com/GCArullo/bayRing/blob/4496ce476658a6518716d018deaba227b21662d8/config_files/config_SXS_0305_Kerr_220_quick.ini).
+1. Add the model to the list of available templates [here](https://github.com/GCArullo/bayRing/blob/8053d9232bbace0fb8ec114ce084fb4c65bcb5e5/bayRing/initialise.py#L273).
+2. Add any model-specific structures or compatibility checks [here](https://github.com/GCArullo/bayRing/blob/8053d9232bbace0fb8ec114ce084fb4c65bcb5e5/bayRing/initialise.py#192).
+3. Declare prior default bounds for model calibration parameters [here](https://github.com/GCArullo/bayRing/blob/8053d9232bbace0fb8ec114ce084fb4c65bcb5e5/bayRing/inference.py#L73).
+4. Add the model-specific parser structure [here](https://github.com/GCArullo/bayRing/blob/8053d9232bbace0fb8ec114ce084fb4c65bcb5e5/bayRing/inference.py#L313).
+5. Construct the waveform template [here](https://github.com/GCArullo/bayRing/blob/8053d9232bbace0fb8ec114ce084fb4c65bcb5e5/bayRing/template_waveforms.py#L87).
+6. Add the call to the waveform template [here](https://github.com/GCArullo/bayRing/blob/8053d9232bbace0fb8ec114ce084fb4c65bcb5e5/bayRing/template_waveforms.py#L169).
+7. Add an example configuration file, similar to e.g. [this](https://github.com/GCArullo/bayRing/blob/8053d9232bbace0fb8ec114ce084fb4c65bcb5e5/config_files/config_SXS_0305_Kerr_220_quick.ini).
 
 ## How to add a new NR catalog
 
