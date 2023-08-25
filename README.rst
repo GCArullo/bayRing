@@ -1,4 +1,4 @@
-|pypi| |version| |pipeline status| |license| |DOI| 
+|pypi| |version| |license| |DOI| 
 
 =======
 bayRing
