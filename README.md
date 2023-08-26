@@ -45,9 +45,7 @@ When referencing ``bayRing`` in your publications, please cite the software Zeno
    
   ```
       @software{carullo_gregorio_2023_8284026,
-      author       = {Carullo, Gregorio and
-                     De Amicis, Marina and
-                     Redondo-Yuste, Jaime},
+      author       = {Carullo, Gregorio and De Amicis, Marina and Redondo-Yuste, Jaime},
       title        = {bayRing},
       month        = aug,
       year         = 2023,
