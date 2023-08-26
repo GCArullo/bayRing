@@ -11,7 +11,9 @@ Relies on [pyRing](https://git.ligo.org/lscsoft/pyring) for waveform interfacing
 
 # Installation
 
-The package can be installed through: 
+Tagged versions can be installed through: `pip install bayRing`.
+
+The source code can be installed through: 
 
   ```
   pip install -r requirements.txt
