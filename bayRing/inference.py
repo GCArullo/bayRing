@@ -705,7 +705,7 @@ def run_inference(parameters, inference_model):
         # Posterior railing check section. #
         #==================================#
 
-        railing_check(results_object, inference_model,  parameters['I/O']['outdir'], parameters['Inference']['nlive'], tolerance=2.0)
+        railing_check(results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['nlive'], tolerance=2.0)
 
     else: raise ValueError('Method {} not recognised.'.format(parameters['Inference']['method']))
 

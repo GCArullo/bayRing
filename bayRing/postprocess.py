@@ -507,15 +507,15 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
             wf_f           = np.gradient(wf_phi, t_cut)/(twopi)
             
             if(perc==50):
-                ax1.plot(t_cut - t_peak, wf_r,                                               c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
-                ax2.plot(t_cut - t_peak, wf_amp, label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
-                ax3.plot(t_cut - t_peak, wf_i,                                               c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
-                ax4.plot(t_cut - t_peak, wf_f,                                               c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
+                ax1.plot(    t_cut - t_peak, wf_r,                                               c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
+                ax2.semilogy(t_cut - t_peak, wf_amp, label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
+                ax3.plot(    t_cut - t_peak, wf_i,                                               c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
+                ax4.plot(    t_cut - t_peak, wf_f,                                               c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
             else:
-                ax1.plot(t_cut - t_peak, wf_r,                                               c=color_model, lw=lw_std, alpha=alpha_med, ls='--' )
-                ax2.plot(t_cut - t_peak, wf_amp,                                             c=color_model, lw=lw_std, alpha=alpha_med, ls='--' )
-                ax3.plot(t_cut - t_peak, wf_i,                                               c=color_model, lw=lw_std, alpha=alpha_med, ls='--' )
-                ax4.plot(t_cut - t_peak, wf_f,                                               c=color_model, lw=lw_std, alpha=alpha_med, ls='--' )
+                ax1.plot(    t_cut - t_peak, wf_r,                                               c=color_model, lw=lw_std, alpha=alpha_med, ls='--' )
+                ax2.semilogy(t_cut - t_peak, wf_amp,                                             c=color_model, lw=lw_std, alpha=alpha_med, ls='--' )
+                ax3.plot(    t_cut - t_peak, wf_i,                                               c=color_model, lw=lw_std, alpha=alpha_med, ls='--' )
+                ax4.plot(    t_cut - t_peak, wf_f,                                               c=color_model, lw=lw_std, alpha=alpha_med, ls='--' )
 
             if(method=='Minimization'): break
 
