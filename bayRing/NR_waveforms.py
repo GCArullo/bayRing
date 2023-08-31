@@ -31,7 +31,7 @@ def read_fake_NR(NR_catalog, fake_NR_modes):
 
     return fake_NR_modes_string, injection_modes_list
 
-def read_RWZ_simulation_parameters(sim_file):
+def read_RWZ_env_simulation_parameters(sim_file):
 
     """
     
@@ -328,7 +328,7 @@ def read_NR_metadata(NR_sim, NR_catalog):
                     'af'    : NR_sim.af,
             }
 
-    elif(NR_catalog=='RWZ'):
+    elif(NR_catalog=='RWZ-env'):
         metadata = {
                     'a_halo'    : NR_sim.a_halo,
                     'M_halo'    : NR_sim.M_halo,
@@ -640,10 +640,10 @@ class NR_simulation():
             t_extr, NR_r_extr, NR_i_extr   = None, None, None
             self.ecc = 0.0
         
-        elif(self.NR_catalog=='RWZ'):
+        elif(self.NR_catalog=='RWZ-env'):
 
             # Read the metadata
-            self.a_halo, self.M_halo, self.C = self.read_RWZ_metadata()
+            self.a_halo, self.M_halo, self.C = self.read_RWZ_env_metadata()
             self.ecc, self.Mf, self.af = 0.0, 1.0, 0.0
 
             # Build NR waveform and time axis
@@ -733,7 +733,7 @@ class NR_simulation():
                 # Global error
                 self.NR_err_cmplx = np.sqrt(NR_r_err_extr**2 + NR_r_err_res**2) + 1j * np.sqrt(NR_i_err_extr**2 + NR_i_err_res**2)
 
-        elif(self.NR_catalog=='RWZ'):
+        elif(self.NR_catalog=='RWZ-env'):
 
             # Waveforms at different resolution levels are already aligned.
             if(NR_error=='resolution'):
@@ -1384,7 +1384,7 @@ class NR_simulation():
 
         return Mf, af
 
-    def read_RWZ_metadata(self):
+    def read_RWZ_env_metadata(self):
 
         """
 
@@ -1409,7 +1409,7 @@ class NR_simulation():
         sim_path = os.path.join(self.NR_dir, '{}'.format(self.NR_ID))
 
         # Simulation units are in M/2
-        simulation_parameters = read_RWZ_simulation_parameters(os.path.join(sim_path, 'sim_params.txt'))
+        simulation_parameters = read_RWZ_env_simulation_parameters(os.path.join(sim_path, 'sim_params.txt'))
         a_halo, M_halo, C     = simulation_parameters['a_halo'], simulation_parameters['M_halo'], simulation_parameters['C']
 
         return a_halo, M_halo, C
@@ -1434,8 +1434,6 @@ class NR_simulation():
 
         """
     
-        print(self.NR_dir, self.NR_ID)
-
         sim_path  = os.path.join(self.NR_dir, '{}'.format(self.NR_ID), f'HplusHcrossLM{self.l}{self.m}.dat')
         sim_file  = np.genfromtxt(sim_path, names=True)
         
