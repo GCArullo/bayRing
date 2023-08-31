@@ -31,6 +31,38 @@ def read_fake_NR(NR_catalog, fake_NR_modes):
 
     return fake_NR_modes_string, injection_modes_list
 
+def read_RWZ_simulation_parameters(sim_file):
+
+    """
+    
+    Read the simulation parameters from the RWZ simulation file.
+
+    Parameters
+    ----------
+
+    sim_file : str
+        Path to the RWZ simulation file.
+
+    Returns
+    -------
+
+    sim_params : dict
+        Dictionary containing the simulation parameters.
+    
+    """
+
+    sim_params = {}
+    with open(sim_file, 'r') as f:
+        lines = f.readlines()
+        for line in lines:
+            if line[0] == '#': continue
+            else:
+                line = line.split()
+                try:    sim_params[line[0]] = float(line[1])
+                except: sim_params[line[0]] = line[1]
+
+    return sim_params
+
 def read_Teukolsky_simulation_parameters(sim_file):
 
     """
@@ -209,7 +241,7 @@ def read_NR_metadata(NR_sim, NR_catalog):
         NRsim object containing the metadata of the NR simulation.
 
     NR_catalog : str
-        Catalog of the NR simulation. Available options: 'SXS', 'cbhdb', 'charged_raw', 'RIT', 'Teukolsky'.
+        Catalog of the NR simulation.
 
     Returns
     -------
@@ -296,6 +328,15 @@ def read_NR_metadata(NR_sim, NR_catalog):
                     'af'    : NR_sim.af,
             }
 
+    elif(NR_catalog=='RWZ'):
+        metadata = {
+                    'a_halo'    : NR_sim.a_halo,
+                    'M_halo'    : NR_sim.M_halo,
+                    'C'         : NR_sim.C,
+                    'Mf'        : NR_sim.Mf,
+                    'af'        : NR_sim.af,
+	    }
+
     elif(NR_catalog=='fake_NR'):
         metadata = {
                     'q'     : NR_sim.q,
@@ -317,7 +358,7 @@ class NR_simulation():
     ----------
 
     NR_catalog : str
-        Catalog of the NR simulation. Available options: 'SXS', 'cbhdb', 'charged_raw', 'RIT', 'Teukolsky'.
+        Catalog of the NR simulation.
 
     NR_ID : str
         ID of the NR simulation.
@@ -598,6 +639,17 @@ class NR_simulation():
                 if(NR_error=='resolution'): raise ValueError("Resolution error not yet available when using nx,nl as resolution indicators.")
             t_extr, NR_r_extr, NR_i_extr   = None, None, None
             self.ecc = 0.0
+        
+        elif(self.NR_catalog=='RWZ'):
+
+            # Read the metadata
+            self.a_halo, self.M_halo, self.C = self.read_RWZ_metadata()
+            self.ecc, self.Mf, self.af = 0.0, 1.0, 0.0
+
+            # Build NR waveform and time axis
+            self.t_NR, self.NR_r, self.NR_i = self.read_hlm_from_RWZ()
+            t_res,     NR_r_res,  NR_i_res  = None, None, None
+            t_extr,    NR_r_extr, NR_i_extr = None, None, None
 
         # Auxiliary quantities for the reference NR simulation.
         self.NR_cpx                         = self.NR_r + 1j * self.NR_i
@@ -680,7 +732,27 @@ class NR_simulation():
 
                 # Global error
                 self.NR_err_cmplx = np.sqrt(NR_r_err_extr**2 + NR_r_err_res**2) + 1j * np.sqrt(NR_i_err_extr**2 + NR_i_err_res**2)
-            
+
+        elif(self.NR_catalog=='RWZ'):
+
+            # Waveforms at different resolution levels are already aligned.
+            if(NR_error=='resolution'):
+                raise ValueError("Resolution error not yet available for RWZ simulations.")
+                if np.shape(self.NR_r) != np.shape(NR_r_res):
+                    if np.shape(NR_r_res) < np.shape(self.NR_r):
+                        NR_r_res = np.append(NR_r_res, np.zeros(len(self.NR_r) - len(NR_r_res))) 
+                        NR_i_res = np.append(NR_r_res, np.zeros(len(self.NR_r) - len(NR_r_res)))
+                    else:
+                        NR_r_res = NR_r_res[:len(self.NR_r)]
+                        NR_i_res = NR_i_res[:len(self.NR_r)]
+                NR_r_err_res, NR_i_err_res = np.abs(self.NR_r-NR_r_res), np.abs(self.NR_i-NR_i_res)
+                self.NR_err_cmplx          = NR_r_err_res + 1j * NR_i_err_res
+            elif('constant' in NR_error):
+                error_value                = float(NR_error.split('-')[-1])
+                self.NR_err_cmplx          = self.generate_constant_error(error_value)
+            else:
+                raise ValueError("Unknown NR error option.")
+
         elif(self.NR_catalog=='Teukolsky'):
 
             # Waveforms at different resolution levels are already aligned.
@@ -1311,6 +1383,67 @@ class NR_simulation():
         Mf, af                = simulation_parameters['black_hole_mass']*2, simulation_parameters['black_hole_spin']*2
 
         return Mf, af
+
+    def read_RWZ_metadata(self):
+
+        """
+
+        Read the metadata of the RWZ waveform.
+
+        Parameters
+        ----------
+
+        None.
+
+        Returns
+        -------
+
+        Mf
+            Mass of the black hole.
+
+        af
+            Dimensionless spin of the black hole.
+
+        """ 
+        
+        sim_path = os.path.join(self.NR_dir, '{}'.format(self.NR_ID))
+
+        # Simulation units are in M/2
+        simulation_parameters = read_RWZ_simulation_parameters(os.path.join(sim_path, 'sim_params.txt'))
+        a_halo, M_halo, C     = simulation_parameters['a_halo'], simulation_parameters['M_halo'], simulation_parameters['C']
+
+        return a_halo, M_halo, C
+
+    def read_hlm_from_RWZ(self):
+
+        """
+
+        Read a given (l,m) mode of a RWZ simulation.
+
+        Returns
+        -------
+
+        t_NR
+            Time array of the (l,m) mode.
+
+        wv_re
+            Real part of the (l,m) mode.
+
+        wv_im
+            Imaginary part of the (l,m) mode.
+
+        """
+    
+        print(self.NR_dir, self.NR_ID)
+
+        sim_path  = os.path.join(self.NR_dir, '{}'.format(self.NR_ID), f'HplusHcrossLM{self.l}{self.m}.dat')
+        sim_file  = np.genfromtxt(sim_path, names=True)
+        
+        time             = sim_file['t']
+        waveform_real    = sim_file['hp']
+        waveform_imag    = sim_file['hc']
+        
+        return time, waveform_real, waveform_imag
 
     def read_hlm_from_Teukolsky(self, res_level):
 
