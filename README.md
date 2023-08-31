@@ -77,4 +77,13 @@ For additional questions, feedback and suggestions feel free to reach by email t
 
 ## How to add a new NR catalog
 
-Instructions coming soon...
+1. Add the catalog to the list of available ones [here](https://github.com/GCArullo/bayRing/blob/bfff5de8e156497c6fba548cf83d951166cb1612/bayRing/initialise.py#L231).
+2. Add any catalog-specific structures or compatibility checks [here](https://github.com/GCArullo/bayRing/blob/bfff5de8e156497c6fba548cf83d951166cb1612/bayRing/initialise.py#L187).
+3. Add a parser structure for simulations parameters [here](https://github.com/GCArullo/bayRing/blob/bfff5de8e156497c6fba548cf83d951166cb1612/bayRing/NR_waveforms.py#L34).
+4. Add a metadata entry [here](https://github.com/GCArullo/bayRing/blob/bfff5de8e156497c6fba548cf83d951166cb1612/bayRing/NR_waveforms.py#L331).
+5. Add a reading structure for the metadata and the waveform [here](https://github.com/GCArullo/bayRing/blob/bfff5de8e156497c6fba548cf83d951166cb1612/bayRing/NR_waveforms.py#L1387).
+6. Add a call to waveform and metadata inside the NR simulation class [here](https://github.com/GCArullo/bayRing/blob/bfff5de8e156497c6fba548cf83d951166cb1612/bayRing/NR_waveforms.py#L643).
+7. Add a method to estimate the NR error (resolution, extrapolation etc.) [here](https://github.com/GCArullo/bayRing/blob/bfff5de8e156497c6fba548cf83d951166cb1612/bayRing/NR_waveforms.py#L736).
+8. Add an example configuration file [here](https://github.com/GCArullo/bayRing/blob/bfff5de8e156497c6fba548cf83d951166cb1612/config_files/config_RWZ_001_DS_2_quick.ini).
+
+An example of a new catalog implementation can be found in [this](https://github.com/GCArullo/bayRing/pull/8) merge request.
