@@ -184,5 +184,5 @@ def main():
             print('\nExecution time (min): {:.2f}\n'.format(execution_time))
 
     postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'])
-
+    postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
     if(parameters['I/O']['show-plots']): plt.show()

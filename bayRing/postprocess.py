@@ -1,4 +1,4 @@
-import os, numpy as np, matplotlib.pyplot as plt, h5py, seaborn as sns
+import corner, os, numpy as np, matplotlib.pyplot as plt, h5py, seaborn as sns
 import bayRing.utils       as utils
 import bayRing.waveform_utils as waveform_utils
 
@@ -822,5 +822,47 @@ def plot_fancy_reconstruction(NR_sim, template, metadata, results, nest_model, o
     # plt.suptitle('SXS:BBH:{} (residuals)'.format(NR_sim.NR_ID), size=24)
     plt.tight_layout(rect=[0,0,1,0.95])
     plt.savefig(os.path.join(outdir, 'Plots/Comparisons/Fancy_Reconstruction.pdf'), bbox_inches='tight')
+
+    return
+
+def global_corner(x, names, output, truths=None):
+
+    """
+    
+    Create a corner plot of all parameters.
+    
+    Parameters
+    ----------
+
+    x       : dictionary    
+        Dictionary of parameters.
+    names   : list
+        List of parameter names.
+    output  : string
+        Output directory.
+
+    Returns
+    -------
+
+    Nothing, but saves a corner plot to the output directory.
+
+    """
+
+    samples = []
+    for xy in names: samples.append(np.array(x[xy]))
+    samples = np.transpose(samples)
+    mask    = [i for i in range(samples.shape[-1]) if not all(samples[:,i]==samples[0,i]) ]
+
+    fig = plt.figure(figsize=(10,10))
+    C   = corner.corner(samples[:,mask],
+                        quantiles     = [0.05, 0.5, 0.95],
+                        labels        = names,
+                        color         = 'darkred',
+                        show_titles   = True,
+                        title_kwargs  = {"fontsize": 12},
+                        use_math_text = True,
+                        truths = truths
+                        )
+    plt.savefig(os.path.join(output, 'Plots', 'Results', 'corner.png'), bbox_inches='tight')
 
     return
