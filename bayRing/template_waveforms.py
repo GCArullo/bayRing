@@ -95,15 +95,13 @@ class WaveformModel(cpnest.model.Model):
                                                         params['phi_{}'.format(i)]    ,
                                                         self.t_start                  ,
                                                         self.t_NR                     )
-        # if(self.tail):
-        #     print('Hello')
-        print(params['phi_tail']) 
-        exit()                                              
-        ringdown_model += wf.tail_factor(np.exp(params['ln_A_tail'])          ,
-                                                                params['phi_tail']    ,
-                                                                params['p_tail']      ,
-                                                                self.t_start          ,
-                                                                self.t_NR             )
+        
+        if(self.tail):                                          
+            ringdown_model += wf.tail_factor(np.exp(params['ln_A_tail'])          ,
+                                                                    params['phi_tail']    ,
+                                                                    params['p_tail']      ,
+                                                                    self.t_start          ,
+                                                                    self.t_NR             )
             
         return ringdown_model
 

@@ -325,19 +325,18 @@ def Dynamic_InferenceModel(base):
                     single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds)
                     self.names.append(fullname)
                     self.bounds.append(single_bounds)
-                # if(self.tail):
-                default_bounds_DS_tail = read_default_bounds('Damped-sinusoids-tail')
-            # for i,name in it.product(list(range(self.N_ds_modes+1)),default_bounds_DS_tail.keys()):
-            #     fullname      = '{}_{}'.format(name,i)
-            #     single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_DS_tail)
-            #     self.names.append(fullname)
-            #     self.bounds.append(single_bounds)
-                for name in default_bounds_DS_tail.keys():
-                    fullname      = '{}'.format(name)
-                    single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_DS_tail)
-                    self.names.append(fullname)
-                    self.bounds.append(single_bounds)
-                    print(fullname,single_bounds)
+                if(self.tail):
+                    default_bounds_DS_tail = read_default_bounds(self.wf_model.wf_model+'-tail')   
+                # for i,name in it.product(list(range(self.N_ds_modes+1)),default_bounds_DS_tail.keys()):
+                #     fullname      = '{}_{}'.format(name,i)
+                #     single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_DS_tail)
+                #     self.names.append(fullname)
+                #     self.bounds.append(single_bounds)
+                    for name in default_bounds_DS_tail.keys():
+                        fullname      = '{}'.format(name)
+                        single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_DS_tail)
+                        self.names.append(fullname)
+                        self.bounds.append(single_bounds)
                     
             elif(self.wf_model.wf_model=='Kerr-Damped-sinusoids'):
 

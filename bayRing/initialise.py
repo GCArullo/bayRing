@@ -133,7 +133,7 @@ def read_config(Config):
         'maxmcmc'          : 256,
         'nnest'            : 1,
         'nensemble'        : 1,
-
+        't-start'          : 20.0,
         't-end'            : 140.0,
         'dt-scd'           : 0.0,
         
@@ -144,7 +144,6 @@ def read_config(Config):
         }
 
     }
-    #'t-start'          : 20.0,
     #General input read.
     for parameters_section in parameters.keys():
 
