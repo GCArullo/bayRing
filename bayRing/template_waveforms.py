@@ -87,15 +87,23 @@ class WaveformModel(cpnest.model.Model):
     def Damped_sinusoids_waveform(self, params):
 
         ringdown_model = np.zeros(len(self.t_NR), dtype=np.complex128)
-        
         # In this case modes is an integer storing the number of free damped sinusoids
         for i in range(self.N_ds_modes):
-            ringdown_model += wf.damped_sinusoid(np.exp(params[  'ln_A_{}'.format(i)]),
-                                                        params[  'f_{}'.format(i)]    ,
+            ringdown_model += wf.damped_sinusoid(np.exp(params['ln_A_{}'.format(i)])  ,
+                                                        params['f_{}'.format(i)]      ,
                                                         params['tau_{}'.format(i)]    ,
                                                         params['phi_{}'.format(i)]    ,
                                                         self.t_start                  ,
                                                         self.t_NR                     )
+        # if(self.tail):
+        #     print('Hello')
+        print(params['phi_tail']) 
+        exit()                                              
+        ringdown_model += wf.tail_factor(np.exp(params['ln_A_tail'])          ,
+                                                                params['phi_tail']    ,
+                                                                params['p_tail']      ,
+                                                                self.t_start          ,
+                                                                self.t_NR             )
             
         return ringdown_model
 

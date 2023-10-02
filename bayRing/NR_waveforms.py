@@ -414,10 +414,10 @@ class NR_simulation():
                  extrap_order                                   , 
                  perturbation_order                             , 
                  NR_dir                                         , 
-                 injection_modes_list                             , 
-                 injection_times                                  , 
-                 injection_noise                                      , 
-                 injection_tail                                       , 
+                 injection_modes_list                           , 
+                 injection_times                                , 
+                 injection_noise                                , 
+                 injection_tail                                 , 
                  l                                              , 
                  m                                              , 
                  outdir                                         , 
@@ -647,9 +647,9 @@ class NR_simulation():
             self.ecc, self.Mf, self.af = 0.0, 1.0, 0.0
 
             # Build NR waveform and time axis
-            self.t_NR, self.NR_r, self.NR_i = self.read_hlm_from_RWZ()
-            t_res,     NR_r_res,  NR_i_res  = None, None, None
-            t_extr,    NR_r_extr, NR_i_extr = None, None, None
+            self.t_NR, self.NR_r, self.NR_i = self.read_hlm_from_RWZ(self.res_level,self.extrap_order)
+            t_res,     NR_r_res,  NR_i_res  = self.read_hlm_from_RWZ(self.res_level-1,self.extrap_order)
+            t_extr,    NR_r_extr, NR_i_extr = self.read_hlm_from_RWZ(self.res_level,self.extrap_order+1)
 
         # Auxiliary quantities for the reference NR simulation.
         self.NR_cpx                         = self.NR_r + 1j * self.NR_i
@@ -737,7 +737,6 @@ class NR_simulation():
 
             # Waveforms at different resolution levels are already aligned.
             if(NR_error=='resolution'):
-                raise ValueError("Resolution error not yet available for RWZ simulations.")
                 if np.shape(self.NR_r) != np.shape(NR_r_res):
                     if np.shape(NR_r_res) < np.shape(self.NR_r):
                         NR_r_res = np.append(NR_r_res, np.zeros(len(self.NR_r) - len(NR_r_res))) 
@@ -747,6 +746,18 @@ class NR_simulation():
                         NR_i_res = NR_i_res[:len(self.NR_r)]
                 NR_r_err_res, NR_i_err_res = np.abs(self.NR_r-NR_r_res), np.abs(self.NR_i-NR_i_res)
                 self.NR_err_cmplx          = NR_r_err_res + 1j * NR_i_err_res
+
+            elif(NR_error=='align-at-peak'):
+                # Resolution error.
+                NR_r_res    , NR_i_res       = waveform_utils.align_waveforms_at_peak(self.t_NR, self.NR_amp, self.NR_phi, t_res, NR_r_res, NR_i_res)
+                NR_r_err_res, NR_i_err_res   = np.abs(self.NR_r-NR_r_res), np.abs(self.NR_i-NR_i_res)
+                    
+                # Extrapolation error.    
+                NR_r_extr    , NR_i_extr     = waveform_utils.align_waveforms_at_peak(self.t_NR, self.NR_amp, self.NR_phi, t_extr, NR_r_extr, NR_i_extr)
+                NR_r_err_extr, NR_i_err_extr = np.abs(self.NR_r-NR_r_extr), np.abs(self.NR_i-NR_i_extr)
+                # Global error
+                self.NR_err_cmplx = np.sqrt(NR_r_err_extr**2 + NR_r_err_res**2) + 1j * np.sqrt(NR_i_err_extr**2 + NR_i_err_res**2)
+
             elif('constant' in NR_error):
                 error_value                = float(NR_error.split('-')[-1])
                 self.NR_err_cmplx          = self.generate_constant_error(error_value)
@@ -1414,7 +1425,7 @@ class NR_simulation():
 
         return a_halo, M_halo, C
 
-    def read_hlm_from_RWZ(self):
+    def read_hlm_from_RWZ(self,res_level,extrap_order):
 
         """
 
@@ -1433,8 +1444,8 @@ class NR_simulation():
             Imaginary part of the (l,m) mode.
 
         """
-    
-        sim_path  = os.path.join(self.NR_dir, '{}'.format(self.NR_ID), f'HplusHcrossLM{self.l}{self.m}.dat')
+
+        sim_path  = os.path.join(self.NR_dir, '{}'.format(self.NR_ID), f'HplusHcrossLM{self.l}{self.m}RL{res_level}EP{extrap_order}.dat')
         sim_file  = np.genfromtxt(sim_path, names=True)
         
         time             = sim_file['t']

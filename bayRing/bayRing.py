@@ -85,12 +85,12 @@ def main():
                                              parameters['I/O']['outdir']                          , 
                                              download       = parameters['NR-data']['download']   , 
                                              NR_error       = parameters['NR-data']['error']      , 
-                                             tM_start       = parameters['Inference']['t-start']  , 
                                              tM_end         = parameters['Inference']['t-end']    , 
                                              t_delay_scd    = parameters['Inference']['dt-scd']   , 
                                              t_min_mismatch = parameters['NR-data']['error-t-min'], 
                                              t_max_mismatch = parameters['NR-data']['error-t-max'])
-
+    
+#tM_start       = parameters['Inference']['t-start']   ,
     error       = NR_sim.NR_cpx_err_cut
     NR_metadata = NR_waveforms.read_NR_metadata(NR_sim, parameters['NR-data']['catalog'])
 
@@ -114,7 +114,7 @@ def main():
                                                 qnm_cached                                            , 
                                                 parameters['NR-data']['l-NR']                         , 
                                                 parameters['NR-data']['m']                            , 
-                                                tail              = parameters['Model']['Kerr-tail']  ,
+                                                tail              = parameters['Model']['Kerr-tail']    ,
                                                 tail_modes        = Kerr_tail_modes                   ,     
                                                 quadratic_modes   = Kerr_quad_modes                   , 
                                                 const_params      = parameters['NR-data']['add-const'], 
@@ -184,5 +184,7 @@ def main():
             print('\nExecution time (min): {:.2f}\n'.format(execution_time))
 
     postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'])
-
+    print("Hello")
+    postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
+    print("Hello2")
     if(parameters['I/O']['show-plots']): plt.show()
