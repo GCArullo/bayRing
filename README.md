@@ -5,7 +5,7 @@ bayRing
 
 # Description
 
-Inference package targeting ringdown modeling of numerical relativity waveforms, using Bayesian sampling algorithm for parameters extraction.  
+Inference package targeting ringdown modeling of numerical relativity waveforms, using a Bayesian method based on stochastic sampling for parameters extraction.  
 
 Relies on [pyRing](https://git.ligo.org/lscsoft/pyring) for waveform interfacing, on [qnm](https://github.com/duetosymmetry/qnm/) for QNM frequencies computations and on [cpnest](https://github.com/johnveitch/cpnest/tree/master)/[raynest](https://github.com/wdpozzo/raynest) for sampling.
 
