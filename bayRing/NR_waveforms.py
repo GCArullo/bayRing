@@ -866,21 +866,21 @@ class NR_simulation():
         if(self.res_level==-1):
             for res_level_x in [6,5,4,3,2,1]:
                 try: 
-                    t_NR, NR_r, NR_i = self.read_hml_from_SXS(self.extrap_order, res_level_x)
+                    t_NR, NR_r, NR_i = self.read_hlm_from_SXS(self.extrap_order, res_level_x)
                     self.res_level = res_level_x
                     break
                 except(ValueError):
                     pass
         else:
-            t_NR, NR_r, NR_i = self.read_hml_from_SXS(self.extrap_order, self.res_level)
+            t_NR, NR_r, NR_i = self.read_hlm_from_SXS(self.extrap_order, self.res_level)
 
         NR_amp, NR_phi               = waveform_utils.amp_phase_from_re_im(NR_r, NR_i)
 
         # Build NR error array.
 
         if(self.fake_error_NR=='from-SXS-NR'):
-            t_res,  NR_r_res,  NR_i_res  = self.read_hml_from_SXS(self.extrap_order,   self.res_level-1)
-            t_extr, NR_r_extr, NR_i_extr = self.read_hml_from_SXS(self.extrap_order+1, self.res_level)
+            t_res,  NR_r_res,  NR_i_res  = self.read_hlm_from_SXS(self.extrap_order,   self.res_level-1)
+            t_extr, NR_r_extr, NR_i_extr = self.read_hlm_from_SXS(self.extrap_order+1, self.res_level)
 
             NR_r_res    , NR_i_res       = waveform_utils.align_waveforms_with_mismatch(t_NR, NR_amp, NR_phi,  t_res,  NR_r_res,  NR_i_res, t_min_mismatch, t_max_mismatch)
             NR_r_err_res, NR_i_err_res   = np.abs(NR_r-NR_r_res), np.abs(NR_i-NR_i_res)
