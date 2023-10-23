@@ -22,7 +22,7 @@ def read_results_object_from_previous_inference(parameters):
             try   :   results_object = np.genfromtxt(os.path.join( parameters['I/O']['outdir'],'Algorithm/posterior.dat'), names=True, deletechars="", delimiter = ",")
             except:   results_object = np.genfromtxt(os.path.join( parameters['I/O']['outdir'],'Algorithm/posterior.dat'), names=True, deletechars="")
         elif(parameters['Inference']['sampler'] == 'raynest'):
-            filename        = os.path.join( parameters['I/O']['outdir'],'Algorithm/cpnest.h5')
+            filename        = os.path.join( parameters['I/O']['outdir'],'Algorithm/raynest.h5')
             h5_file         = h5py.File(filename,'r')
             results_object  = h5_file['combined'].get('posterior_samples')
 
@@ -443,7 +443,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     fontsize_legend = 20
     fontsize_labels = 25
 
-    if(NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT'): tM_end = 80
+    if(template.tail==0 and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): tM_end = 80
 
     ########################
     # Waveforms comparison #
@@ -601,6 +601,43 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     plt.subplots_adjust(hspace=0, wspace=0.3)
 
     plt.savefig(os.path.join(outdir, 'Plots/Comparisons/Residuals_reconstruction.pdf'), bbox_inches='tight')
+
+    # Decay rate
+    if(template.wf_model=='Kerr' and template.tail==1):
+
+        plt.figure(figsize=(6,6))
+
+        log_t_NR         = np.log(t_NR - t_peak)
+        log_t_cut        = np.log(t_cut - t_peak)
+
+        log_A_NR         = np.log(NR_amp)
+        dlog_A_NR_dlog_t = diff1(log_t_NR, log_A_NR)
+
+        models_re_list = [np.real(np.array(nest_model.model(p))) for p in results]
+        models_im_list = [np.imag(np.array(nest_model.model(p))) for p in results]
+        
+        for perc in [50, 5, 95]:
+            wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
+            wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
+
+            wf_amp, _ = waveform_utils.amp_phase_from_re_im(wf_r, wf_i)
+
+            log_A_wf         = np.log(wf_amp)
+            dlog_A_wf_dlog_t = diff1(log_t_cut, log_A_wf)
+
+            plt.plot(t_cut - t_peak, dlog_A_wf_dlog_t, c=color_model, lw=lw_std, alpha=alpha_med, ls='-')
+
+        plt.axhline(0.0, c='k', ls='--', lw=0.7)
+        plt.axhline(-1.0, c='mediumseagreen', ls='--',  label='Okuzumi+',  lw=1.2)
+        plt.axhline(-1.3, c='crimson',        ls='--', label='Albanesi+', lw=1.7)
+        plt.plot(    t_NR  - t_peak, dlog_A_NR_dlog_t, c=color_NR,    lw=lw_std, alpha=alpha_med, ls='-')
+        plt.xlim([75, 100])
+        plt.ylim([-3.4, 1.5])
+        plt.xlabel(r'$t - t_{peak} \, [\mathrm{M}]$',                   fontsize=fontsize_labels)
+        plt.ylabel(r'$\mathrm{p}$', fontsize=fontsize_labels)
+        plt.legend(loc='best', fontsize=fontsize_labels*0.8)
+        plt.tight_layout()
+        plt.savefig(os.path.join(outdir, 'Plots/Comparisons/Decay_rate.pdf'), bbox_inches='tight')
 
     return
 
