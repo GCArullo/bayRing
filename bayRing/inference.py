@@ -82,7 +82,7 @@ def read_default_bounds(wf_model):
     
     default_bounds_Kerr_tail = {'ln_A_tail': [-20.0, 5.0]       ,
                                 'phi_tail' : [0.0, twopi]       ,
-                                'p_tail'   : [-10.0,  10.0]     }
+                                'p_tail'   : [-20.0, 20.0]      }
 
     if(  wf_model=='Damped-sinusoids'): default_bounds = default_bounds_DS
     elif(wf_model=='Kerr'            ): default_bounds = default_bounds_Kerr
@@ -524,6 +524,11 @@ def Dynamic_InferenceModel(base):
                         if (x['f_{}'.format(i)] < x['f_{}'.format(i-1)]): return -np.inf
                     except(KeyError):
                         pass
+            # In the case of Kerr tails, order the tails by exponent
+            if(self.wf_model.wf_model=='Kerr' and self.wf_model.tail==1):
+                for (l_ring, m_ring) in self.tail_modes:
+                    # FIXME: temporarily valid only for two modes. Eventually do it for an arbitrary number of modes.
+                    if (x['p_tail_{}{}'.format(l_ring, m_ring)] < x['p_tail_{}{}'.format(self.wf_model.l_NR, self.wf_model.m_NR)]): return -np.inf
 
             return 0.0
     

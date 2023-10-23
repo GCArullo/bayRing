@@ -214,16 +214,18 @@ def find_peak_time(t, A, ecc):
     """
 
     # Find the peak time.
-    if(ecc> 1e-3):
+    if((ecc> 1e-3) and (ecc < 0.89)):
         try:
             peak_height_threshold = np.max(A) * 0.5
             peaks, _              = find_peaks(A, height=peak_height_threshold)
             merger_idx            = peaks[-1] # the merger is the last peak of A
             t_peak                = t[merger_idx]
+            print('* Using the last relative maximum of the amplitude to define the peak of the waveform.')
         except:
-            print('No peaks found, using the maximum of the amplitude to locate the peak.')
+            print('* No peaks found, using the maximum of the amplitude to define the peak of the waveform.')
             t_peak                = t[np.argmax(A)]
     else:
+        print('* Using the maximum of the amplitude to define the peak of the waveform.')
         t_peak                    = t[np.argmax(A)]
 
     return t_peak

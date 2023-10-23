@@ -140,29 +140,37 @@ def convert_resolution_level_Teukolsky(res_level):
 # Function taken from EOB_hyp repository. Credits to Rossella Gamba and Sebastiano Bernuzzi.
 
 class Waveform_rit(object):
+
     def __init__(self, sims='', path='', ID='', ell=2, m=2):
-        self.path   = path
-        self.ID     = ID 
-        self.smpath = sims
-        self.ell    = ell
-        self.m      = m
+
+        self.path     = path
+        self.ID       = ID 
+        self.smpath   = sims
+        self.ell      = ell
+        self.m        = m
         self.metadata = {}
 
     def load_metadata(self):
+
         ID_str = str(self.ID)
-        nm = self.smpath + '/RIT_eBBH_'+ID_str+'-n100-ecc_Metadata.txt'
+        nm     = self.smpath + '/RIT_eBBH_'+ID_str+'-n100-ecc_Metadata.txt'
+
         with open(nm, 'r') as f:
+
             lines = [l for l in f.readlines() if l.strip()] # rm empty
+
             for line in lines[1:]:
                 if line[0]=="#": continue
-                line = line.rstrip("\n")
+                line               = line.rstrip("\n")
                 #line = line.split("#", 1)[0]
-                key, val = line.split("= ")
-                key = key.strip()
+                key, val           = line.split("= ")
+                key                = key.strip()
                 self.metadata[key] = val
+
         return self.metadata 
 
     def load_hlm(self):
+
         ID_str = str(self.ID)
         nm = self.path + '/ExtrapStrain_RIT-eBBH-'+ID_str+'-n100.h5'
         f = h5py.File(nm, "r")
@@ -180,16 +188,34 @@ class Waveform_rit(object):
 
         return self.u, self.re, self.im, self.A, self.p
         
+    def load_psilm(self):
+
+        ID_str  = str(self.ID)
+        nm      = self.path + f'/Psi_data/ExtrapPsi4_RIT-eBBH-{ID_str}-n100-ecc/rPsi4_l{self.ell}_m{self.m}_rInf.asc'
+        f       = np.loadtxt(nm)
+
+        self.u  = f['1:time']
+        self.p  = f['4:ampl']
+        self.A  = f['5:phse']
+        self.re = f['2:real']
+        self.im = f['3:imag']
+
+        return self.u, self.re, self.im, self.A, self.p
+
     def interp_qnt(self, x, y, x_new):
-        f = interpolate.interp1d(x, y)
-        yn= f(x_new)
+
+        f  = interpolate.interp1d(x, y)
+        yn = f(x_new)
+
         return yn
 
     def interpolate_hlm(self, u_new):
+
         re_i = self.interp_qnt(self.u, self.re, u_new)
         im_i = self.interp_qnt(self.u, self.im, u_new)
         A_i  = self.interp_qnt(self.u, self.A,  u_new)
         p_i  = self.interp_qnt(self.u, self.p,  u_new)
+
         return re_i, im_i, A_i, p_i
 
 class Waveform_C2EFT(object):
