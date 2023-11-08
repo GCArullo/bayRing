@@ -226,10 +226,10 @@ A dot is present at the end of each description line and is not to be intended a
     * Parameters to be passed to the [NR-data] section. *
     *****************************************************
 
-        NR-download      Boolean to ask for the download of the requested SXS NR simulation.                                 Default 1.
+        download         Boolean to ask for the download of the requested SXS NR simulation.                                 Default 1.
         dir              Absolute path of NR local data.                                                                     Default: ''.
         catalog          NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'fake_NR']. Default: 'SXS'.
-        NR-ID            Simulation ID to be considered. Example for SXS: 0305. Example for Teukolsky: \
+        ID               Simulation ID to be considered. Example for SXS: 0305. Example for Teukolsky: \
                          `a_0.7_A_0.141_w_1.4_ingoing_ang_15`.                                                               Default: '0305'.
         extrap-order     Extrapolation order of the `SXS` simulations. Smaller N is better for ringdown \
               (data.black-holes.org/waveforms/index.html). Available options: ['2', '3', '4'].                               Default: 2.
