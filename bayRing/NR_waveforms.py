@@ -1160,8 +1160,8 @@ class NR_simulation():
         ecc              = metadata['reference-eccentricity']
 
         if isinstance(ecc, str):    
-            ecc = 1e-4
-            
+            ecc = float(ecc[1:])
+
         return q, chi1, chi2, tilt1, tilt2, ecc, Mf, chif
 
     # FIXME: The two functions below have been written in a rush and should be adapted to the overall code style.
