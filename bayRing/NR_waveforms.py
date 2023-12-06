@@ -1159,6 +1159,9 @@ class NR_simulation():
         chi1, chi2, chif = metadata['reference_dimensionless_spin1'][2], metadata['reference_dimensionless_spin2'][2], metadata['remnant_dimensionless_spin'][2]
         ecc              = metadata['reference-eccentricity']
 
+        if isinstance(ecc, str):    
+            ecc = float(ecc[1:])
+
         return q, chi1, chi2, tilt1, tilt2, ecc, Mf, chif
 
     # FIXME: The two functions below have been written in a rush and should be adapted to the overall code style.
