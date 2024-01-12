@@ -185,8 +185,8 @@ def read_Kerr_modes(modes_input, QQNM_modes, charge, l_NR, m, NR_metadata):
     linear_modes = read_linear_modes(modes_input, l_NR, m)
 
     # Quadratic modes
-    if(QQNM_modes is not None): quad_modes = read_quad_modes(QQNM_modes, l_NR, m)
-    else                      : quad_modes = None
+    if not(QQNM_modes==''): quad_modes = read_quad_modes(QQNM_modes, l_NR, m)
+    else                  : quad_modes = None
 
     modes_full = construct_full_modes(linear_modes, quad_modes)
 

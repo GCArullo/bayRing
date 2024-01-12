@@ -118,7 +118,7 @@ def read_config(Config):
         'template'         : 'Kerr',
         'N-DS-modes'       : 1,
         'QNM-modes'        : '220,221,320',
-        'QQNM-modes'       : None,
+        'QQNM-modes'       : '',
         'Kerr-tail'        : 0,
         'Kerr-tail-modes'  : '22' 
         },
@@ -278,7 +278,7 @@ A dot is present at the end of each description line and is not to be intended a
         QQNM-modes       List of quadratic modes of the ringdown model if 'Kerr' in template. Otherwise, ignored. \
                          Example format: '--QQNM-modes ``Px220x321,Px220x221', i.e. (child_term x parent1 x parent2), \
                          where the child mode is assumed to be equal to the selected (l_NR,m) multipole and child_term=P,M \
-                            (parent frequencies sum or difference).                                                          Default: None.
+                            (parent frequencies sum or difference).                                                          Default: ''.
         Kerr-tail        Boolean to add a tail factor to the Kerr template.                                                  Default: 0.
         Kerr-tail-modes  Modes to which a tail will be added in the fitting template. Example format: '22,32'.               Default: '22'.
 
