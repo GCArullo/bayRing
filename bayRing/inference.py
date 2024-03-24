@@ -68,9 +68,9 @@ def store_evidence_to_file(parameters, Evidence):
     outFile_evidence.write('{}'.format(Evidence))
     outFile_evidence.close()
 
-    return 
+    return
 
-def read_default_bounds(wf_model):
+def read_default_bounds(wf_model, TEOB_template=''):
 
     default_bounds_DS        = {'ln_A': [-20.0, 5.0]            ,
                                 'phi' : [0.0, twopi]            ,
@@ -82,17 +82,28 @@ def read_default_bounds(wf_model):
     
     default_bounds_Kerr_tail = {'ln_A_tail': [-20.0, 5.0]       ,
                                 'phi_tail' : [0.0, twopi]       ,
-                                'p_tail'   : [-20.0, 20.0]      }
+                                'p_tail'   : [-20.0,  20.0]     }
+    
+    default_bounds_TEOBPM    = {'phi_mrg': [0.0  , twopi]       ,
+                                'c3A'    : [-10.0, 10.0 ]       ,
+                                'c3p'    : [-10.0, 10.0 ]       ,
+                                'c4p'    : [-10.0, 10.0 ]       ,
+                                }
+    if not(TEOB_template=='qc'):
+        default_bounds_TEOBPM['c2A']          = [-10.0, 10.0]
+        default_bounds_TEOBPM['c2p']          = [-10.0, 10.0]
+        default_bounds_TEOBPM['A_peakdotdot'] = [-0.01, 0.0]
+
 
     if(  wf_model=='Damped-sinusoids'): default_bounds = default_bounds_DS
     elif(wf_model=='Kerr'            ): default_bounds = default_bounds_Kerr
     elif(wf_model=='Kerr-tail'       ): default_bounds = default_bounds_Kerr_tail
-    elif(wf_model=='MMRDNP'          ): default_bounds = {'dummy_x': [0.0, 0.001]}
-    elif(wf_model=='TEOBPM'          ): default_bounds = {'dummy_x': [0.0, 0.001]}
+    elif(wf_model=='MMRDNP'          ): default_bounds = {'phi': [0.0, twopi], 'dist': [0,10]} #{'dummy_x': np.array([0.0])}
+    elif(wf_model=='TEOBPM'          ): default_bounds = default_bounds_TEOBPM
 
     return default_bounds
 
-def railing_check(results_object, inference_model, outdir, nlive, tolerance=2.0):
+def railing_check(results_object, inference_model, outdir, nlive, seed, tolerance=2.0):
 
     """
     
@@ -145,11 +156,11 @@ def railing_check(results_object, inference_model, outdir, nlive, tolerance=2.0)
         
         if np.sum(railing_parameters) > 0:
             print('\n* Identifying chain with railing...')
-            chains = [os.path.join(outdir, f'Algorithm/chain_{nlive}_{seed}.txt') for seed in [0,1,2,3]]
+            try   : chains = [np.genfromtxt(os.path.join(outdir, f'Algorithm/chain_{nlive}_{seed_x}.txt'), names = True, deletechars="") for seed_x in [0,1,2,3]]
+            except: chains = [np.genfromtxt(os.path.join(outdir, f'Algorithm/chain_{nlive}_{seed}.txt'), names = True, deletechars="")]
             for chain_number,chain in enumerate(chains):
-                samples = np.genfromtxt(chain, names = True, deletechars="")
-                log_evs, log_wts    = compute_weights(samples['logL'], nlive)
-                weighted_post       = draw_posterior(samples, log_wts)
+                log_evs, log_wts    = compute_weights(chain['logL'], nlive)
+                weighted_post       = draw_posterior(chain, log_wts)
                 railing_parameters_chain = []
                 header_chain = ''
                 for (i,param) in enumerate(inference_model.names):
@@ -259,14 +270,16 @@ def Dynamic_InferenceModel(base):
 
         def __init__(self, data, error, wf_model, Config, method, min_method, likelihood_kind='gaussian'):
 
-            self.data       = data
-            self.error      = error
-            self.wf_model   = wf_model
-            self.kind       = likelihood_kind
-            self.Kerr_modes = self.wf_model.Kerr_modes
-            self.N_ds_modes = self.wf_model.N_ds_modes
-            self.min_method = min_method
-            self.Config     = Config
+            self.data          = data
+            self.error         = error
+            self.wf_model      = wf_model
+            self.kind          = likelihood_kind
+            self.Kerr_modes    = self.wf_model.Kerr_modes
+            self.N_ds_modes    = self.wf_model.N_ds_modes
+            self.TEOB_NR_fit   = self.wf_model.TEOB_NR_fit
+            self.TEOB_template = self.wf_model.TEOB_template
+            self.min_method    = min_method
+            self.Config        = Config
 
             self.names          = []
             self.bounds         = []
@@ -368,10 +381,21 @@ def Dynamic_InferenceModel(base):
                 self.names.append('dummy_x')
                 self.bounds.append([0.0, 0.001])  
 
+                default_bounds = read_default_bounds(self.wf_model.wf_model)   
+                for name in default_bounds.keys():
+                    single_bounds = read_parameter_bounds(Config, configparser, name, name, default_bounds)
+                    self.names.append(name)
+                    self.bounds.append(single_bounds)
+
             elif(self.wf_model.wf_model=='TEOBPM'):
 
-                self.names.append('dummy_x')
-                self.bounds.append([0.0, 0.001])  
+                default_bounds_TEOBPM = read_default_bounds(self.wf_model.wf_model, TEOB_template=self.TEOB_template)   
+                for name in default_bounds_TEOBPM.keys():
+                    if(not(self.TEOB_NR_fit) and not(name=='phi_mrg')): continue
+                    fullname = '{}_{}{}'.format(name, self.wf_model.l_NR, self.wf_model.m_NR)
+                    single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_TEOBPM)
+                    self.names.append(fullname)
+                    self.bounds.append(single_bounds)
 
             self.residuals_tt = []
             self.grid_x       = []
@@ -656,14 +680,15 @@ def run_inference(parameters, inference_model):
             print('* Using CPNest version: `{}`.\n'.format(cpnest.__version__))
             print('* The sampling output appears in the `{}/Algorithm/cpnest.log` file.\n'.format( parameters['I/O']['outdir']))
 
-            job = cpnest.CPNest(inference_model,
-                                verbose  = 3,
-                                nlive    = parameters['Inference']['nlive'],
-                                maxmcmc  = parameters['Inference']['maxmcmc'],
-                                poolsize = 128,
-                                nthreads = 1,
+            job = cpnest.CPNest(inference_model                                                  ,
+                                verbose  = 3                                                     ,
+                                nlive    = parameters['Inference']['nlive']                      ,
+                                maxmcmc  = parameters['Inference']['maxmcmc']                    ,
+                                seed     = parameters['Inference']['seed']                       , 
+                                poolsize = 128                                                   ,
+                                nthreads = 1                                                     ,
                                 output   = os.path.join( parameters['I/O']['outdir'],'Algorithm'),
-                                resume   = 1)
+                                resume   = 1                                                     )
             job.run()
 
             results_object = job.get_posterior_samples(filename='posterior.dat')
@@ -690,14 +715,15 @@ def run_inference(parameters, inference_model):
             print('* Using raynest version: `{}`.\n'.format(raynest.__version__))
             print('* The sampling output appears in the `{}/Algorithm/raynest.log` file.\n'.format( parameters['I/O']['outdir']))
 
-            job = raynest.raynest(inference_model,
-                                  verbose   = 2,
-                                  nlive     = parameters['Inference']['nlive'],
-                                  maxmcmc   = parameters['Inference']['maxmcmc'],
-                                  nnest     = parameters['Inference']['nnest'],
-                                  nensemble = parameters['Inference']['nensemble'],
+            job = raynest.raynest(inference_model                                                   ,
+                                  verbose   = 2                                                     ,
+                                  nlive     = parameters['Inference']['nlive']                      ,
+                                  maxmcmc   = parameters['Inference']['maxmcmc']                    ,
+                                  seed      = parameters['Inference']['seed']                       , 
+                                  nnest     = parameters['Inference']['nnest']                      ,
+                                  nensemble = parameters['Inference']['nensemble']                  ,
                                   output    = os.path.join( parameters['I/O']['outdir'],'Algorithm'),
-                                  resume    = 1)   
+                                  resume    = 1                                                     )   
             job.run()
             results_object  = job.posterior_samples.ravel()
             posterior       = pd.DataFrame(results_object, columns = inference_model.names + ['logL', 'logPrior'])
@@ -710,7 +736,7 @@ def run_inference(parameters, inference_model):
         # Posterior railing check section. #
         #==================================#
 
-        railing_check(results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['nlive'], tolerance=2.0)
+        railing_check(results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['nlive'], parameters['Inference']['seed'], tolerance=2.0)
 
     else: raise ValueError('Method {} not recognised.'.format(parameters['Inference']['method']))
 

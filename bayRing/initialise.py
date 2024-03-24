@@ -103,6 +103,7 @@ def read_config(Config):
         'error-t-min'      : 2692.7480095302817, # SXS-0305 specific
         'error-t-max'      : 3792.7480095302817, # SXS-0305 specific
         'add-const'        : '0.0,0.0',
+        'properties-file'  : '',
         },
 
         'Injection-data':
@@ -115,12 +116,14 @@ def read_config(Config):
 
         'Model':
         {
-        'template'         : 'Kerr',
-        'N-DS-modes'       : 1,
+        'template'         : 'Kerr'       ,
+        'N-DS-modes'       : 1            ,
         'QNM-modes'        : '220,221,320',
-        'QQNM-modes'       : '',
-        'Kerr-tail'        : 0,
-        'Kerr-tail-modes'  : '22' 
+        'QQNM-modes'       : ''           ,
+        'Kerr-tail'        : 0            ,
+        'Kerr-tail-modes'  : '22'         ,
+        'TEOB-NR-fit'      : 0            ,
+        'TEOB-template'    : 'qc'         ,
         },
 
         'Inference':
@@ -130,6 +133,7 @@ def read_config(Config):
         'sampler'          : 'cpnest',
         'nlive'            : 256,
         'maxmcmc'          : 256,
+        'seed'             : 1234,
         'nnest'            : 1,
         'nensemble'        : 1,
 
@@ -202,6 +206,8 @@ def read_config(Config):
         parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,321,310,311,440,441,430,431,420,421,410,411,550,551'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4  or parameters['NR-data']['l-NR']==5): raise ValueError("The TEOBPM template is only available for l=2,3,4,5")
 
+    print('\n\n\nFIXME: print updated vars\n\n\n')
+
     return parameters
 
 #Description of the package. Printed on stdout if --help option is given.
@@ -250,8 +256,10 @@ A dot is present at the end of each description line and is not to be intended a
                          deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-res-only'.
         error-t-min      Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option.     Default: 2692.7480095302817, SXS-0305 specific.
         error-t-max      Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option.     Default: 3792.7480095302817, SXS-0305 specific.
-        add-constant     Parameter of the complex constant to be added to the fit template. Required to account for spurious \
+        add-const        Parameter of the complex constant to be added to the fit template. Required to account for spurious \
                          effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.
+        properties-file  Path to the file containing additional properties of the NR simulation in `.csv` format. \
+                         Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
 
     ************************************************************
     * Parameters to be passed to the [Injection-data] section. *
@@ -281,6 +289,9 @@ A dot is present at the end of each description line and is not to be intended a
                             (parent frequencies sum or difference).                                                          Default: ''.
         Kerr-tail        Boolean to add a tail factor to the Kerr template.                                                  Default: 0.
         Kerr-tail-modes  Modes to which a tail will be added in the fitting template. Example format: '22,32'.               Default: '22'.
+        TEOB-NR-fit      Boolean to fit also for NR calibration coefficients within TEOB model, otherwise, use default fits. Default: 0.
+        TEOB-template    TEOB template to be used. Available options: ['qc', 'nc']. The 'qc' version is defined in  \
+                         arXiv:1904.09550, arXiv:2001.09082, while the 'nc' in II.C of arXiv:2305.19336                      Default: 'qc'.
 
     *******************************************************
     * Parameters to be passed to the [Inference] section. *
@@ -305,6 +316,7 @@ A dot is present at the end of each description line and is not to be intended a
         sampler          Which sampler to use. Available options: ['cpnest', 'raynest'].                                     Default: 'cpnest'.
         nlive            Number of live points to be used for the sampling.                                                  Default: 256.
         maxmcmc          Number of maximum Markov Chain Monte Carlo steps to be used during the sampling.                    Default: 256.
+        seed             Seed for the random initialisation of the sampler.                                                  Default: 1234.
         nnest            Number of nested samplers to run in parallel ('massively-parallel' branch only).                    Default: 1.
         nensemble        Total number of ensemble processes running. nensemble = nnest * N_ev, where N_ev is the number \
                          of live points being substituted at each NS step. Requires N_ev << nlive. \
