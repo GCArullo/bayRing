@@ -1,5 +1,6 @@
 import corner, os, numpy as np, matplotlib.pyplot as plt, h5py, seaborn as sns
-import bayRing.utils       as utils
+
+import bayRing.utils          as utils
 import bayRing.waveform_utils as waveform_utils
 
 twopi = 2.*np.pi
@@ -412,6 +413,8 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
 
     l,m = NR_sim.l, NR_sim.m
 
+    tail_flag = template.wf_model=='Kerr' and template.tail==1
+
     if(NR_sim.NR_catalog=='cbhdb' or NR_sim.NR_catalog=='charged_raw'):
         f_rd_fundamental = template.qnm_cached[(2,l,m,0)]['f']
     else:
@@ -432,7 +435,6 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     color_model     = '#cc0033'
     color_t_start   = 'mediumseagreen' #'#990066', '#cc0033', '#ff0000'
     color_t_peak    = 'royalblue'
-    color_f_ring    = 'crimson' #'forestgreen'
 
     alpha_std       = 1.0
     alpha_med       = 0.8
@@ -440,60 +442,87 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     ls_t            = '--'
     ls_f            = '--'
 
-    fontsize_legend = 20
-    fontsize_labels = 25
+    if(tail_flag) :
+        fontsize_legend = 20
+        fontsize_labels = 25
+        color_f_ring    = 'royalblue'
+    else:
+        fontsize_legend = 18
+        fontsize_labels = 23
+        color_f_ring    = 'forestgreen'
 
-    if(template.tail==0 and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): tM_end = 80
+
+    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): tM_end = 80
 
     ########################
     # Waveforms comparison #
     ########################
 
-    f   = plt.figure(figsize=(12,8))
-    ax1 = plt.subplot(2,2,1)
-    ax2 = plt.subplot(2,2,2)
-    ax3 = plt.subplot(2,2,3)
-    ax4 = plt.subplot(2,2,4)
+    if(tail_flag):
+        f   = plt.figure(figsize=(8,12))
+        ax2 = plt.subplot(2,1,1)
+        ax4 = plt.subplot(2,1,2)
+        
+        rescale = 1.4
+    else:
+        f   = plt.figure(figsize=(12,8))
+        ax1 = plt.subplot(2,2,1)
+        ax2 = plt.subplot(2,2,2)
+        ax3 = plt.subplot(2,2,3)
+        ax4 = plt.subplot(2,2,4)
+  
+        ax1.set_xlim([-10, tM_end])
+        ax3.set_xlim(ax1.get_xlim())
 
-    ax1.set_xlim([-10, tM_end])
-    ax2.set_xlim(ax1.get_xlim())
-    ax3.set_xlim(ax1.get_xlim())
-    ax4.set_xlim(ax1.get_xlim())
+        rescale = 1.0
+
+    ax2.set_xlim(-10, tM_end)
+    ax4.set_xlim(ax2.get_xlim())
 
     # Plot NR data
-    ax1.plot(t_NR - t_peak, NR_r,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
-    ax1.axvline(tM_start,                                                              c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
-    ax1.axvline(0.0,                          label=r'$t_{peak}$',                     c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
-    ax1.set_ylabel(r'$\mathrm{Re[\mathrm{h_{%s%s}}]}$'%(l,m), fontsize=fontsize_labels)
 
-    ax2.semilogy(t_NR - t_peak, NR_amp, label=r'$\mathrm{NR}$',                        c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
-    ax2.axvline(tM_start,                                                              c=color_t_start, lw=lw_medium, alpha=alpha_std, ls=ls_t)
-    ax2.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_medium, alpha=alpha_std, ls=ls_t)
-    ax2.set_ylabel(r'$\mathit{A}$'                 , fontsize=fontsize_labels)
-    if(NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT'): ax2.set_ylim([1e-3*np.max(NR_amp), 2*np.max(NR_amp)])
+    if not(tail_flag):
+        ax1.plot(t_NR - t_peak, NR_r,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
+        ax1.axvline(tM_start,                                                              c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
+        ax1.axvline(0.0,                          label=r'$\mathrm{t_{peak}}$',            c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
+        ax1.set_ylabel(r'$\mathrm{Re[h_{%s%s}]}$'%(l,m), fontsize=fontsize_labels)
 
-    ax3.plot(t_NR - t_peak, NR_i,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
-    ax3.axvline(tM_start, label=r'$t_{start} = t_{peak} \, + %d \mathrm{M}$'%tM_start, c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
-    ax3.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
-    ax3.set_ylabel(r'$\mathrm{Im[h_{%s%s}]}$'%(l,m), fontsize=fontsize_labels)
-    ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
+        ax3.plot(t_NR - t_peak, NR_i,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
+        ax3.axvline(tM_start, label=r'$\mathrm{t_{start} = t_{peak} \, + %d M}$'%tM_start, c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
+        ax3.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
+        ax3.set_ylabel(r'$\mathrm{Im[h_{%s%s}]}$'%(l,m), fontsize=fontsize_labels)
+        ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$'    , fontsize=fontsize_labels)
 
-    ax4.plot(t_NR - t_peak, NR_f,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
-    ax4.axhline(f_rd_fundamental,       label=r'$\mathit{f_{%d%d0}}$'%(l,m),           c=color_f_ring,  lw=lw_medium, alpha=alpha_std, ls=ls_f)
-    ax4.axvline(tM_start,                                                              c=color_t_start, lw=lw_medium, alpha=alpha_std, ls=ls_t)
-    ax4.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_medium, alpha=alpha_std, ls=ls_t)
-    ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
-    ax4.set_ylabel(r'$\mathit{f}$'                 , fontsize=fontsize_labels)
-    try   : ax4.set_ylim([0.0, 2.5*NR_f[np.argmax(NR_amp)+1]])
-    except: pass
-    
+    ax2.semilogy(t_NR - t_peak, NR_amp, label=r'$\mathrm{NR}$',                            c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
+    ax2.axvline(tM_start,                                                                  c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
+    if(not(tail_flag)): ax2.axvline(0.0,                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
+    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): ax2.set_ylim([1e-6*np.max(NR_amp), 2*np.max(NR_amp)])
+    elif(  tail_flag  and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): ax2.set_ylim([2*1e-4, 2*np.max(NR_amp)])
+    ax2.set_xlabel(r'$\mathrm{t - t_{peak} \, [M}]$', fontsize=fontsize_labels)
+
+    ax4.plot(t_NR - t_peak, NR_f,                                                          c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
+    ax4.axhline(f_rd_fundamental, label=r'$\mathit{f_{%d%d0}}$'%(l,m),                     c=color_f_ring,  lw=lw_std,    alpha=alpha_std, ls=ls_f)
+    if(tail_flag): 
+        ax4.axhline(0.0,      label=r'$\mathit{f_{\rm tail}}$',                            c=color_model,   lw=lw_std,    alpha=alpha_std, ls=ls_t)
+        ax4.axvline(tM_start, label=r'$\mathrm{t_{start} = t_{peak} \, + %d M}$'%tM_start, c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
+        ax4.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
+    else         : 
+        ax4.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
+    ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$'    , fontsize=fontsize_labels)
+
+    if not(tail_flag):
+        try   : ax4.set_ylim([-1.5*NR_f[np.argmax(NR_amp)+1], 3.5*NR_f[np.argmax(NR_amp)+1]])
+        except: pass
+    else:
+        ax4.set_ylim([-0.08, 0.28])
+
     if not(nest_model==None):
 
         # Plot waveform reconstruction
         if(method=='Nested-sampler'):
             models_re_list = [np.real(np.array(nest_model.model(p))) for p in results]
             models_im_list = [np.imag(np.array(nest_model.model(p))) for p in results]
-        
+
         for perc in [50, 5, 95]:
 
             if(method=='Nested-sampler'):
@@ -507,36 +536,80 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
             wf_f           = np.gradient(wf_phi, t_cut)/(twopi)
             
             if(perc==50):
-                ax1.plot(    t_cut - t_peak, wf_r,                                               c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
-                ax2.semilogy(t_cut - t_peak, wf_amp, label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
-                ax3.plot(    t_cut - t_peak, wf_i,                                               c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
-                ax4.plot(    t_cut - t_peak, wf_f,                                               c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
+                if not(tail_flag):
+                    ax1.plot(t_cut - t_peak, wf_r,                                               c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
+                    ax3.plot(t_cut - t_peak, wf_i,                                               c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
+                ax2.semilogy(t_cut - t_peak, wf_amp, label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
+                ax4.plot(    t_cut - t_peak, wf_f,                                               c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
             else:
-                ax1.plot(    t_cut - t_peak, wf_r,                                               c=color_model, lw=lw_std, alpha=alpha_med, ls='--' )
-                ax2.semilogy(t_cut - t_peak, wf_amp,                                             c=color_model, lw=lw_std, alpha=alpha_med, ls='--' )
-                ax3.plot(    t_cut - t_peak, wf_i,                                               c=color_model, lw=lw_std, alpha=alpha_med, ls='--' )
-                ax4.plot(    t_cut - t_peak, wf_f,                                               c=color_model, lw=lw_std, alpha=alpha_med, ls='--' )
+                if not(tail_flag):
+                    ax1.plot(t_cut - t_peak, wf_r,                                               c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
+                    ax3.plot(t_cut - t_peak, wf_i,                                               c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
+                ax2.semilogy(t_cut - t_peak, wf_amp,                                             c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
+                ax4.plot(    t_cut - t_peak, wf_f,                                               c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
 
-            if(method=='Minimization'): break
 
-    ax1.set_ylabel(r'$\mathrm{Re(h_{%s%s})}$'%(l,m), fontsize=fontsize_labels)
-    ax2.set_ylabel(r'$\mathrm{A}$'                 , fontsize=fontsize_labels)
-    ax3.set_ylabel(r'$\mathrm{Im(h_{%s%s})}$'%(l,m), fontsize=fontsize_labels)
-    ax4.set_ylabel(r'$\mathit{f}$'                 , fontsize=fontsize_labels)
+        if(tail_flag):
+            # for name_x in results.names:
+            #     if ('ln_A_tail' in name_x):
+            #         results[name_x] = np.log(1e-32)
+            try   : results['ln_A_tail_22'] = np.log(1e-32)
+            except: pass
+            try   : results['ln_A_tail_32'] = np.log(1e-32)
+            except: pass
 
-    ax1.legend(loc='best', fontsize=fontsize_legend)
-    ax2.legend(loc='best', fontsize=fontsize_legend)
-    ax3.legend(loc='best', fontsize=fontsize_legend)
-    ax4.legend(loc='best', fontsize=fontsize_legend)
+            # Plot QNM waveform reconstruction
+            if(method=='Nested-sampler'):
+                models_re_list = [np.real(np.array(nest_model.model(p))) for p in results]
+                models_im_list = [np.imag(np.array(nest_model.model(p))) for p in results]
+            
+            for perc in [50, 5, 95]:
 
-    ax1.get_shared_x_axes().join(ax1, ax3)
+                if(method=='Nested-sampler'):
+                    wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
+                    wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
+                else:
+                    wf_r = np.real(np.array(nest_model.model(results)))
+                    wf_i = np.imag(np.array(nest_model.model(results)))
+
+                wf_amp, wf_phi = waveform_utils.amp_phase_from_re_im(wf_r, wf_i)
+                wf_f           = np.gradient(wf_phi, t_cut)/(twopi)
+                
+                if(perc==50):
+                    ax2.semilogy(t_cut - t_peak, wf_amp, label=r'$\mathrm{%s \,\, QNMs}$'%(template.wf_model), c='royalblue', lw=lw_large*1.4, alpha=alpha_std, ls='-' )
+                    ax4.plot(    t_cut - t_peak, wf_f,                                                         c='royalblue', lw=lw_large*1.4, alpha=alpha_std, ls='-' )
+                else:
+                    ax2.semilogy(t_cut - t_peak, wf_amp,                                                       c='royalblue', lw=lw_std,       alpha=alpha_med, ls='--' )
+                    ax4.plot(    t_cut - t_peak, wf_f,                                                         c='royalblue', lw=lw_std,       alpha=alpha_med, ls='--' )
+
+
+                if(method=='Minimization'): break
+
+    if not(tail_flag):
+        ax1.set_ylabel(r'$\mathit{Re(h_{%s%s})}$'%(l,m), fontsize=fontsize_labels*rescale)
+        ax3.set_ylabel(r'$\mathit{Im(h_{%s%s})}$'%(l,m), fontsize=fontsize_labels*rescale)
+    ax2.set_ylabel(r'$\mathit{A(t)}$'                  , fontsize=fontsize_labels*rescale)
+    ax4.set_ylabel(r'$\mathit{f\,(t)}$'                , fontsize=fontsize_labels*rescale)
+
+    plt.rcParams['legend.frameon'] = True
+
+    ax2.legend(    loc='best', fontsize=fontsize_legend, shadow=True)
+    ax4.legend(    loc='best', fontsize=fontsize_legend, shadow=True)
+
+    if not(tail_flag): 
+        ax1.legend(loc='best', fontsize=fontsize_legend, shadow=True)
+        ax3.legend(loc='best', fontsize=fontsize_legend, shadow=True)
+        ax1.get_shared_x_axes().join(ax1, ax3)
+        ax1.set_xticklabels([])
+        plt.suptitle('{}-{}'.format(NR_sim.NR_catalog, NR_sim.NR_ID), size=28)
+
     ax2.get_shared_x_axes().join(ax2, ax4)
-    ax1.set_xticklabels([])
     ax2.set_xticklabels([])
-    plt.suptitle('{}-{}'.format(NR_sim.NR_catalog, NR_sim.NR_ID), size=28)
     plt.tight_layout(rect=[0,0,1,0.95])
     plt.subplots_adjust(hspace=0, wspace=0.22)
     plt.savefig(os.path.join(outdir, 'Plots/Comparisons/Waveform_reconstruction.pdf'), bbox_inches='tight')
+
+    if (tail_flag): plt.rcParams['legend.frameon'] = False
 
     if (nest_model==None): return
 
@@ -563,34 +636,33 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
         if(method=='Nested-sampler'):
             wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
             wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
-
         else:
             wf_r = np.real(np.array(nest_model.model(results)))
             wf_i = np.imag(np.array(nest_model.model(results)))
 
         if(perc==50):
-            ax1.plot(t_cut - t_peak, wf_r   - NR_r_cut,                                                    c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
+            ax1.plot(t_cut - t_peak, wf_r   - NR_r_cut  ,                                                  c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
             ax2.plot(t_cut - t_peak, wf_amp - NR_amp_cut,                                                  c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
-            ax3.plot(t_cut - t_peak, wf_i   - NR_i_cut,   label=r'$\mathrm{%s - NR}$'%(template.wf_model), c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
-            ax4.plot(t_cut - t_peak, wf_f   - NR_f_cut,                                                    c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
+            ax3.plot(t_cut - t_peak, wf_i   - NR_i_cut  , label=r'$\mathrm{%s - NR}$'%(template.wf_model), c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
+            ax4.plot(t_cut - t_peak, wf_f   - NR_f_cut  ,                                                  c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
         else:
-            ax1.plot(t_cut - t_peak, wf_r   - NR_r_cut,                                                    c=color_model, lw=lw_std, alpha=alpha_med, ls='--')
+            ax1.plot(t_cut - t_peak, wf_r   - NR_r_cut  ,                                                  c=color_model, lw=lw_std, alpha=alpha_med, ls='--')
             ax2.plot(t_cut - t_peak, wf_amp - NR_amp_cut,                                                  c=color_model, lw=lw_std, alpha=alpha_med, ls='--')
-            ax3.plot(t_cut - t_peak, wf_i   - NR_i_cut,                                                    c=color_model, lw=lw_std, alpha=alpha_med, ls='--')
-            ax4.plot(t_cut - t_peak, wf_f   - NR_f_cut,                                                    c=color_model, lw=lw_std, alpha=alpha_med, ls='--')
+            ax3.plot(t_cut - t_peak, wf_i   - NR_i_cut  ,                                                  c=color_model, lw=lw_std, alpha=alpha_med, ls='--')
+            ax4.plot(t_cut - t_peak, wf_f   - NR_f_cut  ,                                                  c=color_model, lw=lw_std, alpha=alpha_med, ls='--')
             
         if(method=='Minimization'): break
 
     ax1.legend(loc='best', fontsize=fontsize_legend)
     ax3.legend(loc='best', fontsize=fontsize_legend)
 
-    ax1.set_ylabel(r'$\mathrm{Re(h_{%s%s})}$'%(l,m),  fontsize=fontsize_labels)
-    ax2.set_ylabel(r'$\mathrm{A}$'                 ,  fontsize=fontsize_labels)
-    ax3.set_ylabel(r'$\mathrm{Im(h_{%s%s})}$'%(l,m),  fontsize=fontsize_labels)
-    ax4.set_ylabel(r'$\mathit{f}$'                 ,  fontsize=fontsize_labels)
+    ax1.set_ylabel(r'$\mathit{Re(h_{%s%s})}$'%(l,m)     , fontsize=fontsize_labels)
+    ax2.set_ylabel(r'$\mathit{A(t)}$'                   , fontsize=fontsize_labels)
+    ax3.set_ylabel(r'$\mathit{Im(h_{%s%s})}$'%(l,m)     , fontsize=fontsize_labels)
+    ax4.set_ylabel(r'$\mathit{f\,(t)}$'                 , fontsize=fontsize_labels)
 
-    ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
-    ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
+    ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$'    , fontsize=fontsize_labels)
+    ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$'    , fontsize=fontsize_labels)
 
     ax1.get_shared_x_axes().join(ax1, ax3)
     ax2.get_shared_x_axes().join(ax2, ax4)
@@ -603,15 +675,15 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     plt.savefig(os.path.join(outdir, 'Plots/Comparisons/Residuals_reconstruction.pdf'), bbox_inches='tight')
 
     # Decay rate
-    if(template.wf_model=='Kerr' and template.tail==1):
+    if(tail_flag):
 
         plt.figure(figsize=(6,6))
 
-        log_t_NR         = np.log(t_NR - t_peak)
+        log_t_NR         = np.log(t_NR  - t_peak)
         log_t_cut        = np.log(t_cut - t_peak)
 
         log_A_NR         = np.log(NR_amp)
-        dlog_A_NR_dlog_t = diff1(log_t_NR, log_A_NR)
+        dlog_A_NR_dlog_t = utils.diff1(log_t_NR, log_A_NR)
 
         models_re_list = [np.real(np.array(nest_model.model(p))) for p in results]
         models_im_list = [np.imag(np.array(nest_model.model(p))) for p in results]
@@ -623,7 +695,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
             wf_amp, _ = waveform_utils.amp_phase_from_re_im(wf_r, wf_i)
 
             log_A_wf         = np.log(wf_amp)
-            dlog_A_wf_dlog_t = diff1(log_t_cut, log_A_wf)
+            dlog_A_wf_dlog_t = utils.diff1(log_t_cut, log_A_wf)
 
             plt.plot(t_cut - t_peak, dlog_A_wf_dlog_t, c=color_model, lw=lw_std, alpha=alpha_med, ls='-')
 
