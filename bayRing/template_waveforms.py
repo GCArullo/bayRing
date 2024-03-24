@@ -120,12 +120,8 @@ class WaveformModel(cpnest.model.Model):
                                    MMRDNP_params['chis']               ,
                                    MMRDNP_params['chia']               ,
 
-                                #   1.0,
-                                #   0.0,
-                                #   0.0,
-
-                                   params['dist']                      , # distance, dummy with geom=1
-                                   0.0                                 , # inclination, dummy with geom=1
+                                   params['dist']                      , # distance     , dummy with geom=1
+                                   0.0                                 , # inclination  , dummy with geom=1
                                    params['phi']                       , # orbital phase, dummy with geom=1
 
                                    TGR_parameters                      ,
@@ -194,8 +190,8 @@ class WaveformModel(cpnest.model.Model):
                                    self.metadata['chi1']        ,
                                    self.metadata['chi2']        ,
                                    merger_phases                ,
-                                   1.0                          , # distance, dummy with geom=1
-                                   0.0                          , # inclination, dummy with geom=1
+                                   1.0                          , # distance     , dummy with geom=1
+                                   0.0                          , # inclination  , dummy with geom=1
                                    0.0                          , # orbital phase, dummy with geom=1
                                    modes                        ,
                                    TGR_parameters               ,
@@ -248,5 +244,5 @@ class WaveformModel(cpnest.model.Model):
 
         # UNDERSTAND WHY!!!!
         if not(self.wf_model=='MMRDNP'): self.wf_r = -self.wf_r
-                                    
+
         return self.wf_r + 1j * self.wf_i
