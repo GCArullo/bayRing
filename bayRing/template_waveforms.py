@@ -4,7 +4,7 @@ import cpnest.model
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None):
+    def __init__(self, t_NR, tM_start, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, TEOB_NR_fit = 0, TEOB_template = 'qc'):
 
         self.t_NR, self.t_start = t_NR, tM_start
         self.wf_model           = wf_model
@@ -18,6 +18,8 @@ class WaveformModel(cpnest.model.Model):
         self.quadratic_modes    = quadratic_modes
         self.N_ds_modes         = N_ds_modes
         self.tail_modes         = tail_modes
+        self.TEOB_NR_fit        = TEOB_NR_fit
+        self.TEOB_template      = TEOB_template
 
         if not(const_params==None):
             self.const_r = [const_params[0]*np.cos(const_params[1])]
@@ -118,9 +120,13 @@ class WaveformModel(cpnest.model.Model):
                                    MMRDNP_params['chis']               ,
                                    MMRDNP_params['chia']               ,
 
-                                   1.0                                 , # distance, dummy with geom=1
+                                #   1.0,
+                                #   0.0,
+                                #   0.0,
+
+                                   params['dist']                      , # distance, dummy with geom=1
                                    0.0                                 , # inclination, dummy with geom=1
-                                   0.0                                 , # orbital phase, dummy with geom=1
+                                   params['phi']                       , # orbital phase, dummy with geom=1
 
                                    TGR_parameters                      ,
 
@@ -140,21 +146,62 @@ class WaveformModel(cpnest.model.Model):
         TGR_parameters = {}
         
         modes          = [(self.l_NR,self.m_NR)]
-        merger_phases  = {mode : 0.0 for mode in modes}
-        
+        merger_phases  = {(self.l_NR,self.m_NR): params['phi_mrg_{}{}'.format(self.l_NR,self.m_NR)]}
+
+        nu = (self.metadata['m1']*self.metadata['m2'])/(self.metadata['m1']+self.metadata['m2'])**2
+
+        if(self.TEOB_NR_fit): 
+            
+            if(self.TEOB_template=='qc'):
+                NR_fit_coeffs = {
+                                (self.l_NR,self.m_NR): {
+                                                        'c3A'           : params[            'c3A_{}{}'.format(self.l_NR,self.m_NR)]   ,
+                                                        'c3p'           : params[            'c3p_{}{}'.format(self.l_NR,self.m_NR)]   ,
+                                                        'c4p'           : params[            'c4p_{}{}'.format(self.l_NR,self.m_NR)]   ,
+                                                        'omg_peak'      : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]   ,
+                                                        'A_peak_over_nu': self.metadata[  'A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu,
+                                                        }
+                                }
+            elif(self.TEOB_template=='nc'):
+                NR_fit_coeffs = {
+                                (self.l_NR,self.m_NR): {
+                                                        'c2A'           : params[                  'c2A_{}{}'.format(self.l_NR,self.m_NR)]   ,
+                                                        'c3A'           : params[                  'c3A_{}{}'.format(self.l_NR,self.m_NR)]   ,
+                                                        'c2p'           : params[                  'c2p_{}{}'.format(self.l_NR,self.m_NR)]   ,
+                                                        'c3p'           : params[                  'c3p_{}{}'.format(self.l_NR,self.m_NR)]   ,
+                                                        'c4p'           : params[                  'c4p_{}{}'.format(self.l_NR,self.m_NR)]   ,
+                                                        'omg_peak'      : self.metadata[      'omg_peak_{}{}'.format(self.l_NR,self.m_NR)]   ,
+                                                        'A_peak_over_nu': self.metadata[        'A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu,
+                                                        'A_peakdotdot'  : params[         'A_peakdotdot_{}{}'.format(self.l_NR,self.m_NR)]/nu,
+                                                        }
+                                }
+            else:
+                raise ValueError("Unknown TEOB template selected: {}".format(self.TEOB_template))
+            
+            NR_fit_coeffs['Mf'] = self.Mf
+            NR_fit_coeffs['af'] = self.af
+
+        else                :
+            NR_fit_coeffs = None
+
+        if(  self.TEOB_template=='qc'): ecc_par = 0
+        elif(self.TEOB_template=='nc'): ecc_par = 1
+
         TGR_parameters = {}
-        ringdown_model = wf.TEOBPM(self.t_start         ,
-                                   self.metadata['m1']  ,
-                                   self.metadata['m2']  ,
-                                   self.metadata['chi1'],
-                                   self.metadata['chi2'],
-                                   merger_phases        ,
-                                   1.0                  , # distance, dummy with geom=1
-                                   0.0                  , # inclination, dummy with geom=1
-                                   0.0                  , # orbital phase, dummy with geom=1
-                                   modes                ,
-                                   TGR_parameters       ,
-                                   geom = 1             )
+        ringdown_model = wf.TEOBPM(self.t_start                 ,
+                                   self.metadata['m1']          ,
+                                   self.metadata['m2']          ,
+                                   self.metadata['chi1']        ,
+                                   self.metadata['chi2']        ,
+                                   merger_phases                ,
+                                   1.0                          , # distance, dummy with geom=1
+                                   0.0                          , # inclination, dummy with geom=1
+                                   0.0                          , # orbital phase, dummy with geom=1
+                                   modes                        ,
+                                   TGR_parameters               ,
+                                   geom          = 1            ,
+                                   ecc_par       = ecc_par      ,
+                                   NR_fit_coeffs = NR_fit_coeffs)
 
 
         return ringdown_model
@@ -200,6 +247,6 @@ class WaveformModel(cpnest.model.Model):
             self.wf_i = self.wf_i + self.const_i
 
         # UNDERSTAND WHY!!!!
-        self.wf_r = -self.wf_r
+        if not(self.wf_model=='MMRDNP'): self.wf_r = -self.wf_r
                                     
         return self.wf_r + 1j * self.wf_i
