@@ -193,8 +193,8 @@ def read_config(Config):
 
     if not(parameters['NR-data']['add-const']==None): parameters['NR-data']['add-const'] = [float(value) for value in parameters['NR-data']['add-const'].split(',')]
 
-    if (parameters['Model']['template']=='MMRDNP' or parameters['Model']['template']=='TEOBPM'): parameters['Model']['fixed-waveform'] = 1
-    else                                                                                       : parameters['Model']['fixed-waveform'] = 0
+    if (parameters['Model']['template']=='MMRDNP'): parameters['Model']['fixed-waveform'] = 1
+    else                                          : parameters['Model']['fixed-waveform'] = 0
 
     if  (parameters['Model']['template']=='Damped-sinusoids'): 
         parameters['Model']['QNM-modes'] = '{}{}0'.format(parameters['NR-data']['l-NR'], parameters['NR-data']['m']) 

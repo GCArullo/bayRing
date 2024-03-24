@@ -76,6 +76,7 @@ def main():
                                              parameters['NR-data']['extrap-order']                , 
                                              parameters['NR-data']['pert-order']                  , 
                                              parameters['NR-data']['dir']                         , 
+                                             parameters['NR-data']['properties-file']             ,
                                              parameters['Injection-data']['modes-list']           , 
                                              parameters['Injection-data']['times']                , 
                                              parameters['Injection-data']['noise']                , 
@@ -105,19 +106,21 @@ def main():
     # Load model. #
     # ============#
 
-    wf_model = template_waveforms.WaveformModel(NR_sim.t_NR_cut                                       , 
-                                                NR_sim.t_min                                          , 
-                                                parameters['Model']['template']                       , 
-                                                parameters['Model']['N-DS-modes']                     , 
-                                                Kerr_modes                                            , 
-                                                NR_metadata                                           , 
-                                                qnm_cached                                            , 
-                                                parameters['NR-data']['l-NR']                         , 
-                                                parameters['NR-data']['m']                            , 
-                                                tail              = parameters['Model']['Kerr-tail']  ,
-                                                tail_modes        = Kerr_tail_modes                   ,     
-                                                quadratic_modes   = Kerr_quad_modes                   , 
-                                                const_params      = parameters['NR-data']['add-const'], 
+    wf_model = template_waveforms.WaveformModel(NR_sim.t_NR_cut                                         , 
+                                                NR_sim.t_min                                            , 
+                                                parameters['Model']['template']                         , 
+                                                parameters['Model']['N-DS-modes']                       , 
+                                                Kerr_modes                                              , 
+                                                NR_metadata                                             , 
+                                                qnm_cached                                              , 
+                                                parameters['NR-data']['l-NR']                           , 
+                                                parameters['NR-data']['m']                              , 
+                                                tail              = parameters['Model']['Kerr-tail']    ,
+                                                tail_modes        = Kerr_tail_modes                     ,     
+                                                quadratic_modes   = Kerr_quad_modes                     , 
+                                                const_params      = parameters['NR-data']['add-const']  , 
+                                                TEOB_NR_fit       = parameters['Model']['TEOB-NR-fit']  ,
+                                                TEOB_template     = parameters['Model']['TEOB-template'],
                                                 )
 
     # ===============#
@@ -146,10 +149,10 @@ def main():
         print('\n* NR-only plotting run-type selected. Exiting.\n')
         exit()
 
+    print_section('Inference')
+
     if(parameters['Model']['fixed-waveform']): results_object = {'dummy_x': np.array([0.0])}
     else:
-
-        print_section('Inference')
 
         #==============================#
         # Inference execution section. #
@@ -184,6 +187,9 @@ def main():
             execution_time = (time.time() - execution_time)/60.0
             print('\nExecution time (min): {:.2f}\n'.format(execution_time))
 
-    postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'])
-    postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
+    try: postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'])
+    except: print('Waveform reconstruction plot failed.')
+    try   : postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
+    except: print('Corner plot failed.')
+
     if(parameters['I/O']['show-plots']): plt.show()
