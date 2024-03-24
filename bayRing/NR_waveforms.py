@@ -1,5 +1,5 @@
 # General python imports
-import h5py, numpy as np, os
+import h5py, numpy as np, os, pandas as pd
 from scipy import interpolate
 
 import sxs
@@ -141,7 +141,7 @@ def convert_resolution_level_Teukolsky(res_level):
 
 class Waveform_rit(object):
 
-    def __init__(self, sims='', path='', ID='', ell=2, m=2):
+    def __init__(self, sims='', path='', csv_path='', ID='', ell=2, m=2):
 
         self.path     = path
         self.ID       = ID 
@@ -149,6 +149,7 @@ class Waveform_rit(object):
         self.ell      = ell
         self.m        = m
         self.metadata = {}
+        self.csv_path = csv_path 
 
     def load_metadata(self):
 
@@ -160,14 +161,21 @@ class Waveform_rit(object):
             lines = [l for l in f.readlines() if l.strip()] # rm empty
 
             for line in lines[1:]:
-                if line[0]=="#": continue
-                line               = line.rstrip("\n")
+
                 #line = line.split("#", 1)[0]
+                if line[0]=="#": continue
+
+                line               = line.rstrip("\n")
                 key, val           = line.split("= ")
                 key                = key.strip()
                 self.metadata[key] = val
 
-        return self.metadata 
+        additional_data = pd.read_csv(self.csv_path)
+        
+        self.metadata[  f'A_peak_{self.ell}{self.m}'] = float(additional_data.loc[additional_data.ID==self.ID,     f'A_peak{self.ell}{self.m}'])
+        self.metadata[f'omg_peak_{self.ell}{self.m}'] = float(additional_data.loc[additional_data.ID==self.ID, f'omega_peak{self.ell}{self.m}'])
+
+        return self.metadata
 
     def load_hlm(self):
 
@@ -267,7 +275,7 @@ def read_NR_metadata(NR_sim, NR_catalog):
         NRsim object containing the metadata of the NR simulation.
 
     NR_catalog : str
-        Catalog of the NR simulation.
+        Catalog of the NR simulation. Available options: ['SXS', 'cbhdb', 'charged_raw', 'RIT', 'Teukolsky']
 
     Returns
     -------
@@ -316,14 +324,16 @@ def read_NR_metadata(NR_sim, NR_catalog):
 
         M = 1.0
         metadata = {
-                    'q'    : NR_sim.q,
-                    'chi1' : NR_sim.chi1,
-                    'chi2' : NR_sim.chi2,
-                    'm1'   : pyRing_utils.m1_from_m_q(M, NR_sim.q),
-                    'm2'   : pyRing_utils.m2_from_m_q(M, NR_sim.q),
-                    'ecc'  : NR_sim.ecc,
-                    'Mf'   : NR_sim.Mf,
-                    'af'   : NR_sim.af,
+                    'q'          : NR_sim.q,
+                    'chi1'       : NR_sim.chi1,
+                    'chi2'       : NR_sim.chi2,
+                    'm1'         : pyRing_utils.m1_from_m_q(M, NR_sim.q),
+                    'm2'         : pyRing_utils.m2_from_m_q(M, NR_sim.q),
+                    'ecc'        : NR_sim.ecc,
+                    'Mf'         : NR_sim.Mf,
+                    'af'         : NR_sim.af,
+                    'A_peak_22'  : NR_sim.A_peak_22,
+                    'omg_peak_22': NR_sim.omg_peak_22,
                 }
 
     elif(NR_catalog=='C2EFT'):
@@ -384,7 +394,7 @@ class NR_simulation():
     ----------
 
     NR_catalog : str
-        Catalog of the NR simulation.
+        Catalog of the NR simulation. Available options: ['SXS', 'cbhdb', 'charged_raw', 'RIT', 'Teukolsky'].
 
     NR_ID : str
         ID of the NR simulation.
@@ -440,10 +450,11 @@ class NR_simulation():
                  extrap_order                                   , 
                  perturbation_order                             , 
                  NR_dir                                         , 
-                 injection_modes_list                             , 
-                 injection_times                                  , 
-                 injection_noise                                      , 
-                 injection_tail                                       , 
+                 additional_NR_properties                       , 
+                 injection_modes_list                           , 
+                 injection_times                                , 
+                 injection_noise                                , 
+                 injection_tail                                 , 
                  l                                              , 
                  m                                              , 
                  outdir                                         , 
@@ -459,25 +470,26 @@ class NR_simulation():
         # Input parameters #
         ####################
 
-        self.NR_catalog       = NR_catalog
-        self.NR_ID            = NR_ID
-        self.res_level        = res_level
-        self.extrap_order     = extrap_order
+        self.NR_catalog               = NR_catalog
+        self.NR_ID                    = NR_ID
+        self.res_level                = res_level
+        self.extrap_order             = extrap_order
 
-        self.l                = l
-        self.m                = m
-        self.pert_order       = perturbation_order
+        self.l                        = l
+        self.m                        = m
+        self.pert_order               = perturbation_order
 
-        self.NR_dir           = NR_dir
-        self.outdir           = outdir
+        self.NR_dir                   = NR_dir
+        self.additional_NR_properties = additional_NR_properties
+        self.outdir                   = outdir
 
-        self.fake_NR_modes    = injection_modes_list
-        self.injection_noise  = injection_noise
-        self.injection_tail   = injection_tail
+        self.fake_NR_modes            = injection_modes_list
+        self.injection_noise          = injection_noise
+        self.injection_tail           = injection_tail
 
-        self.tM_start         = tM_start
-        self.tM_end           = tM_end
-        self.t_delay_scd      = t_delay_scd
+        self.tM_start                 = tM_start
+        self.tM_end                   = tM_end
+        self.t_delay_scd              = t_delay_scd
         
 
         ######################
@@ -629,7 +641,7 @@ class NR_simulation():
         
             print('\n\n\nFIXME: figure out extrapolation order and resolution level for RIT\n\n\n')
 
-            self.q, self.chi1, self.chi2, self.ecc, self.Mf, self.af = self.read_RIT_metadata()
+            self.q, self.chi1, self.chi2, self.ecc, self.Mf, self.af, self.A_peak_22, self.omg_peak_22 = self.read_RIT_metadata()
 
             # Build NR waveform and time axis.
             self.t_NR, self.NR_r, self.NR_i = self.read_hlm_from_RIT()
@@ -1159,8 +1171,7 @@ class NR_simulation():
         chi1, chi2, chif = metadata['reference_dimensionless_spin1'][2], metadata['reference_dimensionless_spin2'][2], metadata['remnant_dimensionless_spin'][2]
         ecc              = metadata['reference-eccentricity']
 
-        if isinstance(ecc, str):    
-            ecc = float(ecc[1:])
+        if isinstance(ecc, str): ecc = float(ecc[1:])
 
         return q, chi1, chi2, tilt1, tilt2, ecc, Mf, chif
 
@@ -1206,28 +1217,32 @@ class NR_simulation():
         """
 
                 
-        h_NR = Waveform_rit(sims=os.path.join(self.NR_dir, 'Metadata'), path=os.path.join(self.NR_dir, 'Data'), ID=self.NR_ID)
+        h_NR = Waveform_rit(sims=os.path.join(self.NR_dir, 'Metadata'), path=os.path.join(self.NR_dir, 'Data'), csv_path=self.additional_NR_properties, ID=self.NR_ID)
         
         # Read intrinsic parameters
-        data  = h_NR.load_metadata()
-        m1    = float(data['initial-mass1'])
-        m2    = float(data['initial-mass2'])
-        chi1z = float(data['initial-bh-chi1z'])
-        chi2z = float(data['initial-bh-chi2z'])
-        q     = m1/m2
-        nu    = q/(1+q)**2
+        data        = h_NR.load_metadata()
+        m1          = float(data['initial-mass1'])
+        m2          = float(data['initial-mass2'])
+        chi1z       = float(data['initial-bh-chi1z'])
+        chi2z       = float(data['initial-bh-chi2z'])
+        q           = m1/m2
+        nu          = q/(1+q)**2
 
         # Read initial conditions.
         # FIXME: these are the initial data before relaxation, so not precisely correct.
-        r0   = float(data['initial-separation'])
-        e0   = float(data['initial-ADM-energy'])
-        j0   = float(data['initial-ADM-angular-momentum-z'])/nu
-        ecc  = float(data['eccentricity'])
+        r0          = float(data['initial-separation'])
+        e0          = float(data['initial-ADM-energy'])
+        j0          = float(data['initial-ADM-angular-momentum-z'])/nu
+        ecc         = float(data['eccentricity'])
 
-        Mf   = float(data['final-mass'])
-        chif = float(data['final-chi'])
+        Mf          = float(data['final-mass'])
+        chif        = float(data['final-chi'])
 
-        return q, chi1z, chi2z, ecc, Mf, chif
+        # FIXME: Generalise to multiple modes with dictionaries.
+        A_peak_22   = float(data['A_peak_22'])
+        omg_peak_22 = float(data['omg_peak_22'])
+
+        return q, chi1z, chi2z, ecc, Mf, chif, A_peak_22, omg_peak_22
 
     def read_hlm_from_RIT(self):
 
