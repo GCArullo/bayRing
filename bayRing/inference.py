@@ -98,7 +98,7 @@ def read_default_bounds(wf_model, TEOB_template=''):
     if(  wf_model=='Damped-sinusoids'): default_bounds = default_bounds_DS
     elif(wf_model=='Kerr'            ): default_bounds = default_bounds_Kerr
     elif(wf_model=='Kerr-tail'       ): default_bounds = default_bounds_Kerr_tail
-    elif(wf_model=='MMRDNP'          ): default_bounds = {'phi': [0.0, twopi], 'dist': [0,10]}
+    elif(wf_model=='MMRDNP'          ): default_bounds = {'phi': [0.0, twopi]}
     elif(wf_model=='TEOBPM'          ): default_bounds = default_bounds_TEOBPM
 
     return default_bounds

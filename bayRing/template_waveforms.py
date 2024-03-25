@@ -123,7 +123,7 @@ class WaveformModel(cpnest.model.Model):
                                    MMRDNP_params['chis']               ,
                                    MMRDNP_params['chia']               ,
 
-                                   params['dist']                      , # distance     , dummy with geom=1
+                                   1.0                                 , # distance     , dummy with geom=1
                                    0.0                                 , # inclination  , dummy with geom=1
                                    params['phi']                       , # orbital phase, dummy with geom=1
 
