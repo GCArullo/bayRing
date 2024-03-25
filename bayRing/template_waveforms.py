@@ -4,9 +4,11 @@ import cpnest.model
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, TEOB_NR_fit = 0, TEOB_template = 'qc'):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, TEOB_NR_fit = 0, TEOB_template = 'qc'):
 
-        self.t_NR, self.t_start = t_NR, tM_start
+        self.t_NR               = t_NR
+        self.t_start            = tM_start
+        self.t_peak             = tM_peak
         self.wf_model           = wf_model
         self.Kerr_modes         = Kerr_modes
         self.metadata           = metadata
@@ -112,6 +114,7 @@ class WaveformModel(cpnest.model.Model):
         MMRDNP_params['chia'] = (self.metadata['m1']*self.metadata['chi1'] - self.metadata['m2']*self.metadata['chi2'])/(MMRDNP_params['Mi'])
 
         ringdown_model = wf.MMRDNP(self.t_start                        ,
+                                   self.t_peak                         ,
                                    self.Mf                             ,
                                    self.af                             ,
 

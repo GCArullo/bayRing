@@ -108,6 +108,7 @@ def main():
 
     wf_model = template_waveforms.WaveformModel(NR_sim.t_NR_cut                                         , 
                                                 NR_sim.t_min                                            , 
+                                                NR_sim.t_peak                                           ,
                                                 parameters['Model']['template']                         , 
                                                 parameters['Model']['N-DS-modes']                       , 
                                                 Kerr_modes                                              , 
