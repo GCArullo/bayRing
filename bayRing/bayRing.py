@@ -89,6 +89,7 @@ def main():
                                              tM_start       = parameters['Inference']['t-start']  , 
                                              tM_end         = parameters['Inference']['t-end']    , 
                                              t_delay_scd    = parameters['Inference']['dt-scd']   , 
+                                             t_peak_22      = parameters['NR-data']['t-peak-22']  ,
                                              t_min_mismatch = parameters['NR-data']['error-t-min'], 
                                              t_max_mismatch = parameters['NR-data']['error-t-max'])
 

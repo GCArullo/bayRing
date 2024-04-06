@@ -104,6 +104,7 @@ def read_config(Config):
         'error-t-max'      : 3792.7480095302817, # SXS-0305 specific
         'add-const'        : '0.0,0.0',
         'properties-file'  : '',
+        't-peak-22'        : 0.0,
         },
 
         'Injection-data':
@@ -193,8 +194,7 @@ def read_config(Config):
 
     if not(parameters['NR-data']['add-const']==None): parameters['NR-data']['add-const'] = [float(value) for value in parameters['NR-data']['add-const'].split(',')]
 
-    if (parameters['Model']['template']=='MMRDNP'): parameters['Model']['fixed-waveform'] = 1
-    else                                          : parameters['Model']['fixed-waveform'] = 0
+    if (parameters['Model']['template']=='MMRDNP' and not(parameters['NR-data']['l-NR']==2 and parameters['NR-data']['m']==2) and parameters['NR-data']['t-peak-22']==0.0): raise ValueError("The time of the peak of the 22 mode must be provided for the MMRDNP model when fitting the HMs, to correctly rescale the amplitudes.")
 
     if  (parameters['Model']['template']=='Damped-sinusoids'): 
         parameters['Model']['QNM-modes'] = '{}{}0'.format(parameters['NR-data']['l-NR'], parameters['NR-data']['m']) 
@@ -260,6 +260,8 @@ A dot is present at the end of each description line and is not to be intended a
                          effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.
         properties-file  Path to the file containing additional properties of the NR simulation in `.csv` format. \
                          Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
+        t-peak-22        Time of the peak of the 22 mode. Used as reference time in MMRDNP model. Must be passed when \
+                         fitting HMs with MMRDNP.                                                                            Default: 0.0.                         
 
     ************************************************************
     * Parameters to be passed to the [Injection-data] section. *

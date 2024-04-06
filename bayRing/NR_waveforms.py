@@ -463,6 +463,7 @@ class NR_simulation():
                  tM_start       = 30.0                          , 
                  tM_end         = 150.0                         , 
                  t_delay_scd    = 0.0                           , 
+                 t_peak_22      = 0.0                           ,
                  t_min_mismatch = 2692.7480095302817            , 
                  t_max_mismatch = 3792.7480095302817            ):
 
@@ -490,12 +491,14 @@ class NR_simulation():
         self.tM_start                 = tM_start
         self.tM_end                   = tM_end
         self.t_delay_scd              = t_delay_scd
-        
+        self.t_peak_22                = t_peak_22
+
 
         ######################
         # Read-in simulation #
         ######################
         
+        #IMPROVEME: work in progress for template injections.
         if(self.NR_catalog=='fake_NR'):
             
             t_start, t_end, dt, self.q, self.Mf, self.af, self.A_dict, self.phi_dict, self.tail_dict = self.read_fake_NR_metadata()
@@ -877,6 +880,10 @@ class NR_simulation():
         if(self.NR_catalog=='Teukolsky' and self.pert_order=='lin'): 
             print("\n* The peak time has been set to the secondary peak time with a delay of: {}.".format(self.t_delay_scd))
             self.t_peak = self.t_peak + self.t_delay_scd
+
+        if(not(self.t_peak_22==0.0) and not(self.l==2 and self.m==2)):
+            print("\n* The peak time has been set to the peak of the 22 mode: {}.".format(self.t_peak_22))
+            self.t_peak = self.t_peak_22
 
         self.NR_freq  = np.gradient(self.NR_phi, self.t_NR)/(twopi)
         

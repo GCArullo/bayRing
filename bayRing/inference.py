@@ -94,7 +94,6 @@ def read_default_bounds(wf_model, TEOB_template=''):
         default_bounds_TEOBPM['c2p']          = [-10.0, 10.0]
         default_bounds_TEOBPM['A_peakdotdot'] = [-0.01, 0.0]
 
-
     if(  wf_model=='Damped-sinusoids'): default_bounds = default_bounds_DS
     elif(wf_model=='Kerr'            ): default_bounds = default_bounds_Kerr
     elif(wf_model=='Kerr-tail'       ): default_bounds = default_bounds_Kerr_tail
