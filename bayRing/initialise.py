@@ -194,7 +194,7 @@ def read_config(Config):
 
     if not(parameters['NR-data']['add-const']==None): parameters['NR-data']['add-const'] = [float(value) for value in parameters['NR-data']['add-const'].split(',')]
 
-    if (parameters['Model']['template']=='MMRDNP' and not(parameters['NR-data']['l-NR']==2 and parameters['NR-data']['m']==2) and parameters['NR-data']['t-peak-22']==0.0): raise ValueError("The time of the peak of the 22 mode must be provided for the MMRDNP model when fitting the HMs, to correctly rescale the amplitudes.")
+    if ((parameters['Model']['template']=='MMRDNP' or parameters['Model']['template']=='TEOBPM') and not(parameters['NR-data']['l-NR']==2 and parameters['NR-data']['m']==2) and parameters['NR-data']['t-peak-22']==0.0): raise ValueError("The time of the peak of the 22 mode must be provided for the MMRDNP and TEOBPM models when fitting the HMs, to correctly rescale the NR-calibrated quantities.")
 
     if  (parameters['Model']['template']=='Damped-sinusoids'): 
         parameters['Model']['QNM-modes'] = '{}{}0'.format(parameters['NR-data']['l-NR'], parameters['NR-data']['m']) 
