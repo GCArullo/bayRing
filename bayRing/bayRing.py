@@ -14,7 +14,9 @@ import bayRing.initialise         as initialise
 import bayRing.QNM_utils          as QNM_utils
 import bayRing.inference          as inference
 import bayRing.template_waveforms as template_waveforms
-from pyRing.utils           import print_section
+import bayRing.waveform_utils     as wf_utils
+
+from pyRing.utils import print_section
 
 twopi = 2.*np.pi
 
@@ -169,9 +171,10 @@ def main():
 
     print('\n* Note: quantities are quoted at the start time of the fit (i.e. t_peak + t_0 [M]).\n')
     postprocess.print_point_estimate(results_object, inference_model.access_names(), parameters['Inference']['method'])
+    postprocess.l2norm_residual_vs_nr(results_object, inference_model, NR_sim, parameters['I/O']['outdir'])
+
     # postprocess.plot_fancy_residual(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'])
     # postprocess.plot_fancy_reconstruction(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], method)
-    postprocess.l2norm_residual_vs_nr(results_object, inference_model, NR_sim, parameters['I/O']['outdir'])
 
     if('Kerr' in parameters['Model']['template'] ): postprocess.post_process_amplitudes(parameters['Inference']['t-start'], results_object, NR_metadata, qnm_cached, Kerr_modes, Kerr_quad_modes, parameters['I/O']['outdir'])
     if(parameters['NR-data']['catalog']=='C2EFT' and 'Damped-sinusoids' in parameters['Model']['template']): postprocess.compare_with_GR_QNMs(results_object, qnm_cached, NR_sim, parameters['I/O']['outdir'])
@@ -186,9 +189,16 @@ def main():
         execution_time = (time.time() - execution_time)/60.0
         print('\nExecution time (min): {:.2f}\n'.format(execution_time))
 
-    try: postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'])
+    try   : postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'])
     except: print('Waveform reconstruction plot failed.')
     try   : postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
-    except: print('Corner plot failed.')
+    except: print('Corner plot failed.') 
+    
+    print('FIXME: think about units of time axis in mismatch computation.')
+    exit()
+    if not(parameters['Mismatch']['asd-path']==''):
+        acf = wf_utils.compute_acf_from_user_asd(parameters['Mismatch']['asd-path'], parameters['Mismatch']['f-min'], parameters['Mismatch']['f-max'], len())
+        try   : postprocess.compute_mismatch(NR_sim, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], acf)
+        except: print('Mismatch computation failed.')
 
     if(parameters['I/O']['show-plots']): plt.show()

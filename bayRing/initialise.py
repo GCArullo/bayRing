@@ -145,8 +145,14 @@ def read_config(Config):
         'min-method'       : 'lm',
         'min-iter-min'     : 1,
         'min-iter-max'     : 1000,
-        
-        }
+        },
+
+        'Mismatch':
+        {
+        'f-min'            : 20.0,
+        'f-max'            : 2048.0,
+        'asd-path'         : '',
+        },
 
     }
 
@@ -227,7 +233,7 @@ A dot is present at the end of each description line and is not to be intended a
         screen-output    Boolean to divert stdout and stderr to files or to screen.                                         Default: 0.
         show-plots       Boolean to show results plots.                                                                     Default: 0.
         outdir           Path of the output directory.                                                                      Default: './'.
-
+        
     *****************************************************
     * Parameters to be passed to the [NR-data] section. *
     *****************************************************
@@ -351,6 +357,15 @@ A dot is present at the end of each description line and is not to be intended a
         Prior default bounds can be changed by adding 'param-min=value' or 'param-max=value' to this section, where `param` is the name of the parameter under consideration.
 
         User-controlled starting values for the minimization can be set by adding`'param-start=value` to the [Priors] section, where `param` is the name of the parameter under consideration. User-defined starting values overrun the `seeding` option for that parameter.
+
+
+    ******************************************************
+    * Parameters to be passed to the [Mismatch] section. *
+    ******************************************************  
+
+        f-min            Minimum frequency (in Hz) to consider in the mismatch computation.         Default: 20.0.   
+        f-max            Maximum frequency (in Hz) to consider in the mismatch computation.         Default: 2048.0.
+        asd-path         Path to the ASD file, used to evaluate the mismatch at the end of the run. Default: ''.
 
 """
                                                      

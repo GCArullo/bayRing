@@ -229,3 +229,53 @@ def find_peak_time(t, A, ecc):
         t_peak                    = t[np.argmax(A)]
 
     return t_peak
+
+def acf_from_asd(asd_filepath, f_min, f_max, N_points):
+
+    ''' 
+        Compute the autocovariance function (ACF) from a given amplitude spectral density (ASD),
+        given a frequency range and the number of points of the corresponding time array. 
+        
+        Parameters
+        ----------
+        
+        f_min : float
+            Minimum frequency to consider.
+        f_max : float
+            Maximum frequency to consider.
+        n_points : int
+            Number of points of the time array.
+        asd_filepath : str
+            Path to the ASD file.
+        
+        Returns
+        -------
+
+        ACF : array
+            Autocovariance function.
+
+     '''
+    
+    # Frequency axis construction
+    s_rate = f_max * 2
+    dt     = 1./s_rate
+    df     = s_rate/N_points
+    f      = np.fft.rfftfreq(N_points, d=dt)
+
+    # Load ASD file and convert it to PSD
+    freq_file, asd_file = np.loadtxt(asd_filepath, unpack=True)
+    psd_file            = asd_file**2                          
+
+    # Interpolate the PSD to the desired frequency range
+    psd_file  =  psd_file[freq_file > f_min]
+    freq_file = freq_file[freq_file > f_min]
+    psd_file  =  psd_file[freq_file < f_max]
+    freq_file = freq_file[freq_file < f_max]
+
+    #FIXME: edges should go to the same constant when taking the FT
+    PSD       = np.interp(f, freq_file, psd_file)
+
+    # Compute the ACF. We are using the one-sided PSD, thus it is twice the Fourier transform of the autocorrelation function (see eq. 7.15 of Maggiore Vol.1). We take the real part just to convert the complex output of fft to a real numpy float. The imaginary part if already 0 when coming out of the fft.
+    ACF = 0.5 * np.real(np.fft.irfft(PSD*df)) * N_points 
+
+    return ACF

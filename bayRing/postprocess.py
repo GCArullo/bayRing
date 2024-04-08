@@ -1,5 +1,4 @@
-import corner, os, numpy as np, matplotlib.pyplot as plt, h5py, seaborn as sns
-
+import corner, os, numpy as np, matplotlib.pyplot as plt, h5py, scipy.linalg as sl, seaborn as sns
 import bayRing.utils          as utils
 import bayRing.waveform_utils as waveform_utils
 
@@ -251,7 +250,7 @@ def post_process_amplitudes(t0, results_object, NR_metadata, qnm_cached, modes, 
 
     return 
 
-def l2norm_residual_vs_nr(results_object, nest_model, NR_sim, outdir):
+def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir):
     
     """
 
@@ -265,7 +264,7 @@ def l2norm_residual_vs_nr(results_object, nest_model, NR_sim, outdir):
     results_object : dict
         Dictionary containing the results of the inference algorithm.
     
-    nest_model : Nested sampler object
+    inference_model : Nested sampler object
         Nested sampler object. 
 
     NR_sim : NR_sim
@@ -285,8 +284,8 @@ def l2norm_residual_vs_nr(results_object, nest_model, NR_sim, outdir):
     NR_r, NR_i         = np.real(NR_sim.NR_cpx_cut)     , np.imag(NR_sim.NR_cpx_cut)
     t_cut = NR_sim.t_NR_cut
 
-    models_re_list = [np.real(np.array(nest_model.model(p))) for p in results_object]
-    models_im_list = [np.imag(np.array(nest_model.model(p))) for p in results_object]
+    models_re_list = [np.real(np.array(inference_model.model(p))) for p in results_object]
+    models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results_object]
 
     wf_r = np.percentile(np.array(models_re_list),[50], axis=0)[0]
     wf_i = np.percentile(np.array(models_im_list),[50], axis=0)[0]
@@ -369,7 +368,93 @@ def compare_with_GR_QNMs(results_object, qnm_cached, NR_sim, outdir):
 
     return 
 
-def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, method):
+def compute_mismatch(NR_sim, results, inference_model, outdir, method, acf):
+
+    """
+
+    Plot the NR waveform against the model waveform.
+
+    Parameters
+    ----------
+
+    NR_sim : NR_sim
+        NR simulation object.
+
+    results : dict
+        Dictionary containing the results object.
+
+    inference_model : inference_model
+        Nested sampling model object.
+
+    outdir : string
+        Output directory.
+
+    method : string
+        Method used to fit the waveform.
+
+    acf : array
+        Autocorrelation function of the noise.
+
+    Returns
+    -------
+
+    Nothing, but computes the mismatch between the NR waveform and the model waveform, and saves the results to a file.
+
+    """
+
+    NR_r, NR_i, NR_c = NR_sim.NR_r_cut, NR_sim.NR_i_cut, NR_sim.NR_r_cut - 1j * NR_sim.NR_i_cut
+
+    NR_dict = {'real': NR_r, 'imaginary': NR_i, 'complex': NR_c}
+
+    # Create file on which to save results
+    outFile_mismatch = open(os.path.join(outdir,'Algorithm/Mismatch.txt'), 'w')
+    outFile_mismatch.write('#CI\tStrain_data\tmismatch\n')
+    outFile_mismatch.close()
+    
+    for NR_quant in NR_dict.keys():
+
+        # NR scalar product
+        whiten_whiten_h_NR = sl.solve_toeplitz(acf, NR_dict[NR_quant], check_finite=False)
+        h_NR_h_NR_sqrt     = np.sqrt(np.dot(NR_dict[NR_quant], whiten_whiten_h_NR))
+
+        # Load wf template
+        if(method=='Nested-sampler'):
+            models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
+            models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
+
+        for perc in [5, 50, 95]:
+
+            if(method=='Nested-sampler'):
+                wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
+                wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
+            else:
+                wf_r = np.real(np.array(inference_model.model(results)))
+                wf_i = np.imag(np.array(inference_model.model(results)))
+
+            wf_quant = {'real': wf_r, 'imaginary': wf_i, 'complex': wf_r - 1j * wf_i}
+
+            # Waveform template scalar product        
+            whiten_whiten_h_wf = sl.solve_toeplitz(acf, wf_quant[NR_quant], check_finite=False)
+            h_wf_h_wf_sqrt     = np.sqrt(np.dot(wf_quant[NR_quant], whiten_whiten_h_wf))
+
+            # Scalar product between NR and template
+            whiten_whiten_h_wf = sl.solve_toeplitz(acf, wf_quant[NR_quant], check_finite=False)
+            h_wf_h_NR          = np.dot(NR_dict[NR_quant], whiten_whiten_h_wf)
+
+            # Mismatch
+            mismatch = 1 - h_wf_h_NR/(h_NR_h_NR_sqrt*h_wf_h_wf_sqrt)
+
+            # Output
+            print(f'Mismatch for {perc}% CI is {mismatch} with {NR_quant} strain data.')
+
+            # Save results to file
+            outFile_mismatch = open(os.path.join(outdir,'Algorithm/Mismatch.txt'), 'a')
+            outFile_mismatch.write(f'{perc}\t{NR_quant}\t{mismatch}\n')
+            outFile_mismatch.close()
+
+    return
+
+def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdir, method):
 
     """
 
@@ -390,7 +475,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     results : dict
         Dictionary containing the results object.
 
-    nest_model : nest_model
+    inference_model : inference_model
         Nested sampling model object.
 
     outdir : string
@@ -516,12 +601,12 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     else:
         ax4.set_ylim([-0.08, 0.28])
 
-    if not(nest_model==None):
+    if not(inference_model==None):
 
         # Plot waveform reconstruction
         if(method=='Nested-sampler'):
-            models_re_list = [np.real(np.array(nest_model.model(p))) for p in results]
-            models_im_list = [np.imag(np.array(nest_model.model(p))) for p in results]
+            models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
+            models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
 
         for perc in [50, 5, 95]:
 
@@ -529,8 +614,8 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
                 wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
                 wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
             else:
-                wf_r = np.real(np.array(nest_model.model(results)))
-                wf_i = np.imag(np.array(nest_model.model(results)))
+                wf_r = np.real(np.array(inference_model.model(results)))
+                wf_i = np.imag(np.array(inference_model.model(results)))
 
             wf_amp, wf_phi = waveform_utils.amp_phase_from_re_im(wf_r, wf_i)
             wf_f           = np.gradient(wf_phi, t_cut)/(twopi)
@@ -560,8 +645,8 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
 
             # Plot QNM waveform reconstruction
             if(method=='Nested-sampler'):
-                models_re_list = [np.real(np.array(nest_model.model(p))) for p in results]
-                models_im_list = [np.imag(np.array(nest_model.model(p))) for p in results]
+                models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
+                models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
             
             for perc in [50, 5, 95]:
 
@@ -569,8 +654,8 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
                     wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
                     wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
                 else:
-                    wf_r = np.real(np.array(nest_model.model(results)))
-                    wf_i = np.imag(np.array(nest_model.model(results)))
+                    wf_r = np.real(np.array(inference_model.model(results)))
+                    wf_i = np.imag(np.array(inference_model.model(results)))
 
                 wf_amp, wf_phi = waveform_utils.amp_phase_from_re_im(wf_r, wf_i)
                 wf_f           = np.gradient(wf_phi, t_cut)/(twopi)
@@ -611,7 +696,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
 
     if (tail_flag): plt.rcParams['legend.frameon'] = False
 
-    if (nest_model==None): return
+    if (inference_model==None): return
 
     ############################
     # Residuals reconstruction #
@@ -637,8 +722,8 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
             wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
             wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
         else:
-            wf_r = np.real(np.array(nest_model.model(results)))
-            wf_i = np.imag(np.array(nest_model.model(results)))
+            wf_r = np.real(np.array(inference_model.model(results)))
+            wf_i = np.imag(np.array(inference_model.model(results)))
 
         if(perc==50):
             ax1.plot(t_cut - t_peak, wf_r   - NR_r_cut  ,                                                  c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
@@ -685,8 +770,8 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
         log_A_NR         = np.log(NR_amp)
         dlog_A_NR_dlog_t = utils.diff1(log_t_NR, log_A_NR)
 
-        models_re_list = [np.real(np.array(nest_model.model(p))) for p in results]
-        models_im_list = [np.imag(np.array(nest_model.model(p))) for p in results]
+        models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
+        models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
         
         for perc in [50, 5, 95]:
             wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
@@ -713,7 +798,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
 
     return
 
-def plot_fancy_residual(NR_sim, template, metadata, results, nest_model, outdir, method):
+def plot_fancy_residual(NR_sim, template, metadata, results, inference_model, outdir, method):
 
     """
 
@@ -734,7 +819,7 @@ def plot_fancy_residual(NR_sim, template, metadata, results, nest_model, outdir,
     results : dict
         Dictionary containing the results object.
 
-    nest_model : nest_model
+    inference_model : inference_model
         Nested sampling model object.
 
     outdir : string
@@ -773,12 +858,12 @@ def plot_fancy_residual(NR_sim, template, metadata, results, nest_model, outdir,
     lw_std   = 1.0
     lw_large = 1.5
 
-    if not(nest_model==None):
+    if not(inference_model==None):
 
         # Plot waveform reconstruction
         if(method=='Nested-sampler'):
-            models_re_list = [np.real(np.array(nest_model.model(p))) for p in results]
-            models_im_list = [np.imag(np.array(nest_model.model(p))) for p in results]
+            models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
+            models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
 
     ###########################
     # Waveform reconstruction #
@@ -821,7 +906,7 @@ def plot_fancy_residual(NR_sim, template, metadata, results, nest_model, outdir,
 
     return
 
-def plot_fancy_reconstruction(NR_sim, template, metadata, results, nest_model, outdir, method):
+def plot_fancy_reconstruction(NR_sim, template, metadata, results, inference_model, outdir, method):
 
     """
 
@@ -842,7 +927,7 @@ def plot_fancy_reconstruction(NR_sim, template, metadata, results, nest_model, o
     results : dict
         Dictionary containing the results object.
 
-    nest_model : nest_model
+    inference_model : inference_model
         Nested sampling model object.
 
     outdir : string
@@ -889,12 +974,12 @@ def plot_fancy_reconstruction(NR_sim, template, metadata, results, nest_model, o
     lw_std   = 1.0
     lw_large = 1.2
 
-    if not(nest_model==None):
+    if not(inference_model==None):
 
         # Plot waveform reconstruction
         if(method=='Nested-sampler'):
-            models_re_list = [np.real(np.array(nest_model.model(p))) for p in results]
-            models_im_list = [np.imag(np.array(nest_model.model(p))) for p in results]
+            models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
+            models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
 
     f, [ax1, ax2]   = plt.subplots(nrows = 2, ncols = 1, figsize=(4,7))
 
