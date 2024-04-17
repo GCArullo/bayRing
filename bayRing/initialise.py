@@ -201,7 +201,7 @@ def read_config(Config):
         parameters['Model']['QNM-modes'] = '{}{}0'.format(parameters['NR-data']['l-NR'], parameters['NR-data']['m']) 
     elif(parameters['Model']['template']=='MMRDNP'          ): 
         if  (parameters['Model']['KerrHM-version']=='London2018'): parameters['Model']['QNM-modes'] = '220,221,210,330,331,320,440,430,2-20,2-21,2-10,3-30,3-31,3-20,4-40,4-30'
-        elif(parameters['Model']['KerrHM-version']=='Cheung2023'): parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,440,430,2-20,2-10'
+        elif(parameters['Model']['KerrHM-version']=='Cheung2023'): parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,440,430,550,2-20,2-10'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4): raise ValueError("The MMRDNP template is only available for l=2,3,4")
     elif(parameters['Model']['template']=='TEOBPM'      ):
         print('\n\n Fix handling of merger phases for TEOBPM.\n\n')
