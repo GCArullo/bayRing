@@ -123,6 +123,7 @@ def read_config(Config):
         'QQNM-modes'       : ''           ,
         'Kerr-tail'        : 0            ,
         'Kerr-tail-modes'  : '22'         ,
+        'KerrHM-version'   : 'London2018' ,
         'TEOB-NR-fit'      : 0            ,
         'TEOB-template'    : 'qc'         ,
         },
@@ -199,7 +200,8 @@ def read_config(Config):
     if  (parameters['Model']['template']=='Damped-sinusoids'): 
         parameters['Model']['QNM-modes'] = '{}{}0'.format(parameters['NR-data']['l-NR'], parameters['NR-data']['m']) 
     elif(parameters['Model']['template']=='MMRDNP'          ): 
-        parameters['Model']['QNM-modes'] = '220,221,210,330,331,320,440,430'
+        if  (parameters['Model']['KerrHM-version']=='London2018'): parameters['Model']['QNM-modes'] = '220,221,210,330,331,320,440,430,2-20,2-21,2-10,3-30,3-31,3-20,4-40,4-30'
+        elif(parameters['Model']['KerrHM-version']=='Cheung2023'): parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,440,430,2-20,2-10'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4): raise ValueError("The MMRDNP template is only available for l=2,3,4")
     elif(parameters['Model']['template']=='TEOBPM'      ):
         print('\n\n Fix handling of merger phases for TEOBPM.\n\n')
@@ -291,6 +293,7 @@ A dot is present at the end of each description line and is not to be intended a
                             (parent frequencies sum or difference).                                                          Default: ''.
         Kerr-tail        Boolean to add a tail factor to the Kerr template.                                                  Default: 0.
         Kerr-tail-modes  Modes to which a tail will be added in the fitting template. Example format: '22,32'.               Default: '22'.
+        KerrHM-version   Version of the KerrHM model to be used. Available options: ['London2018', 'Cheung2023'].            Default: 'London2018'.
         TEOB-NR-fit      Boolean to fit also for NR calibration coefficients within TEOB model, otherwise, use default fits. Default: 0.
         TEOB-template    TEOB template to be used. Available options: ['qc', 'nc']. The 'qc' version is defined in  \
                          arXiv:1904.09550, arXiv:2001.09082, while the 'nc' in II.C of arXiv:2305.19336                      Default: 'qc'.

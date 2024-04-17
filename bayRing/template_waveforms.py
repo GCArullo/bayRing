@@ -4,7 +4,7 @@ import cpnest.model
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, TEOB_NR_fit = 0, TEOB_template = 'qc'):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrHM_version = 'London2018', TEOB_NR_fit = 0, TEOB_template = 'qc'):
 
         self.t_NR               = t_NR
         self.t_start            = tM_start
@@ -20,6 +20,7 @@ class WaveformModel(cpnest.model.Model):
         self.quadratic_modes    = quadratic_modes
         self.N_ds_modes         = N_ds_modes
         self.tail_modes         = tail_modes
+        self.KerrHM_version     = KerrHM_version
         self.TEOB_NR_fit        = TEOB_NR_fit
         self.TEOB_template      = TEOB_template
 
@@ -94,13 +95,13 @@ class WaveformModel(cpnest.model.Model):
         
         # In this case modes is an integer storing the number of free damped sinusoids
         for i in range(self.N_ds_modes):
-            ringdown_model += wf.damped_sinusoid(np.exp(params[  'ln_A_{}'.format(i)]),
-                                                        params[  'f_{}'.format(i)]    ,
-                                                        params['tau_{}'.format(i)]    ,
-                                                        params['phi_{}'.format(i)]    ,
-                                                        self.t_start                  ,
-                                                        self.t_NR                     )
-            
+            ringdown_model += wf.damped_sinusoid(np.exp(params['ln_A_{}'.format(i)]),
+                                                        params[   'f_{}'.format(i)] ,
+                                                        params[ 'tau_{}'.format(i)] ,
+                                                        params[ 'phi_{}'.format(i)] ,
+                                                        self.t_start                ,
+                                                        self.t_NR                   )
+        
         return ringdown_model
 
     def MMRDNP_waveform(self, params):
@@ -113,30 +114,31 @@ class WaveformModel(cpnest.model.Model):
         MMRDNP_params['chis'] = (self.metadata['m1']*self.metadata['chi1'] + self.metadata['m2']*self.metadata['chi2'])/(MMRDNP_params['Mi'])
         MMRDNP_params['chia'] = (self.metadata['m1']*self.metadata['chi1'] - self.metadata['m2']*self.metadata['chi2'])/(MMRDNP_params['Mi'])
 
-        ringdown_model = wf.MMRDNP(self.t_start                        ,
-                                   self.t_peak                         ,
-                                   self.Mf                             ,
-                                   self.af                             ,
+        ringdown_model = wf.MMRDNP(self.t_start                      ,
+                                   self.t_peak                       ,
+                                   self.Mf                           ,
+                                   self.af                           ,
 
-                                   MMRDNP_params['Mi']                 ,
-                                   MMRDNP_params['eta']                ,
-                                   MMRDNP_params['chis']               ,
-                                   MMRDNP_params['chia']               ,
+                                   MMRDNP_params['Mi']               ,
+                                   MMRDNP_params['eta']              ,
+                                   MMRDNP_params['chis']             ,
+                                   MMRDNP_params['chia']             ,
 
-                                   1.0                                 , # distance     , dummy with geom=1
-                                   0.0                                 , # inclination  , dummy with geom=1
-                                   params['phi']                       , # orbital phase, dummy with geom=1
+                                   1.0                               , # distance     , dummy with geom=1
+                                   0.0                               , # inclination  , dummy with geom=1
+                                   params['phi']                     ,
 
-                                   TGR_parameters                      ,
+                                   TGR_parameters                    ,
 
-                                   single_l     = self.l_NR            ,
-                                   single_m     = self.m_NR            ,
-                                   single_mode  = 1                    ,
+                                   single_l     = self.l_NR          ,
+                                   single_m     = self.m_NR          ,
+                                   single_mode  = 1                  ,
 
-                                   geom         = 1                    ,
-                                   qnm_fit      = 0                    ,
-                                   interpolants = None                 ,
-                                   qnm_cached   = self.qnm_cached      )
+                                   geom         = 1                  ,
+                                   qnm_fit      = 0                  ,
+                                   interpolants = None               ,
+                                   qnm_cached   = self.qnm_cached    ,
+                                   version      = self.KerrHM_version)
 
         return ringdown_model
 
