@@ -1,3 +1,5 @@
+import numpy as np
+
 def find_longest_name_length(names):
     
     """

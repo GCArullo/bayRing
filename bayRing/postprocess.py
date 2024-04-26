@@ -369,7 +369,7 @@ def compare_with_GR_QNMs(results_object, qnm_cached, NR_sim, outdir):
 
     return 
 
-def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, method):
+def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, method, tail_flag):
 
     """
 
@@ -412,8 +412,6 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     t_cut, tM_start, tM_end, NR_r_cut, NR_i_cut, NR_r_err_cut, NR_i_err_cut, NR_amp_cut, NR_phi_cut, NR_f_cut = NR_sim.t_NR_cut, NR_sim.tM_start, NR_sim.tM_end, NR_sim.NR_r_cut, NR_sim.NR_i_cut, np.real(NR_sim.NR_cpx_err_cut), np.imag(NR_sim.NR_cpx_err_cut), NR_sim.NR_amp_cut, NR_sim.NR_phi_cut, NR_sim.NR_freq_cut
 
     l,m = NR_sim.l, NR_sim.m
-
-    tail_flag = template.wf_model=='Kerr' and template.tail==1
 
     if(NR_sim.NR_catalog=='cbhdb' or NR_sim.NR_catalog=='charged_raw'):
         f_rd_fundamental = template.qnm_cached[(2,l,m,0)]['f']
@@ -607,7 +605,9 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     ax2.set_xticklabels([])
     plt.tight_layout(rect=[0,0,1,0.95])
     plt.subplots_adjust(hspace=0, wspace=0.22)
-    plt.savefig(os.path.join(outdir, 'Plots/Comparisons/Waveform_reconstruction.pdf'), bbox_inches='tight')
+    if(tail_flag): leg_name_tail = '_tail'
+    else         : leg_name_tail = ''
+    plt.savefig(os.path.join(outdir, f'Plots/Comparisons/Waveform_reconstruction{leg_name_tail}.pdf'), bbox_inches='tight')
 
     if (tail_flag): plt.rcParams['legend.frameon'] = False
 

@@ -170,10 +170,14 @@ class Waveform_rit(object):
                 key                = key.strip()
                 self.metadata[key] = val
 
-        additional_data = pd.read_csv(self.csv_path)
-        
-        self.metadata[  f'A_peak_{self.ell}{self.m}'] = float(additional_data.loc[additional_data.ID==self.ID,     f'A_peak{self.ell}{self.m}'])
-        self.metadata[f'omg_peak_{self.ell}{self.m}'] = float(additional_data.loc[additional_data.ID==self.ID, f'omega_peak{self.ell}{self.m}'])
+        try:
+            additional_data = pd.read_csv(self.csv_path)
+            
+            self.metadata[  f'A_peak_{self.ell}{self.m}'] = float(additional_data.loc[additional_data.ID==self.ID,     f'A_peak{self.ell}{self.m}'])
+            self.metadata[f'omg_peak_{self.ell}{self.m}'] = float(additional_data.loc[additional_data.ID==self.ID, f'omega_peak{self.ell}{self.m}'])
+        except:
+            self.metadata[  f'A_peak_{self.ell}{self.m}'] = 0.0
+            self.metadata[f'omg_peak_{self.ell}{self.m}'] = 0.0
 
         return self.metadata
 
