@@ -241,7 +241,7 @@ A dot is present at the end of each description line and is not to be intended a
         dir              Absolute path of NR local data.                                                                     Default: ''.
         catalog          NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'fake_NR']. Default: 'SXS'.
         ID               Simulation ID to be considered. Example for SXS: 0305. Example for Teukolsky: \
-                         `a_0.7_A_0.141_w_1.4_ingoing_ang_15`.                                                               Default: '0305'.
+                         `a_0.7_A_0.141_w_1.4_ingoing_ang_15`.                                                               Default: 0305.
         extrap-order     Extrapolation order of the `SXS` simulations. Smaller N is better for ringdown \
               (data.black-holes.org/waveforms/index.html). Available options: ['2', '3', '4'].                               Default: 2.
         res-level        Resolution level of the simulation. For `SXS`: -1 selects the maximum available resolution. \

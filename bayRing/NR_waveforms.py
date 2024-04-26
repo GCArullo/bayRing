@@ -637,7 +637,15 @@ class NR_simulation():
             else:
                 self.t_NR, self.NR_r, self.NR_i = self.read_hlm_from_SXS(self.extrap_order, self.res_level)
 
-            t_res,     NR_r_res,  NR_i_res  = self.read_hlm_from_SXS(self.extrap_order,   self.res_level-1)
+            counter = 1
+            while(counter==0):
+                try              : 
+                    if(self.res_level-counter==0): raise ValueError("Only a single resolution available.")
+                    t_res,     NR_r_res,  NR_i_res  = self.read_hlm_from_SXS(self.extrap_order,   self.res_level-counter)
+                    print('Resolution error constructed with resolution level {}'.format(self.res_level-counter))
+                    counter = 0
+                except ValueError: 
+                    counter += 1
             t_extr,    NR_r_extr, NR_i_extr = self.read_hlm_from_SXS(self.extrap_order+1, self.res_level)
 
         elif(self.NR_catalog=='RIT'):
