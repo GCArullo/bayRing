@@ -1,3 +1,18 @@
+import numpy as np
+
+#FIXME: implement fixed params reading for all models
+def get_param_override(fixed_params, x, name):
+    """
+        Function returning either a sample or the fixed value for the parameter considered.
+        ---------------
+        
+        Returns x[name], unless it is over-ridden by
+        value in the fixed_params dictionary.
+        
+    """
+    if name in fixed_params: return fixed_params[name]
+    else:                    return x[name]
+
 def find_longest_name_length(names):
     
     """

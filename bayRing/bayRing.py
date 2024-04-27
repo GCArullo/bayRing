@@ -146,9 +146,12 @@ def main():
                                      parameters['Inference']['min-method']                , 
                                      likelihood_kind=parameters['Inference']['likelihood'])
 
+    tail_flag = wf_model.wf_model=='Kerr' and wf_model.tail==1
     # Plot and terminate execution if plotting only.
     if(parameters['I/O']['run-type']=='plot-NR-only'): 
-        postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None)
+        postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, tail_flag)
+        # In case a tail run is selected, do plots also without tail format
+        if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, False)
         print('\n* NR-only plotting run-type selected. Exiting.\n')
         exit()
 
@@ -187,7 +190,10 @@ def main():
         execution_time = (time.time() - execution_time)/60.0
         print('\nExecution time (min): {:.2f}\n'.format(execution_time))
 
-    try: postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'])
+    try: 
+        postprocess.plot_NR_vs_model(               NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], tail_flag)
+        # In case a tail run is selected, do plots also without tail format
+        if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], False    )
     except: print('Waveform reconstruction plot failed.')
     try   : postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
     except: print('Corner plot failed.')
