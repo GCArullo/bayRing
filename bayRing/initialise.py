@@ -205,7 +205,7 @@ def read_config(Config):
     if  (parameters['Model']['template']=='Damped-sinusoids'): 
         parameters['Model']['QNM-modes'] = '{}{}0'.format(parameters['NR-data']['l-NR'], parameters['NR-data']['m']) 
     elif(parameters['Model']['template']=='MMRDNP'          ): 
-        parameters['Model']['QNM-modes'] = '220,210,330,320,440,430'
+        parameters['Model']['QNM-modes'] = '220,221,210,330,331,320,440,430'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4): raise ValueError("The MMRDNP template is only available for l=2,3,4")
     elif(parameters['Model']['template']=='TEOBPM'      ):
         print('\n\n Fix handling of merger phases for TEOBPM.\n\n')

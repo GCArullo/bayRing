@@ -1,6 +1,9 @@
-import pyRing.waveform as wf
 import numpy as np
+
 import cpnest.model
+
+import pyRing.waveform as wf
+import bayRing.utils   as utils
 
 class WaveformModel(cpnest.model.Model):
     
@@ -27,24 +30,30 @@ class WaveformModel(cpnest.model.Model):
             self.const_r = [const_params[0]*np.cos(const_params[1])]
             self.const_i = [const_params[0]*np.sin(const_params[1])]
     
-    def Kerr_waveform(self, params):
+    def Kerr_waveform(self, params, fixed_params):
 
         amps, quad_amps, tail_parameters = {}, {}, {}
         
         # Read-in linear modes.
         for (l_ring, m_ring, n) in self.Kerr_modes:
             linear_string = '{}{}{}'.format(l_ring, m_ring, n)
-            amps[(2, l_ring, m_ring, n)] = np.exp(params['ln_A_{}'.format(linear_string)]) * np.exp(1j*(params['phi_{}'.format(linear_string)]))
+            amp_value = utils.get_param_override(fixed_params,params,'ln_A_{}'.format(linear_string))
+            phi_value = utils.get_param_override(fixed_params,params,'phi_{}'.format(linear_string))
+            amps[(2, l_ring, m_ring, n)] = np.exp(amp_value) * np.exp(1j*(phi_value))
             
         # Read-in tail parameters.
         if(self.tail):
             for (l_ring, m_ring) in self.tail_modes:
                 tail_string = '{}{}'.format(l_ring, m_ring)
                 tail_parameters[(l_ring, m_ring)] = {}
-                
-                tail_parameters[(l_ring, m_ring)]['A']   = np.exp(params['ln_A_tail_{}'.format(tail_string)])
-                tail_parameters[(l_ring, m_ring)]['phi'] =        params[ 'phi_tail_{}'.format(tail_string)]
-                tail_parameters[(l_ring, m_ring)]['p']   =        params[   'p_tail_{}'.format(tail_string)]
+
+                tail_amp_value = utils.get_param_override(fixed_params,params,'ln_A_tail_{}'.format(tail_string))
+                tail_phi_value = utils.get_param_override(fixed_params,params, 'phi_tail_{}'.format(tail_string))
+                tail_p_value   = utils.get_param_override(fixed_params,params,   'p_tail_{}'.format(tail_string))
+
+                tail_parameters[(l_ring, m_ring)]['A']   = np.exp(tail_amp_value)
+                tail_parameters[(l_ring, m_ring)]['phi'] =        tail_phi_value
+                tail_parameters[(l_ring, m_ring)]['p']   =        tail_p_value
 
         # Read-in quadratic modes.
         if(self.quadratic_modes is not None):
@@ -52,7 +61,9 @@ class WaveformModel(cpnest.model.Model):
                 quad_amps[quad_term] = {}
                 for ((l,m,n),(l1,m1,n1),(l2,m2,n2)) in self.quadratic_modes[quad_term]:
                     quad_string = '{}_{}{}{}_{}{}{}_{}{}{}'.format(quad_term, l,m,n, l1,m1,n1, l2,m2,n2)
-                    quad_amps[quad_term][((2,l,m,n),(2,l1,m1,n1),(2,l2,m2,n2))] = np.exp(params['ln_A_{}'.format(quad_string)]) * np.exp(1j*(params['phi_{}'.format(quad_string)]))
+                    quad_amp_value = utils.get_param_override(fixed_params,params,'ln_A_{}'.format(quad_string))
+                    quad_phi_value = utils.get_param_override(fixed_params,params, 'phi_{}'.format(quad_string))
+                    quad_amps[quad_term][((2,l,m,n),(2,l1,m1,n1),(2,l2,m2,n2))] = np.exp(quad_amp_value) * np.exp(1j*quad_phi_value)
 
         if('qf' in self.metadata): 
             TGR_parameters      = {}
@@ -88,22 +99,27 @@ class WaveformModel(cpnest.model.Model):
         
         return ringdown_model
         
-    def Damped_sinusoids_waveform(self, params):
+    def Damped_sinusoids_waveform(self, params, fixed_params):
 
         ringdown_model = np.zeros(len(self.t_NR), dtype=np.complex128)
         
+        amp_value = utils.get_param_override(fixed_params,params,'ln_A_{}'.format(i))
+        phi_value = utils.get_param_override(fixed_params,params, 'phi_{}'.format(i))
+        f_value   = utils.get_param_override(fixed_params,params,   'f_{}'.format(i))
+        tau_value = utils.get_param_override(fixed_params,params, 'tau_{}'.format(i))
+
         # In this case modes is an integer storing the number of free damped sinusoids
         for i in range(self.N_ds_modes):
-            ringdown_model += wf.damped_sinusoid(np.exp(params[  'ln_A_{}'.format(i)]),
-                                                        params[  'f_{}'.format(i)]    ,
-                                                        params['tau_{}'.format(i)]    ,
-                                                        params['phi_{}'.format(i)]    ,
-                                                        self.t_start                  ,
-                                                        self.t_NR                     )
+            ringdown_model += wf.damped_sinusoid(np.exp(amp_value)   ,
+                                                        f_value      ,
+                                                        tau_value    ,
+                                                        phi_value    ,
+                                                        self.t_start ,
+                                                        self.t_NR    )
             
         return ringdown_model
 
-    def MMRDNP_waveform(self, params):
+    def MMRDNP_waveform(self, params, fixed_params):
 
         TGR_parameters = {}
         MMRDNP_params  = {}
@@ -112,6 +128,8 @@ class WaveformModel(cpnest.model.Model):
         MMRDNP_params['eta']  = (self.metadata['m1']*self.metadata['m2'])/(MMRDNP_params['Mi'])**2
         MMRDNP_params['chis'] = (self.metadata['m1']*self.metadata['chi1'] + self.metadata['m2']*self.metadata['chi2'])/(MMRDNP_params['Mi'])
         MMRDNP_params['chia'] = (self.metadata['m1']*self.metadata['chi1'] - self.metadata['m2']*self.metadata['chi2'])/(MMRDNP_params['Mi'])
+
+        phi_value = utils.get_param_override(fixed_params,params,'phi')
 
         ringdown_model = wf.MMRDNP(self.t_start                        ,
                                    self.t_peak                         ,
@@ -125,7 +143,7 @@ class WaveformModel(cpnest.model.Model):
 
                                    1.0                                 , # distance     , dummy with geom=1
                                    0.0                                 , # inclination  , dummy with geom=1
-                                   params['phi']                       , # orbital phase, dummy with geom=1
+                                   phi_value                           , # orbital phase, dummy with geom=1
 
                                    TGR_parameters                      ,
 
@@ -140,7 +158,7 @@ class WaveformModel(cpnest.model.Model):
 
         return ringdown_model
 
-    def TEOBPM_waveform(self, params):
+    def TEOBPM_waveform(self, params, fixed_params):
 
         TGR_parameters = {}
         
@@ -205,22 +223,22 @@ class WaveformModel(cpnest.model.Model):
 
         return ringdown_model
 
-    def waveform(self, params):
+    def waveform(self, params, fixed_params):
 
         if (self.wf_model=='Kerr'):
             
-            ringdown_model = self.Kerr_waveform(params)
+            ringdown_model = self.Kerr_waveform(params, fixed_params)
             _, _, _, self.wf_r, self.wf_i = ringdown_model.waveform(self.t_NR)
     
         elif (self.wf_model=='Damped-sinusoids'):
             
-            ringdown_model = self.Damped_sinusoids_waveform(params)
+            ringdown_model = self.Damped_sinusoids_waveform(params, fixed_params)
             self.wf_r, self.wf_i = np.real(ringdown_model), np.imag(ringdown_model)
 
         elif (self.wf_model=='Kerr-Damped-sinusoids'):
 
-            ringdown_model_Kerr = self.Kerr_waveform(params) 
-            ringdown_model_DS   = self.Damped_sinusoids_waveform(params)
+            ringdown_model_Kerr = self.Kerr_waveform(params, fixed_params) 
+            ringdown_model_DS   = self.Damped_sinusoids_waveform(params, fixed_params)
 
             _, _, _, self.wf_r_Kerr, self.wf_i_Kerr = ringdown_model_Kerr.waveform(self.t_NR)
             self.wf_r_DS, self.wf_i_DS = np.real(ringdown_model_DS), np.imag(ringdown_model_DS)
@@ -230,12 +248,12 @@ class WaveformModel(cpnest.model.Model):
 
         elif (self.wf_model=='MMRDNP'):
             
-            ringdown_model                = self.MMRDNP_waveform(params)
+            ringdown_model                = self.MMRDNP_waveform(params, fixed_params)
             _, _, _, self.wf_r, self.wf_i = ringdown_model.waveform(self.t_NR)
         
         elif (self.wf_model=='TEOBPM'):
             
-            ringdown_model                = self.TEOBPM_waveform(params)
+            ringdown_model                = self.TEOBPM_waveform(params, fixed_params)
             _, _, _, self.wf_r, self.wf_i = ringdown_model.waveform(self.t_NR)
 
         else:
