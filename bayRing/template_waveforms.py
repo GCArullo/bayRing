@@ -147,9 +147,9 @@ class WaveformModel(cpnest.model.Model):
 
                                    TGR_parameters                      ,
 
-                                   single_l     = self.l_NR            ,
-                                   single_m     = self.m_NR            ,
-                                   single_mode  = 1                    ,
+                                   single_spherical_mode  = 1          ,
+                                   single_spherical_l     = self.l_NR  ,
+                                   single_spherical_m     = self.m_NR  ,
 
                                    geom         = 1                    ,
                                    qnm_fit      = 0                    ,
