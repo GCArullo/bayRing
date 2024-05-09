@@ -122,7 +122,7 @@ def read_config(Config):
         'N-DS-tails'       : 1            ,
         'DS-tail'          : 0            ,
         'QNM-modes'        : '220,221,320',
-        'QQNM-modes'       : None         ,
+        'QQNM-modes'       : ''           ,
         'Kerr-tail'        : 0            ,
         'Kerr-tail-modes'  : '22'         ,
         'TEOB-NR-fit'      : 0            ,
