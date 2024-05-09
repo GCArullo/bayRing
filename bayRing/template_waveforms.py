@@ -116,6 +116,7 @@ class WaveformModel(cpnest.model.Model):
                                                         tau_value    ,
                                                         phi_value    ,
                                                         self.t_start ,
+                                                        self.t_start ,
                                                         self.t_NR    )
             
         return ringdown_model
