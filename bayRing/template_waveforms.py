@@ -111,20 +111,22 @@ class WaveformModel(cpnest.model.Model):
 
         # In this case modes is an integer storing the number of free damped sinusoids
         for i in range(self.N_ds_modes):
-            ringdown_model += wf.damped_sinusoid(np.exp(amp_value)   ,
-                                                        f_value      ,
-                                                        tau_value    ,
-                                                        phi_value    ,
-                                                        self.t_start ,
-                                                        self.t_start ,
-                                                        self.t_NR    )
+            ringdown_model += wf.damped_sinusoid(np.exp(amp_value)       ,
+                                                        f_value          ,
+                                                        tau_value        ,
+                                                        phi_value        ,
+                                                        self.t_start     ,
+                                                        self.t_start     ,
+                                                        self.t_NR        ,
+                                                        real_waveform = 1)
         #if(self.tail):
         for i in range(self.N_ds_tails):                                          
-            ringdown_model += wf.tail_factor(np.exp(params['ln_A_tail'])  ,
-                                                    params['phi_tail']    ,
-                                                    params['p_tail']      ,
-                                                    self.t_start          ,
-                                                    self.t_NR             )
+            ringdown_model += wf.tail_factor(np.exp(params['ln_A_tail']) ,
+                                                    params['phi_tail']   ,
+                                                    params['p_tail']     ,
+                                                    self.t_start         ,
+                                                    self.t_peak          ,
+                                                    self.t_NR            )
             
         return ringdown_model
 
