@@ -119,7 +119,7 @@ def read_config(Config):
         {
         'template'         : 'Kerr'       ,
         'N-DS-modes'       : 1            ,
-        'N-DS-tails'       : 1            ,
+        'N-DS-tails'       : 0            ,
         'DS-tail'          : 0            ,
         'QNM-modes'        : '220,221,320',
         'QQNM-modes'       : ''           ,
@@ -283,6 +283,7 @@ A dot is present at the end of each description line and is not to be intended a
         template         Fitting template. Available options: ['Damped-sinusoids', 'Kerr', 'Kerr-Damped-sinusoids',\
               'MMRDNP', 'TEOBPM'].                                                                                           Default: 'Kerr'.
         N-DS-modes       Number of free modes in the ringdown model if 'Damped-sinusoids' in template. Otherwise, ignored.   Default: 1.
+        N-DS-tails       Number of free tails in the ringdown model if 'Damped-sinusoids' in template. Otherwise, ignored.   Default: 0.
         QNM-modes        List of modes of the ringdown model, if 'Kerr' in template. Otherwise, ignored. \
             Example format: '220,221,320'.                                                                                   Default: '220,221,320'.
         QQNM-modes       List of quadratic modes of the ringdown model if 'Kerr' in template. Otherwise, ignored. \

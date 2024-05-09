@@ -119,14 +119,18 @@ class WaveformModel(cpnest.model.Model):
                                                         self.t_start     ,
                                                         self.t_NR        ,
                                                         real_waveform = 1)
-        #if(self.tail):
+
+        amp_tail_value = utils.get_param_override(fixed_params,params,'ln_A_tail_{}'.format(i))
+        phi_tail_value = utils.get_param_override(fixed_params,params, 'phi_tail_{}'.format(i))
+        p_tail_value   = utils.get_param_override(fixed_params,params,   'p_tail_{}'.format(i))
+
         for i in range(self.N_ds_tails):                                          
-            ringdown_model += wf.tail_factor(np.exp(params['ln_A_tail']) ,
-                                                    params['phi_tail']   ,
-                                                    params['p_tail']     ,
-                                                    self.t_start         ,
-                                                    self.t_peak          ,
-                                                    self.t_NR            )
+            ringdown_model += wf.tail_factor(np.exp(amp_tail_value),
+                                                    phi_tail_value ,
+                                                    p_tail_value   ,
+                                                    self.t_start   ,
+                                                    self.t_peak    ,
+                                                    self.t_NR      )
             
         return ringdown_model
 
