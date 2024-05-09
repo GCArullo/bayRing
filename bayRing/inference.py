@@ -68,9 +68,9 @@ def store_evidence_to_file(parameters, Evidence):
     outFile_evidence.write('{}'.format(Evidence))
     outFile_evidence.close()
 
-    return 
+    return
 
-def read_default_bounds(wf_model):
+def read_default_bounds(wf_model, TEOB_template=''):
 
     default_bounds_DS        = {'ln_A': [-20.0, 5.0]            ,
                                 'phi' : [0.0, twopi]            ,
@@ -87,17 +87,27 @@ def read_default_bounds(wf_model):
     default_bounds_Kerr_tail = {'ln_A_tail': [-20.0, 5.0]       ,
                                 'phi_tail' : [0.0, twopi]       ,
                                 'p_tail'   : [-20.0,  20.0]     }
+    
+    default_bounds_TEOBPM    = {'phi_mrg': [0.0  , twopi]       ,
+                                'c3A'    : [-10.0, 10.0 ]       ,
+                                'c3p'    : [-10.0, 10.0 ]       ,
+                                'c4p'    : [-10.0, 10.0 ]       ,
+                                }
+    if not(TEOB_template=='qc'):
+        default_bounds_TEOBPM['c2A']          = [-10.0, 10.0]
+        default_bounds_TEOBPM['c2p']          = [-10.0, 10.0]
+        default_bounds_TEOBPM['A_peakdotdot'] = [-0.01, 0.0]
 
     if(wf_model=='Damped-sinusoids'): default_bounds = default_bounds_DS
     elif(wf_model=='Damped-sinusoids-tail'): default_bounds = default_bounds_DS_tail
     elif(wf_model=='Kerr'            ): default_bounds = default_bounds_Kerr
     elif(wf_model=='Kerr-tail'       ): default_bounds = default_bounds_Kerr_tail
-    elif(wf_model=='MMRDNP'          ): default_bounds = {'dummy_x': [0.0, 0.001]}
-    elif(wf_model=='TEOBPM'          ): default_bounds = {'dummy_x': [0.0, 0.001]}
+    elif(wf_model=='MMRDNP'          ): default_bounds = {'phi': [0.0, twopi]}
+    elif(wf_model=='TEOBPM'          ): default_bounds = default_bounds_TEOBPM
 
     return default_bounds
 
-def railing_check(results_object, inference_model, outdir, nlive, tolerance=2.0):
+def railing_check(results_object, inference_model, outdir, nlive, seed, tolerance=2.0):
 
     """
     
@@ -150,11 +160,11 @@ def railing_check(results_object, inference_model, outdir, nlive, tolerance=2.0)
         
         if np.sum(railing_parameters) > 0:
             print('\n* Identifying chain with railing...')
-            chains = [os.path.join(outdir, f'Algorithm/chain_{nlive}_{seed}.txt') for seed in [0,1,2,3]]
+            try   : chains = [np.genfromtxt(os.path.join(outdir, f'Algorithm/chain_{nlive}_{seed_x}.txt'), names = True, deletechars="") for seed_x in [0,1,2,3]]
+            except: chains = [np.genfromtxt(os.path.join(outdir, f'Algorithm/chain_{nlive}_{seed}.txt'), names = True, deletechars="")]
             for chain_number,chain in enumerate(chains):
-                samples = np.genfromtxt(chain, names = True, deletechars="")
-                log_evs, log_wts    = compute_weights(samples['logL'], nlive)
-                weighted_post       = draw_posterior(samples, log_wts)
+                log_evs, log_wts    = compute_weights(chain['logL'], nlive)
+                weighted_post       = draw_posterior(chain, log_wts)
                 railing_parameters_chain = []
                 header_chain = ''
                 for (i,param) in enumerate(inference_model.names):
@@ -264,18 +274,21 @@ def Dynamic_InferenceModel(base):
 
         def __init__(self, data, error, wf_model, Config, method, min_method, likelihood_kind='gaussian'):
 
-            self.data       = data
-            self.error      = error
-            self.wf_model   = wf_model
-            self.kind       = likelihood_kind
-            self.Kerr_modes = self.wf_model.Kerr_modes
-            self.N_ds_modes = self.wf_model.N_ds_modes
-            self.N_ds_tails = self.wf_model.N_ds_tails
-            self.min_method = min_method
-            self.Config     = Config
+            self.data          = data
+            self.error         = error
+            self.wf_model      = wf_model
+            self.kind          = likelihood_kind
+            self.Kerr_modes    = self.wf_model.Kerr_modes
+            self.N_ds_modes    = self.wf_model.N_ds_modes
+            self.N_ds_tails    = self.wf_model.N_ds_tails
+            self.TEOB_NR_fit   = self.wf_model.TEOB_NR_fit
+            self.TEOB_template = self.wf_model.TEOB_template
+            self.min_method    = min_method
+            self.Config        = Config
 
             self.names          = []
             self.bounds         = []
+            self.fixed_params   = {}
             self.min_start_pars = {}
 
             pyRing_utils.print_section(f'{self.wf_model.wf_model} model')
@@ -289,11 +302,13 @@ def Dynamic_InferenceModel(base):
                 default_bounds = read_default_bounds(self.wf_model.wf_model)   
                 for (l_ring, m_ring, n) in self.Kerr_modes:
                     for name in default_bounds.keys():
-
                         fullname      = '{}_{}{}{}'.format(name, l_ring, m_ring, n)
-                        single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds)
-                        self.names.append(fullname)
-                        self.bounds.append(single_bounds)
+                        try:
+                            self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                        except(configparser.NoOptionError):
+                            single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds)
+                            self.names.append(fullname)
+                            self.bounds.append(single_bounds)
 
                 if(self.quadratic_modes is not None):
 
@@ -302,9 +317,12 @@ def Dynamic_InferenceModel(base):
                             for name in default_bounds.keys():
 
                                 fullname      = '{}_{}_{}{}{}_{}{}{}_{}{}{}'.format(name, quad_term, l,m,n, l1,m1,n1, l2,m2,n2)
-                                single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds)
-                                self.names.append(fullname)
-                                self.bounds.append(single_bounds)
+                                try:
+                                    self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                                except(configparser.NoOptionError):
+                                    single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds)
+                                    self.names.append(fullname)
+                                    self.bounds.append(single_bounds)
 
                 if(self.tail):
                     default_bounds_tail = read_default_bounds(self.wf_model.wf_model+'-tail')   
@@ -312,9 +330,12 @@ def Dynamic_InferenceModel(base):
                         for name in default_bounds_tail.keys():
 
                             fullname      = '{}_{}{}'.format(name, l_ring, m_ring)
-                            single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_tail)
-                            self.names.append(fullname)
-                            self.bounds.append(single_bounds)
+                            try:
+                                self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                            except(configparser.NoOptionError):
+                                single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_tail)
+                                self.names.append(fullname)
+                                self.bounds.append(single_bounds)
         
             elif(self.wf_model.wf_model=='Damped-sinusoids'):
 
@@ -323,9 +344,13 @@ def Dynamic_InferenceModel(base):
                 for i,name in it.product(list(range(self.N_ds_modes)),default_bounds.keys()):
 
                     fullname      = '{}_{}'.format(name, i)
-                    single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds)
-                    self.names.append(fullname)
-                    self.bounds.append(single_bounds)
+                    try:
+                        self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                    except(configparser.NoOptionError):
+                        single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds)
+                        self.names.append(fullname)
+                        self.bounds.append(single_bounds)
+
                 for i in range(self.N_ds_tails):
                     default_bounds_DS_tail = read_default_bounds(self.wf_model.wf_model+'-tail')   
                 # for i,name in it.product(list(range(self.N_ds_tails)),default_bounds_DS_tail.keys()):
@@ -334,7 +359,11 @@ def Dynamic_InferenceModel(base):
                 #     self.names.append(fullname)
                 #     self.bounds.append(single_bounds)
                     for name in default_bounds_DS_tail.keys():
-                            fullname      = '{}'.format(name)
+                        
+                        fullname      = '{}'.format(name)
+                        try:
+                            self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                        except(configparser.NoOptionError):
                             single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_DS_tail)
                             self.names.append(fullname)
                             self.bounds.append(single_bounds)
@@ -349,9 +378,12 @@ def Dynamic_InferenceModel(base):
                     for name in default_bounds_Kerr.keys():
 
                         fullname      = '{}_{}{}{}'.format(name, l_ring, m_ring, n)
-                        single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_Kerr)
-                        self.names.append(fullname)
-                        self.bounds.append(single_bounds)
+                        try:
+                            self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                        except(configparser.NoOptionError):
+                            single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_Kerr)
+                            self.names.append(fullname)
+                            self.bounds.append(single_bounds)
 
                 if(self.quadratic_modes is not None):
 
@@ -360,9 +392,12 @@ def Dynamic_InferenceModel(base):
                             for name in default_bounds_Kerr.keys():
 
                                 fullname      = '{}_{}_{}{}{}_{}{}{}_{}{}{}'.format(name, quad_term, l,m,n, l1,m1,n1, l2,m2,n2)
-                                single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_Kerr)
-                                self.names.append(fullname)
-                                self.bounds.append(single_bounds)
+                                try:
+                                    self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                                except(configparser.NoOptionError):
+                                    single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_Kerr)
+                                    self.names.append(fullname)
+                                    self.bounds.append(single_bounds)
 
                 if(self.tail):
                     default_bounds_tail = read_default_bounds('Kerr-tail')   
@@ -370,31 +405,54 @@ def Dynamic_InferenceModel(base):
                         for name in default_bounds_tail.keys():
 
                             fullname      = '{}_{}{}'.format(name, l_ring, m_ring)
-                            single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_tail)
-                            self.names.append(fullname)
-                            self.bounds.append(single_bounds)
+                            try:
+                                self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                            except(configparser.NoOptionError):
+                                single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_tail)
+                                self.names.append(fullname)
+                                self.bounds.append(single_bounds)
 
                 default_bounds_DS = read_default_bounds('Damped-sinusoids')
                 for i,name in it.product(list(range(self.N_ds_modes)),default_bounds_DS.keys()):
 
                     fullname      = '{}_{}'.format(name, i)
-                    single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_DS)
-                    self.names.append(fullname)
-                    self.bounds.append(single_bounds)
+                    try:
+                        self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                    except(configparser.NoOptionError):
+                        single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_DS)
+                        self.names.append(fullname)
+                        self.bounds.append(single_bounds)
 
             elif(self.wf_model.wf_model=='MMRDNP'):
 
-                self.names.append('dummy_x')
-                self.bounds.append([0.0, 0.001])  
+                default_bounds = read_default_bounds(self.wf_model.wf_model)   
+                for name in default_bounds.keys():
+                    try:
+                        self.fixed_params[name] = self.Config.getfloat("Priors",'fix-'+name)
+                    except(configparser.NoOptionError):
+                        single_bounds = read_parameter_bounds(Config, configparser, name, name, default_bounds)
+                        self.names.append(name)
+                        self.bounds.append(single_bounds)
 
             elif(self.wf_model.wf_model=='TEOBPM'):
 
-                self.names.append('dummy_x')
-                self.bounds.append([0.0, 0.001])  
+                default_bounds_TEOBPM = read_default_bounds(self.wf_model.wf_model, TEOB_template=self.TEOB_template)   
+                for name in default_bounds_TEOBPM.keys():
+                    if(not(self.TEOB_NR_fit) and not(name=='phi_mrg')): continue
+                    fullname = '{}_{}{}'.format(name, self.wf_model.l_NR, self.wf_model.m_NR)
+                    try:
+                        self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                    except(configparser.NoOptionError):
+                        single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_TEOBPM)
+                        self.names.append(fullname)
+                        self.bounds.append(single_bounds)
 
             self.residuals_tt = []
             self.grid_x       = []
             self.grid_y       = []
+
+            pyRing_utils.print_subsection('Fixed')
+            pyRing_utils.print_fixed_parameters(self.fixed_params)
             
         def access_names(self):
 
@@ -458,7 +516,7 @@ def Dynamic_InferenceModel(base):
 
             """
             
-            fit_model = self.wf_model.waveform(x)
+            fit_model = self.wf_model.waveform(x, self.fixed_params)
             
             return fit_model
 
@@ -540,7 +598,9 @@ def Dynamic_InferenceModel(base):
                 # Order the frequencies per given polarisation (same as m1>m2 in LAL).
                 for i in range(self.wf_model.N_ds_modes):
                     try:
-                        if (x['f_{}'.format(i)] < x['f_{}'.format(i-1)]): return -np.inf
+                        f_1 = utils.get_param_override(self.fixed_params,x,'f_{}'.format(i  ))
+                        f_2 = utils.get_param_override(self.fixed_params,x,'f_{}'.format(i-1))
+                        if (f_1 < f_2): return -np.inf
                     except(KeyError):
                         pass
                 for i in range(self.wf_model.N_ds_tails):
@@ -556,6 +616,15 @@ def Dynamic_InferenceModel(base):
                         if (x['f_{}'.format(i)] < x['f_{}'.format(i-1)]): return -np.inf
                     except(KeyError):
                         pass
+
+            # In the case of Kerr tails, order the tails by exponent
+            if(self.wf_model.wf_model=='Kerr' and self.wf_model.tail==1):
+                for (l_ring, m_ring) in self.tail_modes:
+                    # FIXME: temporarily valid only for two modes. Eventually do it for an arbitrary number of modes.
+                    p_tail_1 = utils.get_param_override(self.fixed_params,x,'p_tail_{}{}'.format(l_ring            , m_ring            ))
+                    p_tail_2 = utils.get_param_override(self.fixed_params,x,'p_tail_{}{}'.format(self.wf_model.l_NR, self.wf_model.m_NR))
+
+                    if (p_tail_1 < p_tail_2): return -np.inf
 
             return 0.0
     
@@ -683,14 +752,15 @@ def run_inference(parameters, inference_model):
             print('* Using CPNest version: `{}`.\n'.format(cpnest.__version__))
             print('* The sampling output appears in the `{}/Algorithm/cpnest.log` file.\n'.format( parameters['I/O']['outdir']))
 
-            job = cpnest.CPNest(inference_model,
-                                verbose  = 3,
-                                nlive    = parameters['Inference']['nlive'],
-                                maxmcmc  = parameters['Inference']['maxmcmc'],
-                                poolsize = 128,
-                                nthreads = 1,
+            job = cpnest.CPNest(inference_model                                                  ,
+                                verbose  = 3                                                     ,
+                                nlive    = parameters['Inference']['nlive']                      ,
+                                maxmcmc  = parameters['Inference']['maxmcmc']                    ,
+                                seed     = parameters['Inference']['seed']                       , 
+                                poolsize = 128                                                   ,
+                                nthreads = 1                                                     ,
                                 output   = os.path.join( parameters['I/O']['outdir'],'Algorithm'),
-                                resume   = 1)
+                                resume   = 1                                                     )
             job.run()
 
             results_object = job.get_posterior_samples(filename='posterior.dat')
@@ -717,14 +787,15 @@ def run_inference(parameters, inference_model):
             print('* Using raynest version: `{}`.\n'.format(raynest.__version__))
             print('* The sampling output appears in the `{}/Algorithm/raynest.log` file.\n'.format( parameters['I/O']['outdir']))
 
-            job = raynest.raynest(inference_model,
-                                  verbose   = 2,
-                                  nlive     = parameters['Inference']['nlive'],
-                                  maxmcmc   = parameters['Inference']['maxmcmc'],
-                                  nnest     = parameters['Inference']['nnest'],
-                                  nensemble = parameters['Inference']['nensemble'],
+            job = raynest.raynest(inference_model                                                   ,
+                                  verbose   = 2                                                     ,
+                                  nlive     = parameters['Inference']['nlive']                      ,
+                                  maxmcmc   = parameters['Inference']['maxmcmc']                    ,
+                                  seed      = parameters['Inference']['seed']                       , 
+                                  nnest     = parameters['Inference']['nnest']                      ,
+                                  nensemble = parameters['Inference']['nensemble']                  ,
                                   output    = os.path.join( parameters['I/O']['outdir'],'Algorithm'),
-                                  resume    = 1)   
+                                  resume    = 1                                                     )   
             job.run()
             results_object  = job.posterior_samples.ravel()
             posterior       = pd.DataFrame(results_object, columns = inference_model.names + ['logL', 'logPrior'])
@@ -737,7 +808,7 @@ def run_inference(parameters, inference_model):
         # Posterior railing check section. #
         #==================================#
 
-        railing_check(results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['nlive'], tolerance=2.0)
+        railing_check(results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['nlive'], parameters['Inference']['seed'], tolerance=2.0)
 
     else: raise ValueError('Method {} not recognised.'.format(parameters['Inference']['method']))
 

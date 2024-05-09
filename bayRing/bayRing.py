@@ -76,6 +76,7 @@ def main():
                                              parameters['NR-data']['extrap-order']                , 
                                              parameters['NR-data']['pert-order']                  , 
                                              parameters['NR-data']['dir']                         , 
+                                             parameters['NR-data']['properties-file']             ,
                                              parameters['Injection-data']['modes-list']           , 
                                              parameters['Injection-data']['times']                , 
                                              parameters['Injection-data']['noise']                , 
@@ -88,6 +89,7 @@ def main():
                                              tM_start       = parameters['Inference']['t-start']  , 
                                              tM_end         = parameters['Inference']['t-end']    , 
                                              t_delay_scd    = parameters['Inference']['dt-scd']   , 
+                                             t_peak_22      = parameters['NR-data']['t-peak-22']  ,
                                              t_min_mismatch = parameters['NR-data']['error-t-min'], 
                                              t_max_mismatch = parameters['NR-data']['error-t-max'])
     
@@ -106,20 +108,23 @@ def main():
     # Load model. #
     # ============#
 
-    wf_model = template_waveforms.WaveformModel(NR_sim.t_NR_cut                                       , 
-                                                NR_sim.t_min                                          , 
-                                                parameters['Model']['template']                       , 
-                                                parameters['Model']['N-DS-modes']                     ,
-                                                parameters['Model']['N-DS-tails']                     , 
-                                                Kerr_modes                                            , 
-                                                NR_metadata                                           , 
-                                                qnm_cached                                            , 
-                                                parameters['NR-data']['l-NR']                         , 
-                                                parameters['NR-data']['m']                            , 
+    wf_model = template_waveforms.WaveformModel(NR_sim.t_NR_cut                                         , 
+                                                NR_sim.t_min                                            , 
+                                                NR_sim.t_peak                                           ,
+                                                parameters['Model']['template']                         , 
+                                                parameters['Model']['N-DS-modes']                       ,
+                                                parameters['Model']['N-DS-tails']                       ,  
+                                                Kerr_modes                                              , 
+                                                NR_metadata                                             , 
+                                                qnm_cached                                              , 
+                                                parameters['NR-data']['l-NR']                           , 
+                                                parameters['NR-data']['m']                              , 
                                                 tail              = parameters['Model']['Kerr-tail']    ,
-                                                tail_modes        = Kerr_tail_modes                   ,     
-                                                quadratic_modes   = Kerr_quad_modes                   , 
-                                                const_params      = parameters['NR-data']['add-const'], 
+                                                tail_modes        = Kerr_tail_modes                     ,     
+                                                quadratic_modes   = Kerr_quad_modes                     , 
+                                                const_params      = parameters['NR-data']['add-const']  , 
+                                                TEOB_NR_fit       = parameters['Model']['TEOB-NR-fit']  ,
+                                                TEOB_template     = parameters['Model']['TEOB-template'],
                                                 )
 
     # ===============#
@@ -142,49 +147,56 @@ def main():
                                      parameters['Inference']['min-method']                , 
                                      likelihood_kind=parameters['Inference']['likelihood'])
 
+    tail_flag = wf_model.wf_model=='Kerr' and wf_model.tail==1
     # Plot and terminate execution if plotting only.
     if(parameters['I/O']['run-type']=='plot-NR-only'): 
-        postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None)
+        postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, tail_flag)
+        # In case a tail run is selected, do plots also without tail format
+        if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, False)
         print('\n* NR-only plotting run-type selected. Exiting.\n')
         exit()
 
-    if(parameters['Model']['fixed-waveform']): results_object = {'dummy_x': np.array([0.0])}
-    else:
+    print_section('Inference')
 
-        print_section('Inference')
+    #==============================#
+    # Inference execution section. #
+    #==============================#
+    
+    if(  parameters['I/O']['run-type']=='full'           ): results_object = inference.run_inference(parameters, inference_model)
+    elif(parameters['I/O']['run-type']=='post-processing'): results_object = postprocess.read_results_object_from_previous_inference(parameters)
+    else                                                  : raise Exception("Unknown run type selected. Exiting.")
+            
+    #=========================#
+    # Postprocessing section. #
+    #=========================#
 
-        #==============================#
-        # Inference execution section. #
-        #==============================#
-        
-        if(  parameters['I/O']['run-type']=='full'           ): results_object = inference.run_inference(parameters, inference_model)
-        elif(parameters['I/O']['run-type']=='post-processing'): results_object = postprocess.read_results_object_from_previous_inference(parameters)
-        else                                                  : raise Exception("Unknown run type selected. Exiting.")
-                
-        #=========================#
-        # Postprocessing section. #
-        #=========================#
+    print_section('Post-processing')
 
-        print_section('Post-processing')
+    print('\n* Note: quantities are quoted at the start time of the fit (i.e. t_peak + t_0 [M]).\n')
+    postprocess.print_point_estimate(results_object, inference_model.access_names(), parameters['Inference']['method'])
+    # postprocess.plot_fancy_residual(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'])
+    # postprocess.plot_fancy_reconstruction(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], method)
+    postprocess.l2norm_residual_vs_nr(results_object, inference_model, NR_sim, parameters['I/O']['outdir'])
 
-        print('\n* Note: quantities are quoted at the start time of the fit (i.e. t_peak + t_0 [M]).\n')
-        postprocess.print_point_estimate(results_object, inference_model.access_names(), parameters['Inference']['method'])
-        # postprocess.plot_fancy_residual(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'])
-        # postprocess.plot_fancy_reconstruction(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], method)
-        postprocess.l2norm_residual_vs_nr(results_object, inference_model, NR_sim, parameters['I/O']['outdir'])
+    if('Kerr' in parameters['Model']['template'] ): postprocess.post_process_amplitudes(parameters['Inference']['t-start'], results_object, NR_metadata, qnm_cached, Kerr_modes, Kerr_quad_modes, parameters['I/O']['outdir'])
+    if(parameters['NR-data']['catalog']=='C2EFT' and 'Damped-sinusoids' in parameters['Model']['template']): postprocess.compare_with_GR_QNMs(results_object, qnm_cached, NR_sim, parameters['I/O']['outdir'])
 
-        if('Kerr' in parameters['Model']['template'] ): postprocess.post_process_amplitudes(parameters['Inference']['t-start'], results_object, NR_metadata, qnm_cached, Kerr_modes, Kerr_quad_modes, parameters['I/O']['outdir'])
-        if(parameters['NR-data']['catalog']=='C2EFT' and 'Damped-sinusoids' in parameters['Model']['template']): postprocess.compare_with_GR_QNMs(results_object, qnm_cached, NR_sim, parameters['I/O']['outdir'])
+    if(parameters['I/O']['run-type']=='full'):
+    
+        if(parameters['Inference']['method']=='Nested-sampler'):
+            os.system('mv {dir}/Algorithm/posterior*.pdf {dir}/Plots/Results/.'.format(dir = parameters['I/O']['outdir']))
+            if(  parameters['Inference']['sampler']=='raynest'): os.system('mv {dir}/Algorithm/*trace.png   {dir}/Plots/Chains/.'.format(dir = parameters['I/O']['outdir']))
+            elif(parameters['Inference']['sampler']=='cpnest' ): os.system('mv {dir}/Algorithm/nschain*.pdf {dir}/Plots/Chains/.'.format(dir = parameters['I/O']['outdir']))
+            
+        execution_time = (time.time() - execution_time)/60.0
+        print('\nExecution time (min): {:.2f}\n'.format(execution_time))
 
-        if(parameters['I/O']['run-type']=='full'):
-        
-            if(parameters['Inference']['method']=='Nested-sampler'):
-                os.system('mv {dir}/Algorithm/posterior*.pdf {dir}/Plots/Results/.'.format(dir = parameters['I/O']['outdir']))
-                os.system('mv {dir}/Algorithm/nschain*.pdf {dir}/Plots/Chains/.'.format(dir = parameters['I/O']['outdir']))
-                
-            execution_time = (time.time() - execution_time)/60.0
-            print('\nExecution time (min): {:.2f}\n'.format(execution_time))
+    try: 
+        postprocess.plot_NR_vs_model(               NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], tail_flag)
+        # In case a tail run is selected, do plots also without tail format
+        if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], False    )
+    except: print('Waveform reconstruction plot failed.')
+    try   : postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
+    except: print('Corner plot failed.')
 
-    postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'])
-    postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
     if(parameters['I/O']['show-plots']): plt.show()

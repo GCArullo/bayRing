@@ -103,6 +103,8 @@ def read_config(Config):
         'error-t-min'      : 2692.7480095302817, # SXS-0305 specific
         'error-t-max'      : 3792.7480095302817, # SXS-0305 specific
         'add-const'        : '0.0,0.0',
+        'properties-file'  : '',
+        't-peak-22'        : 0.0,
         },
 
         'Injection-data':
@@ -115,14 +117,16 @@ def read_config(Config):
 
         'Model':
         {
-        'template'         : 'Kerr',
-        'N-DS-modes'       : 1,
-        'N-DS-tails'       : 1,
+        'template'         : 'Kerr'       ,
+        'N-DS-modes'       : 1            ,
+        'N-DS-tails'       : 1            ,
+        'DS-tail'          : 0            ,
         'QNM-modes'        : '220,221,320',
-        'QQNM-modes'       : None,
-        'Kerr-tail'        : 0,
-        'Kerr-tail-modes'  : '22',
-        'DS-tail'          : 0,
+        'QQNM-modes'       : None         ,
+        'Kerr-tail'        : 0            ,
+        'Kerr-tail-modes'  : '22'         ,
+        'TEOB-NR-fit'      : 0            ,
+        'TEOB-template'    : 'qc'         ,
         },
 
         'Inference':
@@ -132,6 +136,7 @@ def read_config(Config):
         'sampler'          : 'cpnest',
         'nlive'            : 256,
         'maxmcmc'          : 256,
+        'seed'             : 1234,
         'nnest'            : 1,
         'nensemble'        : 1,
         't-start'          : 20.0,
@@ -189,18 +194,19 @@ def read_config(Config):
 
     if not(parameters['NR-data']['add-const']==None): parameters['NR-data']['add-const'] = [float(value) for value in parameters['NR-data']['add-const'].split(',')]
 
-    if (parameters['Model']['template']=='MMRDNP' or parameters['Model']['template']=='TEOBPM'): parameters['Model']['fixed-waveform'] = 1
-    else                                                                                       : parameters['Model']['fixed-waveform'] = 0
+    if ((parameters['Model']['template']=='MMRDNP' or parameters['Model']['template']=='TEOBPM') and not(parameters['NR-data']['l-NR']==2 and parameters['NR-data']['m']==2) and parameters['NR-data']['t-peak-22']==0.0): raise ValueError("The time of the peak of the 22 mode must be provided for the MMRDNP and TEOBPM models when fitting the HMs, to correctly rescale the NR-calibrated quantities.")
 
     if  (parameters['Model']['template']=='Damped-sinusoids'): 
         parameters['Model']['QNM-modes'] = '{}{}0'.format(parameters['NR-data']['l-NR'], parameters['NR-data']['m']) 
     elif(parameters['Model']['template']=='MMRDNP'          ): 
-        parameters['Model']['QNM-modes'] = '220,210,330,320,440,430'
+        parameters['Model']['QNM-modes'] = '220,221,210,330,331,320,440,430'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4): raise ValueError("The MMRDNP template is only available for l=2,3,4")
     elif(parameters['Model']['template']=='TEOBPM'      ):
         print('\n\n Fix handling of merger phases for TEOBPM.\n\n')
         parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,321,310,311,440,441,430,431,420,421,410,411,550,551'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4  or parameters['NR-data']['l-NR']==5): raise ValueError("The TEOBPM template is only available for l=2,3,4,5")
+
+    print('\n\n\nFIXME: print updated vars\n\n\n')
 
     return parameters
 
@@ -226,10 +232,10 @@ A dot is present at the end of each description line and is not to be intended a
     * Parameters to be passed to the [NR-data] section. *
     *****************************************************
 
-        NR-download      Boolean to ask for the download of the requested SXS NR simulation.                                 Default 1.
+        download         Boolean to ask for the download of the requested SXS NR simulation.                                 Default 1.
         dir              Absolute path of NR local data.                                                                     Default: ''.
         catalog          NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'fake_NR']. Default: 'SXS'.
-        NR-ID            Simulation ID to be considered. Example for SXS: 0305. Example for Teukolsky: \
+        ID               Simulation ID to be considered. Example for SXS: 0305. Example for Teukolsky: \
                          `a_0.7_A_0.141_w_1.4_ingoing_ang_15`.                                                               Default: '0305'.
         extrap-order     Extrapolation order of the `SXS` simulations. Smaller N is better for ringdown \
               (data.black-holes.org/waveforms/index.html). Available options: ['2', '3', '4'].                               Default: 2.
@@ -250,8 +256,12 @@ A dot is present at the end of each description line and is not to be intended a
                          deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-res-only'.
         error-t-min      Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option.     Default: 2692.7480095302817, SXS-0305 specific.
         error-t-max      Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option.     Default: 3792.7480095302817, SXS-0305 specific.
-        add-constant     Parameter of the complex constant to be added to the fit template. Required to account for spurious \
+        add-const        Parameter of the complex constant to be added to the fit template. Required to account for spurious \
                          effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.
+        properties-file  Path to the file containing additional properties of the NR simulation in `.csv` format. \
+                         Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
+        t-peak-22        Time of the peak of the 22 mode. Used as reference time in MMRDNP model. Must be passed when \
+                         fitting HMs with MMRDNP.                                                                            Default: 0.0.                         
 
     ************************************************************
     * Parameters to be passed to the [Injection-data] section. *
@@ -278,9 +288,12 @@ A dot is present at the end of each description line and is not to be intended a
         QQNM-modes       List of quadratic modes of the ringdown model if 'Kerr' in template. Otherwise, ignored. \
                          Example format: '--QQNM-modes ``Px220x321,Px220x221', i.e. (child_term x parent1 x parent2), \
                          where the child mode is assumed to be equal to the selected (l_NR,m) multipole and child_term=P,M \
-                            (parent frequencies sum or difference).                                                          Default: None.
+                            (parent frequencies sum or difference).                                                          Default: ''.
         Kerr-tail        Boolean to add a tail factor to the Kerr template.                                                  Default: 0.
         Kerr-tail-modes  Modes to which a tail will be added in the fitting template. Example format: '22,32'.               Default: '22'.
+        TEOB-NR-fit      Boolean to fit also for NR calibration coefficients within TEOB model, otherwise, use default fits. Default: 0.
+        TEOB-template    TEOB template to be used. Available options: ['qc', 'nc']. The 'qc' version is defined in  \
+                         arXiv:1904.09550, arXiv:2001.09082, while the 'nc' in II.C of arXiv:2305.19336                      Default: 'qc'.
 
     *******************************************************
     * Parameters to be passed to the [Inference] section. *
@@ -305,6 +318,7 @@ A dot is present at the end of each description line and is not to be intended a
         sampler          Which sampler to use. Available options: ['cpnest', 'raynest'].                                     Default: 'cpnest'.
         nlive            Number of live points to be used for the sampling.                                                  Default: 256.
         maxmcmc          Number of maximum Markov Chain Monte Carlo steps to be used during the sampling.                    Default: 256.
+        seed             Seed for the random initialisation of the sampler.                                                  Default: 1234.
         nnest            Number of nested samplers to run in parallel ('massively-parallel' branch only).                    Default: 1.
         nensemble        Total number of ensemble processes running. nensemble = nnest * N_ev, where N_ev is the number \
                          of live points being substituted at each NS step. Requires N_ev << nlive. \
