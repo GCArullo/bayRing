@@ -86,7 +86,7 @@ def read_default_bounds(wf_model):
     
     default_bounds_Kerr_tail = {'ln_A_tail': [-20.0, 5.0]       ,
                                 'phi_tail' : [0.0, twopi]       ,
-                                'p_tail'   : [-10.0,  10.0]     }
+                                'p_tail'   : [-20.0,  20.0]     }
 
     if(wf_model=='Damped-sinusoids'): default_bounds = default_bounds_DS
     elif(wf_model=='Damped-sinusoids-tail'): default_bounds = default_bounds_DS_tail
@@ -270,6 +270,7 @@ def Dynamic_InferenceModel(base):
             self.kind       = likelihood_kind
             self.Kerr_modes = self.wf_model.Kerr_modes
             self.N_ds_modes = self.wf_model.N_ds_modes
+            self.N_ds_tails = self.wf_model.N_ds_tails
             self.min_method = min_method
             self.Config     = Config
 
@@ -325,18 +326,18 @@ def Dynamic_InferenceModel(base):
                     single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds)
                     self.names.append(fullname)
                     self.bounds.append(single_bounds)
-                if(self.tail):
+                for i in range(self.N_ds_tails):
                     default_bounds_DS_tail = read_default_bounds(self.wf_model.wf_model+'-tail')   
-                # for i,name in it.product(list(range(self.N_ds_modes+1)),default_bounds_DS_tail.keys()):
+                # for i,name in it.product(list(range(self.N_ds_tails)),default_bounds_DS_tail.keys()):
                 #     fullname      = '{}_{}'.format(name,i)
                 #     single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_DS_tail)
                 #     self.names.append(fullname)
                 #     self.bounds.append(single_bounds)
                     for name in default_bounds_DS_tail.keys():
-                        fullname      = '{}'.format(name)
-                        single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_DS_tail)
-                        self.names.append(fullname)
-                        self.bounds.append(single_bounds)
+                            fullname      = '{}'.format(name)
+                            single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_DS_tail)
+                            self.names.append(fullname)
+                            self.bounds.append(single_bounds)
                     
             elif(self.wf_model.wf_model=='Kerr-Damped-sinusoids'):
 
@@ -538,6 +539,19 @@ def Dynamic_InferenceModel(base):
             if(self.wf_model.wf_model=='Damped-sinusoids'):
                 # Order the frequencies per given polarisation (same as m1>m2 in LAL).
                 for i in range(self.wf_model.N_ds_modes):
+                    try:
+                        if (x['f_{}'.format(i)] < x['f_{}'.format(i-1)]): return -np.inf
+                    except(KeyError):
+                        pass
+                for i in range(self.wf_model.N_ds_tails):
+                    try:
+                        if (x['f_{}'.format(i)] < x['f_{}'.format(i-1)]): return -np.inf
+                    except(KeyError):
+                        pass
+
+            if(self.wf_model.wf_model=='Damped-sinusoids-tail'):
+                # Order the frequencies per given polarisation (same as m1>m2 in LAL).
+                for i in range(self.wf_model.N_ds_tails):
                     try:
                         if (x['f_{}'.format(i)] < x['f_{}'.format(i-1)]): return -np.inf
                     except(KeyError):

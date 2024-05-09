@@ -4,7 +4,7 @@ import cpnest.model
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None):
+    def __init__(self, t_NR, tM_start, wf_model, N_ds_modes,N_ds_tails, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail, tail_modes=None, quadratic_modes=None, const_params=None):
 
         self.t_NR, self.t_start = t_NR, tM_start
         self.wf_model           = wf_model
@@ -17,6 +17,7 @@ class WaveformModel(cpnest.model.Model):
         self.tail               = tail
         self.quadratic_modes    = quadratic_modes
         self.N_ds_modes         = N_ds_modes
+        self.N_ds_tails         = N_ds_tails
         self.tail_modes         = tail_modes
 
         if not(const_params==None):
@@ -96,7 +97,8 @@ class WaveformModel(cpnest.model.Model):
                                                         self.t_start                  ,
                                                         self.t_NR                     )
         
-        if(self.tail):                                          
+        #if(self.tail):
+        for i in range(self.N_ds_tails):                                          
             ringdown_model += wf.tail_factor(np.exp(params['ln_A_tail'])          ,
                                                                     params['phi_tail']    ,
                                                                     params['p_tail']      ,

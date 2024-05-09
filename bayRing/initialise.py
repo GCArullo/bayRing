@@ -117,11 +117,12 @@ def read_config(Config):
         {
         'template'         : 'Kerr',
         'N-DS-modes'       : 1,
+        'N-DS-tails'       : 1,
         'QNM-modes'        : '220,221,320',
         'QQNM-modes'       : None,
         'Kerr-tail'        : 0,
         'Kerr-tail-modes'  : '22',
-        #'DS-tail'          : 0,
+        'DS-tail'          : 0,
         },
 
         'Inference':

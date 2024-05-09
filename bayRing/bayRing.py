@@ -91,7 +91,7 @@ def main():
                                              t_min_mismatch = parameters['NR-data']['error-t-min'], 
                                              t_max_mismatch = parameters['NR-data']['error-t-max'])
     
-#tM_start       = parameters['Inference']['t-start']   ,
+
     error       = NR_sim.NR_cpx_err_cut
     NR_metadata = NR_waveforms.read_NR_metadata(NR_sim, parameters['NR-data']['catalog'])
 
@@ -109,13 +109,14 @@ def main():
     wf_model = template_waveforms.WaveformModel(NR_sim.t_NR_cut                                       , 
                                                 NR_sim.t_min                                          , 
                                                 parameters['Model']['template']                       , 
-                                                parameters['Model']['N-DS-modes']                     , 
+                                                parameters['Model']['N-DS-modes']                     ,
+                                                parameters['Model']['N-DS-tails']                     , 
                                                 Kerr_modes                                            , 
                                                 NR_metadata                                           , 
                                                 qnm_cached                                            , 
                                                 parameters['NR-data']['l-NR']                         , 
                                                 parameters['NR-data']['m']                            , 
-                                                tail              = parameters['Model']['DS-tail']    ,
+                                                tail              = parameters['Model']['Kerr-tail']    ,
                                                 tail_modes        = Kerr_tail_modes                   ,     
                                                 quadratic_modes   = Kerr_quad_modes                   , 
                                                 const_params      = parameters['NR-data']['add-const'], 
