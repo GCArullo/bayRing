@@ -116,6 +116,7 @@ class WaveformModel(cpnest.model.Model):
                                                         tau_value    ,
                                                         phi_value    ,
                                                         self.t_start ,
+                                                        self.t_start ,
                                                         self.t_NR    )
         #if(self.tail):
         for i in range(self.N_ds_tails):                                          
