@@ -95,6 +95,7 @@ class WaveformModel(cpnest.model.Model):
                                    quadratic_modes     = quad_amps            ,
                                    quad_lin_prop       = 0                    ,
                                    qnm_cached          = self.qnm_cached      ,
+                                   t_ref               = self.t_peak          ,
 
                                    charge              = self.charge          ,
                                    TGR_params          = TGR_parameters       ,
