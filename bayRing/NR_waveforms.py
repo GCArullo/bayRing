@@ -175,9 +175,16 @@ class Waveform_rit(object):
             
             self.metadata[  f'A_peak_{self.ell}{self.m}'] = float(additional_data.loc[additional_data.ID==self.ID,     f'A_peak{self.ell}{self.m}'])
             self.metadata[f'omg_peak_{self.ell}{self.m}'] = float(additional_data.loc[additional_data.ID==self.ID, f'omega_peak{self.ell}{self.m}'])
+            self.metadata[                       f'Emrg'] = float(additional_data.loc[additional_data.ID==self.ID,                     f'Heff_til'])
+            self.metadata[                       f'Jmrg'] = float(additional_data.loc[additional_data.ID==self.ID,                     f'Jmrg_til'])
+            self.metadata[                       f'bmrg'] = float(additional_data.loc[additional_data.ID==self.ID,               f'b_massless_EOB'])
+            
         except:
             self.metadata[  f'A_peak_{self.ell}{self.m}'] = 0.0
             self.metadata[f'omg_peak_{self.ell}{self.m}'] = 0.0
+            self.metadata[                       f'Emrg'] = 0.0
+            self.metadata[                       f'Jmrg'] = 0.0
+            self.metadata[                       f'bmrg'] = 0.0
 
         return self.metadata
 
