@@ -117,15 +117,16 @@ def read_config(Config):
 
         'Model':
         {
-        'template'         : 'Kerr'       ,
-        'N-DS-modes'       : 1            ,
-        'QNM-modes'        : '220,221,320',
-        'QQNM-modes'       : ''           ,
-        'Kerr-tail'        : 0            ,
-        'Kerr-tail-modes'  : '22'         ,
-        'KerrNR-version'   : 'London2018' ,
-        'TEOB-NR-fit'      : 0            ,
-        'TEOB-template'    : 'qc'         ,
+        'template'                     : 'Kerr'       ,
+        'N-DS-modes'                   : 1            ,
+        'QNM-modes'                    : '220,221,320',
+        'QQNM-modes'                   : ''           ,
+        'Kerr-tail'                    : 0            ,
+        'Kerr-tail-modes'              : '22'         ,
+        'KerrNR-version'               : 'London2018' ,
+        'KerrNR-amplitudes-nc-version' : ''           ,
+        'TEOB-NR-fit'                  : 0            ,
+        'TEOB-template'                : 'qc'         ,
         },
 
         'Inference':

@@ -175,9 +175,9 @@ class Waveform_rit(object):
             
             self.metadata[  f'A_peak_{self.ell}{self.m}'] = float(additional_data.loc[additional_data.ID==self.ID,     f'A_peak{self.ell}{self.m}'])
             self.metadata[f'omg_peak_{self.ell}{self.m}'] = float(additional_data.loc[additional_data.ID==self.ID, f'omega_peak{self.ell}{self.m}'])
-            self.metadata[                       f'Emrg'] = float(additional_data.loc[additional_data.ID==self.ID,                     f'Heff_til'])
-            self.metadata[                       f'Jmrg'] = float(additional_data.loc[additional_data.ID==self.ID,                     f'Jmrg_til'])
-            self.metadata[                       f'bmrg'] = float(additional_data.loc[additional_data.ID==self.ID,               f'b_massless_EOB'])
+            self.metadata[                        'Emrg'] = float(additional_data.loc[additional_data.ID==self.ID,                     f'Heff_til'])
+            self.metadata[                        'Jmrg'] = float(additional_data.loc[additional_data.ID==self.ID,                     f'Jmrg_til'])
+            self.metadata[                        'bmrg'] = float(additional_data.loc[additional_data.ID==self.ID,               f'b_massless_EOB'])
             
         except:
             self.metadata[  f'A_peak_{self.ell}{self.m}'] = 0.0
@@ -345,6 +345,9 @@ def read_NR_metadata(NR_sim, NR_catalog):
                     'af'         : NR_sim.af,
                     'A_peak_22'  : NR_sim.A_peak_22,
                     'omg_peak_22': NR_sim.omg_peak_22,
+                    'bmrg'       : NR_sim.bmrg,
+                    'Emrg'       : NR_sim.Emrg,
+                    'Jmrg'       : NR_sim.Jmrg,
                 }
 
     elif(NR_catalog=='C2EFT'):
@@ -663,7 +666,7 @@ class NR_simulation():
         
             print('\n\n\nFIXME: figure out extrapolation order and resolution level for RIT\n\n\n')
 
-            self.q, self.chi1, self.chi2, self.ecc, self.Mf, self.af, self.A_peak_22, self.omg_peak_22 = self.read_RIT_metadata()
+            self.q, self.chi1, self.chi2, self.ecc, self.Mf, self.af, self.A_peak_22, self.omg_peak_22, self.bmrg, self.Emrg, self.Jmrg = self.read_RIT_metadata()
 
             # Build NR waveform and time axis.
             self.t_NR, self.NR_r, self.NR_i = self.read_hlm_from_RIT()
@@ -1267,8 +1270,11 @@ class NR_simulation():
         # FIXME: Generalise to multiple modes with dictionaries.
         A_peak_22   = float(data['A_peak_22'])
         omg_peak_22 = float(data['omg_peak_22'])
+        bmrg        = float(data['bmrg'])
+        Emrg        = float(data['Emrg'])
+        Jmrg        = float(data['Jmrg'])
 
-        return q, chi1z, chi2z, ecc, Mf, chif, A_peak_22, omg_peak_22
+        return q, chi1z, chi2z, ecc, Mf, chif, A_peak_22, omg_peak_22, bmrg, Emrg, Jmrg
 
     def read_hlm_from_RIT(self):
 

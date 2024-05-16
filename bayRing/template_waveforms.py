@@ -149,7 +149,7 @@ class WaveformModel(cpnest.model.Model):
                                    phi_value                                           , 
 
                                    TGR_parameters                                      ,
-,
+
                                    noncircular_params      = noncircular_parameters    ,
                                    noncircular_amp_version = self.KerrNR_amp_nc_version,
 
