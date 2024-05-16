@@ -128,7 +128,8 @@ class WaveformModel(cpnest.model.Model):
         TGR_parameters = {}
         KerrNR_params  = {}
 
-        noncircular_parameters = {'Emrg': self.metadata['Emrg'], 'Jmrg': self.metadata['Jmrg'], 'bmrg': self.metadata['bmrg']}
+        if(self.KerrNR_version=='noncircular'): noncircular_parameters = {'Emrg': self.metadata['Emrg'], 'Jmrg': self.metadata['Jmrg'], 'bmrg': self.metadata['bmrg']}
+        else                                  : noncircular_parameters = {}
 
         KerrNR_params['Mi'], KerrNR_params['eta'], KerrNR_params['chis'], KerrNR_params['chia'] = pyr_utils.compute_KerrNR_binary_quantities(self.metadata['m1'], self.metadata['m2'], self.metadata['chi1'], self.metadata['chi2'])  
 
