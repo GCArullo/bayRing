@@ -96,6 +96,9 @@ def main():
     error       = NR_sim.NR_cpx_err_cut
     NR_metadata = NR_waveforms.read_NR_metadata(NR_sim, parameters['NR-data']['catalog'])
 
+    print_section('Simulation metadata')
+    for key in NR_metadata.keys(): print('{}: {}'.format(key.ljust(len('omg_peak_22')), NR_metadata[key]))
+
     # =================#
     # Load Kerr modes. #
     # =================#
