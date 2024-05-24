@@ -508,8 +508,11 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
         ax4.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
     ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$'    , fontsize=fontsize_labels)
 
+    # Find the index of zero
+    t_peak_idx = np.argmin(np.abs(t_NR - t_peak))
+    
     if not(tail_flag):
-        try   : ax4.set_ylim([-1.5*NR_f[np.argmax(NR_amp)+1], 3.5*NR_f[np.argmax(NR_amp)+1]])
+        try   : ax4.set_ylim([-1.5*NR_f[t_peak_idx], 3.5*NR_f[t_peak_idx]])
         except: pass
     else:
         ax4.set_ylim([-0.08, 0.28])
