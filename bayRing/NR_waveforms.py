@@ -567,7 +567,7 @@ class NR_simulation():
                                      reference_amplitude = 0.0            ,
                                      geom                = 1              ,
                                      qnm_fit             = 0              ,
-                                     interpolants        = None           ,
+                                     qnm_interpolants    = None           ,
                                     
                                      Spheroidal          = 0              , # Spheroidal harmonics, overrun by geom
                                      amp_non_prec_sym    = 1              ,
