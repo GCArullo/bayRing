@@ -120,14 +120,14 @@ def main():
                                                 qnm_cached                                                                 , 
                                                 parameters['NR-data']['l-NR']                                              , 
                                                 parameters['NR-data']['m']                                                 , 
-                                                tail                  = parameters['Model']['Kerr-tail']                   ,
-                                                tail_modes            = Kerr_tail_modes                                    ,     
-                                                quadratic_modes       = Kerr_quad_modes                                    , 
-                                                const_params          = parameters['NR-data']['add-const']                 , 
-                                                KerrNR_version        = parameters['Model']['KerrNR-version']              ,
-                                                KerrNR_amp_nc_version = parameters['Model']['KerrNR-amplitudes-nc-version'],
-                                                TEOB_NR_fit           = parameters['Model']['TEOB-NR-fit']                 ,
-                                                TEOB_template         = parameters['Model']['TEOB-template']               ,
+                                                tail                      = parameters['Model']['Kerr-tail']                   ,
+                                                tail_modes                = Kerr_tail_modes                                    ,     
+                                                quadratic_modes           = Kerr_quad_modes                                    , 
+                                                const_params              = parameters['NR-data']['add-const']                 , 
+                                                KerrBinary_version        = parameters['Model']['KerrBinary-version']              ,
+                                                KerrBinary_amp_nc_version = parameters['Model']['KerrBinary-amplitudes-nc-version'],
+                                                TEOB_NR_fit               = parameters['Model']['TEOB-NR-fit']                 ,
+                                                TEOB_template             = parameters['Model']['TEOB-template']               ,
                                                 )
 
     # ===============#

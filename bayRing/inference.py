@@ -97,7 +97,7 @@ def read_default_bounds(wf_model, TEOB_template=''):
     if(  wf_model=='Damped-sinusoids'): default_bounds = default_bounds_DS
     elif(wf_model=='Kerr'            ): default_bounds = default_bounds_Kerr
     elif(wf_model=='Kerr-tail'       ): default_bounds = default_bounds_Kerr_tail
-    elif(wf_model=='KerrNR'          ): default_bounds = {'phi': [0.0, twopi]}
+    elif(wf_model=='KerrBinary'      ): default_bounds = {'phi': [0.0, twopi]}
     elif(wf_model=='TEOBPM'          ): default_bounds = default_bounds_TEOBPM
 
     return default_bounds
@@ -399,7 +399,7 @@ def Dynamic_InferenceModel(base):
                         self.names.append(fullname)
                         self.bounds.append(single_bounds)
 
-            elif(self.wf_model.wf_model=='KerrNR'):
+            elif(self.wf_model.wf_model=='KerrBinary'):
 
                 default_bounds = read_default_bounds(self.wf_model.wf_model)   
                 for name in default_bounds.keys():

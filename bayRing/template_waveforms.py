@@ -8,26 +8,26 @@ import bayRing.utils   as utils
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrNR_version = 'London2018', KerrNR_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc'):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc'):
 
-        self.t_NR                  = t_NR
-        self.t_start               = tM_start
-        self.t_peak                = tM_peak
-        self.wf_model              = wf_model
-        self.Kerr_modes            = Kerr_modes
-        self.metadata              = metadata
-        self.const_params          = const_params
-        self.Mf, self.af           = self.metadata['Mf'], self.metadata['af']
-        self.qnm_cached            = qnm_cached
-        self.l_NR, self.m_NR       = l_NR, m_NR
-        self.tail                  = tail
-        self.quadratic_modes       = quadratic_modes
-        self.N_ds_modes            = N_ds_modes
-        self.tail_modes            = tail_modes
-        self.KerrNR_version        = KerrNR_version
-        self.KerrNR_amp_nc_version = KerrNR_amp_nc_version
-        self.TEOB_NR_fit           = TEOB_NR_fit
-        self.TEOB_template         = TEOB_template
+        self.t_NR                      = t_NR
+        self.t_start                   = tM_start
+        self.t_peak                    = tM_peak
+        self.wf_model                  = wf_model
+        self.Kerr_modes                = Kerr_modes
+        self.metadata                  = metadata
+        self.const_params              = const_params
+        self.Mf, self.af               = self.metadata['Mf'], self.metadata['af']
+        self.qnm_cached                = qnm_cached
+        self.l_NR, self.m_NR           = l_NR, m_NR
+        self.tail                      = tail
+        self.quadratic_modes           = quadratic_modes
+        self.N_ds_modes                = N_ds_modes
+        self.tail_modes                = tail_modes
+        self.KerrBinary_version        = KerrBinary_version
+        self.KerrBinary_amp_nc_version = KerrBinary_amp_nc_version
+        self.TEOB_NR_fit               = TEOB_NR_fit
+        self.TEOB_template             = TEOB_template
 
         if not(const_params==None):
             self.const_r = [const_params[0]*np.cos(const_params[1])]
@@ -124,46 +124,46 @@ class WaveformModel(cpnest.model.Model):
             
         return ringdown_model
 
-    def KerrNR_waveform(self, params, fixed_params):
+    def KerrBinary_waveform(self, params, fixed_params):
 
         TGR_parameters = {}
-        KerrNR_params  = {}
+        KerrBinary_params  = {}
 
-        if(self.KerrNR_version=='noncircular'): noncircular_parameters = {'Emrg': self.metadata['Emrg'], 'Jmrg': self.metadata['Jmrg'], 'bmrg': self.metadata['bmrg']}
+        if(self.KerrBinary_version=='noncircular'): noncircular_parameters = {'Emrg': self.metadata['Emrg'], 'Jmrg': self.metadata['Jmrg'], 'bmrg': self.metadata['bmrg']}
         else                                  : noncircular_parameters = {}
 
-        KerrNR_params['Mi'], KerrNR_params['eta'], KerrNR_params['chis'], KerrNR_params['chia'] = pyr_utils.compute_KerrNR_binary_quantities(self.metadata['m1'], self.metadata['m2'], self.metadata['chi1'], self.metadata['chi2'])  
+        KerrBinary_params['Mi'], KerrBinary_params['eta'], KerrBinary_params['chis'], KerrBinary_params['chia'] = pyr_utils.compute_KerrBinary_binary_quantities(self.metadata['m1'], self.metadata['m2'], self.metadata['chi1'], self.metadata['chi2'])  
 
         phi_value = utils.get_param_override(fixed_params,params,'phi')
 
-        ringdown_model = wf.KerrNR(self.t_start                                        ,
-                                   self.t_peak                                         ,
-                                   self.Mf                                             ,
-                                   self.af                                             ,
+        ringdown_model = wf.KerrBinary(self.t_start                                        ,
+                                       self.t_peak                                         ,
+                                       self.Mf                                             ,
+                                       self.af                                             ,
 
-                                   KerrNR_params['Mi']                                 ,
-                                   KerrNR_params['eta']                                ,
-                                   KerrNR_params['chis']                               ,
-                                   KerrNR_params['chia']                               ,
+                                       KerrBinary_params['Mi']                                 ,
+                                       KerrBinary_params['eta']                                ,
+                                       KerrBinary_params['chis']                               ,
+                                       KerrBinary_params['chia']                               ,
 
-                                   1.0                                                 , # distance     , dummy with geom=1
-                                   0.0                                                 , # inclination  , dummy with geom=1
-                                   phi_value                                           , 
+                                       1.0                                                     , # distance     , dummy with geom=1
+                                       0.0                                                     , # inclination  , dummy with geom=1
+                                       phi_value                                               , 
 
-                                   TGR_parameters                                      ,
+                                       TGR_parameters                                          ,
 
-                                   noncircular_params      = noncircular_parameters    ,
-                                   noncircular_amp_version = self.KerrNR_amp_nc_version,
+                                       noncircular_params      = noncircular_parameters        ,
+                                       noncircular_amp_version = self.KerrBinary_amp_nc_version,
 
-                                   single_spherical_mode   = 1                         ,
-                                   single_spherical_l      = self.l_NR                 ,
-                                   single_spherical_m      = self.m_NR                 ,
+                                       single_spherical_mode   = 1                             ,
+                                       single_spherical_l      = self.l_NR                     ,
+                                       single_spherical_m      = self.m_NR                     ,
 
-                                   geom                    = 1                         ,
-                                   qnm_fit                 = 0                         ,
-                                   interpolants            = None                      ,
-                                   qnm_cached              = self.qnm_cached           ,
-                                   version                 = self.KerrNR_version       )
+                                       geom                    = 1                             ,
+                                       qnm_fit                 = 0                             ,
+                                       interpolants            = None                          ,
+                                       qnm_cached              = self.qnm_cached               ,
+                                       version                 = self.KerrBinary_version       )
 
         return ringdown_model
 
@@ -255,9 +255,9 @@ class WaveformModel(cpnest.model.Model):
             self.wf_r = self.wf_r_Kerr + self.wf_r_DS
             self.wf_i = self.wf_i_Kerr + self.wf_i_DS   
 
-        elif (self.wf_model=='KerrNR'):
+        elif (self.wf_model=='KerrBinary'):
             
-            ringdown_model                = self.KerrNR_waveform(params, fixed_params)
+            ringdown_model                = self.KerrBinary_waveform(params, fixed_params)
             _, _, _, self.wf_r, self.wf_i = ringdown_model.waveform(self.t_NR)
         
         elif (self.wf_model=='TEOBPM'):
@@ -273,6 +273,6 @@ class WaveformModel(cpnest.model.Model):
             self.wf_i = self.wf_i + self.const_i
 
         # UNDERSTAND WHY!!!!
-        if not(self.wf_model=='KerrNR'): self.wf_r = -self.wf_r
+        if not(self.wf_model=='KerrBinary'): self.wf_r = -self.wf_r
 
         return self.wf_r + 1j * self.wf_i
