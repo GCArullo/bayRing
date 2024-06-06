@@ -105,6 +105,7 @@ def read_config(Config):
         'add-const'        : '0.0,0.0',
         'properties-file'  : '',
         't-peak-22'        : 0.0,
+        'waveform-type'    : 'strain',
         },
 
         'Injection-data':
@@ -270,6 +271,7 @@ A dot is present at the end of each description line and is not to be intended a
                          Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
         t-peak-22        Time of the peak of the 22 mode. Used as reference time in KerrBinary model. Must be passed when \
                          fitting HMs with KerrBinary.                                                                        Default: 0.0.                         
+        waveform-type    Type of waveform to be used. Available options: ['strain', 'psi4'].                                 Default: 'strain'.
 
     ************************************************************
     * Parameters to be passed to the [Injection-data] section. *
