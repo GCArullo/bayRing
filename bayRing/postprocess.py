@@ -411,6 +411,8 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     NR_r, NR_i, NR_r_err, NR_i_err, NR_amp, NR_f, t_NR, t_peak                                                = NR_sim.NR_r, NR_sim.NR_i, np.real(NR_sim.NR_err_cmplx), np.imag(NR_sim.NR_err_cmplx), NR_sim.NR_amp, NR_sim.NR_freq, NR_sim.t_NR, NR_sim.t_peak
     t_cut, tM_start, tM_end, NR_r_cut, NR_i_cut, NR_r_err_cut, NR_i_err_cut, NR_amp_cut, NR_phi_cut, NR_f_cut = NR_sim.t_NR_cut, NR_sim.tM_start, NR_sim.tM_end, NR_sim.NR_r_cut, NR_sim.NR_i_cut, np.real(NR_sim.NR_cpx_err_cut), np.imag(NR_sim.NR_cpx_err_cut), NR_sim.NR_amp_cut, NR_sim.NR_phi_cut, NR_sim.NR_freq_cut
 
+    wf_data_type = NR_sim.waveform_type
+
     l,m = NR_sim.l, NR_sim.m
 
     if(NR_sim.NR_catalog=='cbhdb' or NR_sim.NR_catalog=='charged_raw'):
@@ -449,8 +451,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
         fontsize_labels = 23
         color_f_ring    = 'forestgreen'
 
-
-    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): tM_end = 80
+    if(not(tail_flag) and not(wf_data_type=='psi4') and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): tM_end = 80
 
     ########################
     # Waveforms comparison #
