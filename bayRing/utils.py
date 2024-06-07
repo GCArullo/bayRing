@@ -138,4 +138,12 @@ def read_psi4_RIT_format(tar_gz_path, asc_name):
                     else:
                         asc_files_data[member.name] = file_data_dict
 
-    return asc_files_data[asc_name]
+    try   : output = asc_files_data[asc_name]
+    except: 
+        # A few simulation had an inconsistent naming convention
+        asc_name_parts = asc_name.split('/')
+        asc_name_parts[0] = asc_name_parts[0].replace('ecc', '')
+        asc_name_new = asc_name_parts[0] + '/' + asc_name_parts[1]
+        output = asc_files_data[asc_name_new]
+
+    return output

@@ -142,34 +142,59 @@ def convert_resolution_level_Teukolsky(res_level):
 
 class Waveform_rit(object):
 
-    def __init__(self, sims='', path='', csv_path='', ID='', ell=2, m=2):
+    def __init__(self, NR_data_path='', csv_path='', ID='', ell=2, m=2, resolution_level=100):
 
-        self.path     = path
-        self.ID       = ID 
-        self.smpath   = sims
-        self.ell      = ell
-        self.m        = m
-        self.metadata = {}
-        self.csv_path = csv_path 
+        self.waveform_path    = os.path.join(NR_data_path, 'Data')
+        self.metadata_path    = os.path.join(NR_data_path, 'Metadata')
+        self.psi4_path        = os.path.join(NR_data_path, 'Data/Psi4')
+        self.csv_path         = csv_path 
+        self.ID               = ID 
+        self.ell              = ell
+        self.m                = m
+        self.resolution_level = resolution_level
+
+        self.metadata       = {}
+
+    def set_metadata_RIT(self, filename_to_set):
+
+        full_name = os.path.join(self.metadata_path, filename_to_set)
+        if not os.path.isfile(full_name):
+            print(f"File not present locally. Attempting to download it from the online RIT catalog.")
+            os.system(f'wget https://ccrgpages.rit.edu/~RITCatalog/Metadata/{filename_to_set} -P {self.metadata_path} --no-check-certificate')
+
+        f = open(full_name, "r")
+
+        return f
 
     def load_metadata(self):
 
         ID_str = str(self.ID)
-        nm     = self.smpath + '/RIT_eBBH_'+ID_str+'-n100-ecc_Metadata.txt'
 
-        with open(nm, 'r') as f:
+        possible_name_formats_list = [
+                                        os.path.join(self.metadata_path, f'RIT_eBBH_{ID_str}-n{self.resolution_level}-ecc_Metadata.txt'    ),
+                                        os.path.join(self.metadata_path, f'RIT:eBBH:{ID_str}-n{self.resolution_level}-ecc_Metadata.txt'    ),
+                                     ]
+        idx_names = [                   os.path.join(self.metadata_path, f'RIT:eBBH:{ID_str}-n{self.resolution_level}-id{idx}_Metadata.txt') for idx in range(0, 4)]
+        
+        possible_name_formats_list = possible_name_formats_list + idx_names
+        for name_format in possible_name_formats_list:
+            try:
+                f  = self.set_metadata_RIT(name_format)
+                break
+            except:
+                continue
 
-            lines = [l for l in f.readlines() if l.strip()] # rm empty
+        lines = [l for l in f.readlines() if l.strip()] # rm empty
 
-            for line in lines[1:]:
+        for line in lines[1:]:
 
-                #line = line.split("#", 1)[0]
-                if line[0]=="#": continue
+            #line = line.split("#", 1)[0]
+            if line[0]=="#": continue
 
-                line               = line.rstrip("\n")
-                key, val           = line.split("= ")
-                key                = key.strip()
-                self.metadata[key] = val
+            line               = line.rstrip("\n")
+            key, val           = line.split("= ")
+            key                = key.strip()
+            self.metadata[key] = val
 
         try:
             additional_data = pd.read_csv(self.csv_path)
@@ -189,17 +214,30 @@ class Waveform_rit(object):
 
         return self.metadata
 
+    def set_h_data_RIT(self, filename_strain):
+
+        full_name = os.path.join(self.waveform_path, filename_strain)
+        if not os.path.isfile(full_name):
+            print(f"File not present locally. Attempting to download it from the online RIT catalog.")
+            os.system(f'wget https://ccrgpages.rit.edu/~RITCatalog/Data/{filename_strain} -P {self.waveform_path} --no-check-certificate')
+
+        f = h5py.File(full_name, "r")
+
+        return f
+
     def load_waveform_lm(self):
 
         ID_str = str(self.ID)
-        nm     = self.path + '/ExtrapStrain_RIT-eBBH-'+ID_str+'-n100.h5'
 
-        # Check if nm exists
-        if not os.path.isfile(nm):
-            print(f"File not present locally. Attempting to download it from the online RIT catalog.")
-            os.system(f'wget https://ccrgpages.rit.edu/~RITCatalog/Data/ExtrapStrain_RIT-BBH-{ID}-n100.h5 -P {self.path} --no-check-certificate')
+        possible_name_formats_list = [f'ExtrapStrain_RIT-eBBH-{ID_str}-n{self.resolution_level}.h5',
+                                      f'ExtrapStrain_RIT-BBH-{ID_str}-n{self.resolution_level}.h5' ,]            
+        for filename_strain in possible_name_formats_list:
+            try:
+                f = self.set_h_data_RIT(filename_strain)
+                break
+            except:
+                continue
 
-        f   = h5py.File(nm, "r")
         u   =  f['NRTimes'][:]
         A   =  f[f'amp_l{self.ell}_m{self.m}']['Y'][:]
         A_u =  f[f'amp_l{self.ell}_m{self.m}']['X'][:]
@@ -213,19 +251,36 @@ class Waveform_rit(object):
         self.im = self.A*np.sin(-self.p)
 
         return self.u, self.re, self.im, self.A, self.p
-        
-    def load_psi4_lm(self):
+ 
+    def set_psi4_data_RIT(self, dir_name):
 
-        ID_str      = str(self.ID)
-        psi4_path   = self.path + f'/Psi4'
-        asc_name    = f'ExtrapPsi4_RIT-eBBH-{ID_str}-n100-ecc/rPsi4_l{self.ell}_m{self.m}_rInf.asc'
-        tar_gz_path = psi4_path + f'/ExtrapPsi4_RIT-eBBH-{ID_str}-n100-ecc.tar.gz'
+        asc_name    = os.path.join(dir_name, f'rPsi4_l{self.ell}_m{self.m}_rInf.asc')
+        tar_gz_name = f'{dir_name}.tar.gz'
+        tar_gz_path = os.path.join(self.psi4_path, tar_gz_name)
 
         if not os.path.isfile(tar_gz_path):
             print(f"File not present locally. Attempting to download it from the online RIT catalog.")
-            os.system(f'wget https://ccrgpages.rit.edu/~RITCatalog/Data/ExtrapPsi4_RIT-eBBH-{ID}-n100-ecc.tar.gz -P {psi4_path} --no-check-certificate')
+            os.system(f'wget https://ccrgpages.rit.edu/~RITCatalog/Data/{tar_gz_name} -P {self.psi4_path} --no-check-certificate')
 
-        f       = utils.read_psi4_RIT_format(tar_gz_path, asc_name)
+        f = utils.read_psi4_RIT_format(tar_gz_path, asc_name)
+
+        return f
+
+    def load_psi4_lm(self):
+
+        ID_str    = str(self.ID)
+
+        possible_name_formats_list = [f'ExtrapPsi4_RIT-eBBH-{ID_str}-n{self.resolution_level}-ecc'                          ]    
+        idx_names                  = [f'ExtrapPsi4_RIT-BBH-{ID_str}-n{self.resolution_level}-id{idx}' for idx in range(0, 4)]
+        
+        possible_name_formats_list = possible_name_formats_list + idx_names
+        for dir_name in possible_name_formats_list:
+            try:
+                f = self.set_psi4_data_RIT(dir_name)
+                break
+            except:
+                continue
+
         self.u  = f['time']
         self.A  = f['ampl']
         self.p  = f['phse']
@@ -907,8 +962,7 @@ class NR_simulation():
                         self.NR_i[i] += np.imag(self.NR_err_cmplx.data[i])
 
         # Start from zero.
-        if(self.t_NR[0] < 0):
-            self.t_NR = self.t_NR - self.t_NR[0]
+        if(self.t_NR[0] < 0 and self.waveform_type=='strain'): self.t_NR = self.t_NR - self.t_NR[0]
         
         # Locate the merger time (which does not coincide with the peak in the eccentric case).
         self.t_peak = waveform_utils.find_peak_time(self.t_NR, self.NR_amp, self.ecc)
@@ -918,7 +972,7 @@ class NR_simulation():
             print("\n* The peak time has been set to the secondary peak time with a delay of: {}.".format(self.t_delay_scd))
             self.t_peak = self.t_peak + self.t_delay_scd
 
-        if(not(self.t_peak_22==0.0) and not(self.l==2 and self.m==2)):
+        if not(self.t_peak_22==0.0):
             print("\n* The peak time has been set to the peak of the 22 mode: {}.".format(self.t_peak_22))
             self.t_peak = self.t_peak_22
 
@@ -1261,7 +1315,7 @@ class NR_simulation():
         """
 
                 
-        waveform_NR = Waveform_rit(sims=os.path.join(self.NR_dir, 'Metadata'), path=os.path.join(self.NR_dir, 'Data'), csv_path=self.additional_NR_properties, ID=self.NR_ID)
+        waveform_NR = Waveform_rit(NR_data_path=self.NR_dir, csv_path=self.additional_NR_properties, ID=self.NR_ID)
         
         # Read intrinsic parameters
         data        = waveform_NR.load_metadata()
@@ -1316,12 +1370,23 @@ class NR_simulation():
 
         """
                 
-        waveform_NR = Waveform_rit(sims=os.path.join(self.NR_dir, 'Metadata'), path=os.path.join(self.NR_dir, 'Data'), ID=self.NR_ID, ell = self.l, m = self.m)                
+        waveform_NR = Waveform_rit(NR_data_path=self.NR_dir, ID=self.NR_ID, ell = self.l, m = self.m)                
         
-        if  (self.waveform_type=='strain'): t_NR, wv_re, wv_im, _, _  = waveform_NR.load_waveform_lm()
-        elif(self.waveform_type=='psi4'  ): t_NR, wv_re, wv_im, _, _  = waveform_NR.load_psi4_lm()
+        if  (self.waveform_type=='strain'): 
+            t_NR, wv_re, wv_im, _, _  = waveform_NR.load_waveform_lm()
+            t_NR = t_NR.astype(np.float64)
+        elif(self.waveform_type=='psi4'  ): 
 
-        t_NR = t_NR.astype(np.float64)
+            # RIT Psi4 data are longer than the strain (likely because of the data conditioning involved in getting h), and have not been shifted to have the zero corresponding to the maximum of the amplitude.
+            # Here, we compensate for the length difference, and in the code below we avoid shifting the time axis to have the zero set to the first element, to re-aligned it with the strain.
+            t_NR_h,     _,     _, _, _  = waveform_NR.load_waveform_lm()
+            t_NR  , wv_re, wv_im, _, _  = waveform_NR.load_psi4_lm()
+
+            dt_missing  = t_NR_h[1] - t_NR_h[0]
+            len_missing = dt_missing * (len(t_NR)-len(t_NR_h))
+
+            t_NR = t_NR.astype(np.float64)
+            t_NR = t_NR - len_missing
         
         return t_NR, wv_re, wv_im
 
