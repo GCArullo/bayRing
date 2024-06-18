@@ -452,7 +452,11 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
         color_f_ring    = 'forestgreen'
 
     if(not(tail_flag) and not(wf_data_type=='psi4') and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): tM_end = 80
-    if(wf_data_type=='psi4'): tM_end = 120
+    if(wf_data_type=='psi4'): 
+        tM_end = 120
+        label_data = '\psi_{4,%s%s}'%(l,m)
+    else:
+        label_data = 'h_{%s%s}'%(l,m)
 
     ########################
     # Waveforms comparison #
@@ -485,13 +489,13 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
         ax1.plot(t_NR - t_peak, NR_r,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
         ax1.axvline(tM_start,                                                              c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax1.axvline(0.0,                          label=r'$\mathrm{t_{peak}}$',            c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
-        ax1.set_ylabel(r'$\mathrm{Re[h_{%s%s}]}$'%(l,m), fontsize=fontsize_labels)
+        ax1.set_ylabel(r'$\mathrm{Re[%s]}$'%(label_data), fontsize=fontsize_labels)
 
         ax3.plot(t_NR - t_peak, NR_i,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
         ax3.axvline(tM_start, label=r'$\mathrm{t_{start} = t_{peak} \, + %d M}$'%tM_start, c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax3.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
-        ax3.set_ylabel(r'$\mathrm{Im[h_{%s%s}]}$'%(l,m), fontsize=fontsize_labels)
-        ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$'    , fontsize=fontsize_labels)
+        ax3.set_ylabel(r'$\mathrm{Im[%s]}$'%(label_data), fontsize=fontsize_labels)
+        ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
 
     ax2.semilogy(t_NR - t_peak, NR_amp, label=r'$\mathrm{NR}$',                            c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
     ax2.axvline(tM_start,                                                                  c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
@@ -589,10 +593,10 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
                 if(method=='Minimization'): break
 
     if not(tail_flag):
-        ax1.set_ylabel(r'$\mathit{Re(h_{%s%s})}$'%(l,m), fontsize=fontsize_labels*rescale)
-        ax3.set_ylabel(r'$\mathit{Im(h_{%s%s})}$'%(l,m), fontsize=fontsize_labels*rescale)
-    ax2.set_ylabel(r'$\mathit{A(t)}$'                  , fontsize=fontsize_labels*rescale)
-    ax4.set_ylabel(r'$\mathit{f\,(t)}$'                , fontsize=fontsize_labels*rescale)
+        ax1.set_ylabel(r'$\mathit{Re(%s)}$'%(label_data), fontsize=fontsize_labels*rescale)
+        ax3.set_ylabel(r'$\mathit{Im(%s)}$'%(label_data), fontsize=fontsize_labels*rescale)
+    ax2.set_ylabel(    r'$\mathit{A_{%d%d}(t)}$'%(l,m)  , fontsize=fontsize_labels*rescale)
+    ax4.set_ylabel(    r'$\mathit{f_{%d%d}\,(t)}$'%(l,m), fontsize=fontsize_labels*rescale)
 
     plt.rcParams['legend.frameon'] = True
 
@@ -661,13 +665,13 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     ax1.legend(loc='best', fontsize=fontsize_legend)
     ax3.legend(loc='best', fontsize=fontsize_legend)
 
-    ax1.set_ylabel(r'$\mathit{Re(h_{%s%s})}$'%(l,m)     , fontsize=fontsize_labels)
-    ax2.set_ylabel(r'$\mathit{A(t)}$'                   , fontsize=fontsize_labels)
-    ax3.set_ylabel(r'$\mathit{Im(h_{%s%s})}$'%(l,m)     , fontsize=fontsize_labels)
-    ax4.set_ylabel(r'$\mathit{f\,(t)}$'                 , fontsize=fontsize_labels)
+    ax1.set_ylabel(r'$\mathit{Re(%s)}$'%(label_data), fontsize=fontsize_labels)
+    ax2.set_ylabel(r'$\mathit{A(t)}$'               , fontsize=fontsize_labels)
+    ax3.set_ylabel(r'$\mathit{Im(%s)}$'%(label_data), fontsize=fontsize_labels)
+    ax4.set_ylabel(r'$\mathit{f\,(t)}$'             , fontsize=fontsize_labels)
 
-    ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$'    , fontsize=fontsize_labels)
-    ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$'    , fontsize=fontsize_labels)
+    ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
+    ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
 
     ax1.get_shared_x_axes().join(ax1, ax3)
     ax2.get_shared_x_axes().join(ax2, ax4)
