@@ -14,7 +14,7 @@ Relies on [pyRing](https://git.ligo.org/lscsoft/pyring) for waveform interfacing
 
 # Installation
 
-**Currently requires the `remove_redundant_Kerr_params` branch of pyRing**.
+**Currently requires the `hm_nc_fit` branch of pyRing**.
 
 Tagged versions can be installed through: `pip install bayRing`.
 
