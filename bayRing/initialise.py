@@ -105,6 +105,7 @@ def read_config(Config):
         'add-const'        : '0.0,0.0',
         'properties-file'  : '',
         't-peak-22'        : 0.0,
+        'waveform-type'    : 'strain',
         },
 
         'Injection-data':
@@ -117,14 +118,16 @@ def read_config(Config):
 
         'Model':
         {
-        'template'         : 'Kerr'       ,
-        'N-DS-modes'       : 1            ,
-        'QNM-modes'        : '220,221,320',
-        'QQNM-modes'       : ''           ,
-        'Kerr-tail'        : 0            ,
-        'Kerr-tail-modes'  : '22'         ,
-        'TEOB-NR-fit'      : 0            ,
-        'TEOB-template'    : 'qc'         ,
+        'template'                         : 'Kerr'       ,
+        'N-DS-modes'                       : 1            ,
+        'QNM-modes'                        : '220,221,320',
+        'QQNM-modes'                       : ''           ,
+        'Kerr-tail'                        : 0            ,
+        'Kerr-tail-modes'                  : '22'         ,
+        'KerrBinary-version'               : 'London2018' ,
+        'KerrBinary-amplitudes-nc-version' : ''           ,
+        'TEOB-NR-fit'                      : 0            ,
+        'TEOB-template'                    : 'qc'         ,
         },
 
         'Inference':
@@ -200,15 +203,21 @@ def read_config(Config):
 
     if not(parameters['NR-data']['add-const']==None): parameters['NR-data']['add-const'] = [float(value) for value in parameters['NR-data']['add-const'].split(',')]
 
-    if ((parameters['Model']['template']=='MMRDNP' or parameters['Model']['template']=='TEOBPM') and not(parameters['NR-data']['l-NR']==2 and parameters['NR-data']['m']==2) and parameters['NR-data']['t-peak-22']==0.0): raise ValueError("The time of the peak of the 22 mode must be provided for the MMRDNP and TEOBPM models when fitting the HMs, to correctly rescale the NR-calibrated quantities.")
+    if ((parameters['Model']['template']=='KerrBinary' or parameters['Model']['template']=='TEOBPM') and not(parameters['NR-data']['l-NR']==2 and parameters['NR-data']['m']==2) and parameters['NR-data']['t-peak-22']==0.0): raise ValueError("The time of the peak of the 22 mode must be provided for the KerrBinary and TEOBPM models when fitting the HMs, to correctly rescale the NR-calibrated quantities.")
 
     if  (parameters['Model']['template']=='Damped-sinusoids'): 
         parameters['Model']['QNM-modes'] = '{}{}0'.format(parameters['NR-data']['l-NR'], parameters['NR-data']['m']) 
-    elif(parameters['Model']['template']=='MMRDNP'          ): 
-        parameters['Model']['QNM-modes'] = '220,221,210,330,331,320,440,430'
-        if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4): raise ValueError("The MMRDNP template is only available for l=2,3,4")
+    elif(parameters['Model']['template']=='KerrBinary'          ): 
+        if  (parameters['Model']['KerrBinary-version']=='London2018'): 
+            parameters['Model']['QNM-modes'] = '220,221,210,330,331,320,440,430,2-20,2-21,2-10,3-30,3-31,3-20,4-40,4-30'
+            if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4): raise ValueError("The KerrBinary-London template is only available for l=2,3,4")
+        elif(parameters['Model']['KerrBinary-version']=='Cheung2023'): 
+            parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,440,430,550,2-20,2-10'
+            if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4 or parameters['NR-data']['l-NR']==5): raise ValueError("The KerrBinary-Cheung template is only available for l=2,3,4,5")
+        elif  (parameters['Model']['KerrBinary-version']=='noncircular'): 
+            parameters['Model']['QNM-modes'] = '220,210,330'
+            if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4): raise ValueError("The KerrBinary-noncircular template is only available for l=2,3")  
     elif(parameters['Model']['template']=='TEOBPM'      ):
-        print('\n\n Fix handling of merger phases for TEOBPM.\n\n')
         parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,321,310,311,440,441,430,431,420,421,410,411,550,551'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4  or parameters['NR-data']['l-NR']==5): raise ValueError("The TEOBPM template is only available for l=2,3,4,5")
 
@@ -229,11 +238,11 @@ A dot is present at the end of each description line and is not to be intended a
     * Parameters to be passed to the [I/O] section. *
     *************************************************
 
-        run-type         Type of run. Available options: ['full', 'post-processing', 'plot-NR-only'].                       Default: 'full'.
-        screen-output    Boolean to divert stdout and stderr to files or to screen.                                         Default: 0.
-        show-plots       Boolean to show results plots.                                                                     Default: 0.
-        outdir           Path of the output directory.                                                                      Default: './'.
-        
+        run-type         Type of run. Available options: ['full', 'post-processing', 'plot-NR-only'].                        Default: 'full'.
+        screen-output    Boolean to divert stdout and stderr to files or to screen.                                          Default: 0.
+        show-plots       Boolean to show results plots.                                                                      Default: 0.
+        outdir           Path of the output directory.                                                                       Default: './'.
+
     *****************************************************
     * Parameters to be passed to the [NR-data] section. *
     *****************************************************
@@ -242,7 +251,7 @@ A dot is present at the end of each description line and is not to be intended a
         dir              Absolute path of NR local data.                                                                     Default: ''.
         catalog          NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'fake_NR']. Default: 'SXS'.
         ID               Simulation ID to be considered. Example for SXS: 0305. Example for Teukolsky: \
-                         `a_0.7_A_0.141_w_1.4_ingoing_ang_15`.                                                               Default: '0305'.
+                         `a_0.7_A_0.141_w_1.4_ingoing_ang_15`.                                                               Default: 0305.
         extrap-order     Extrapolation order of the `SXS` simulations. Smaller N is better for ringdown \
               (data.black-holes.org/waveforms/index.html). Available options: ['2', '3', '4'].                               Default: 2.
         res-level        Resolution level of the simulation. For `SXS`: -1 selects the maximum available resolution. \
@@ -266,8 +275,9 @@ A dot is present at the end of each description line and is not to be intended a
                          effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.
         properties-file  Path to the file containing additional properties of the NR simulation in `.csv` format. \
                          Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
-        t-peak-22        Time of the peak of the 22 mode. Used as reference time in MMRDNP model. Must be passed when \
-                         fitting HMs with MMRDNP.                                                                            Default: 0.0.                         
+        t-peak-22        Time of the peak of the 22 mode. Used as reference time in KerrBinary model. Must be passed when \
+                         fitting HMs with KerrBinary.                                                                        Default: 0.0.                         
+        waveform-type    Type of waveform to be used. Available options: ['strain', 'psi4'].                                 Default: 'strain'.
 
     ************************************************************
     * Parameters to be passed to the [Injection-data] section. *
@@ -285,21 +295,26 @@ A dot is present at the end of each description line and is not to be intended a
     ***************************************************
     * Parameters to be passed to the [Model] section. *
     ***************************************************
+    
+        template                         Fitting template. Available options: ['Damped-sinusoids', 'Kerr', 'Kerr-Damped-sinusoids',\
+              'KerrBinary', 'TEOBPM'].                                                                                                                                  Default: 'Kerr'.
+        N-DS-modes                       Number of free modes in the ringdown model if 'Damped-sinusoids' in template. Otherwise, ignored.                                Default: 1.
+        QNM-modes                        List of modes of the ringdown model, if 'Kerr' in template. Otherwise, ignored. \
+                                         Example format: '220,221,320'.                                                                                                   Default: '220,221,320'.
+        QQNM-modes                       List of quadratic modes of the ringdown model if 'Kerr' in template. Otherwise, ignored. \
+                                         Example format: '--QQNM-modes ``Px220x321,Px220x221', i.e. (child_term x parent1 x parent2), \
+                                         where the child mode is assumed to be equal to the selected (l_NR,m) multipole and child_term=P,M \
+                                         (parent frequencies sum or difference).                                                                                          Default: ''.
+        Kerr-tail                        Boolean to add a tail factor to the Kerr template.                                                                               Default: 0.
+        Kerr-tail-modes                  Modes to which a tail will be added in the fitting template. Example format: '22,32'.                                            Default: '22'.
+        KerrBinary-version               Option to select the version of the KerrBinary model to be used. Available options: ['London2018', 'Cheung2023', 'noncircular'].     Default: 'London2018'.
+        KerrBinary-amplitudes-nc-version Option to select the version of the KerrBinary model amplitudes noncircular correction fit to be used. Format: `X-Y`, \ 
+                                         where each entry selects a noncircular variable to be used for the noncircular fit, among ['bmrg','Emrg', 'Jmrg', 'Mf', 'af']. \
+                                         Can also pass a single variable instead of two, but not less than one or more than two.                                          Default: ''.
 
-        template         Fitting template. Available options: ['Damped-sinusoids', 'Kerr', 'Kerr-Damped-sinusoids',\
-              'MMRDNP', 'TEOBPM'].                                                                                           Default: 'Kerr'.
-        N-DS-modes       Number of free modes in the ringdown model if 'Damped-sinusoids' in template. Otherwise, ignored.   Default: 1.
-        QNM-modes        List of modes of the ringdown model, if 'Kerr' in template. Otherwise, ignored. \
-            Example format: '220,221,320'.                                                                                   Default: '220,221,320'.
-        QQNM-modes       List of quadratic modes of the ringdown model if 'Kerr' in template. Otherwise, ignored. \
-                         Example format: '--QQNM-modes ``Px220x321,Px220x221', i.e. (child_term x parent1 x parent2), \
-                         where the child mode is assumed to be equal to the selected (l_NR,m) multipole and child_term=P,M \
-                            (parent frequencies sum or difference).                                                          Default: ''.
-        Kerr-tail        Boolean to add a tail factor to the Kerr template.                                                  Default: 0.
-        Kerr-tail-modes  Modes to which a tail will be added in the fitting template. Example format: '22,32'.               Default: '22'.
-        TEOB-NR-fit      Boolean to fit also for NR calibration coefficients within TEOB model, otherwise, use default fits. Default: 0.
-        TEOB-template    TEOB template to be used. Available options: ['qc', 'nc']. The 'qc' version is defined in  \
-                         arXiv:1904.09550, arXiv:2001.09082, while the 'nc' in II.C of arXiv:2305.19336                      Default: 'qc'.
+        TEOB-NR-fit                      Boolean to fit also for NR calibration coefficients within TEOB model, otherwise, use default fits.                              Default: 0.
+        TEOB-template                    TEOB template to be used. Available options: ['qc', 'nc']. The 'qc' version is defined in  \
+                                         arXiv:1904.09550, arXiv:2001.09082, while the 'nc' in II.C of arXiv:2305.19336.                                                  Default: 'qc'.
 
     *******************************************************
     * Parameters to be passed to the [Inference] section. *
@@ -409,4 +424,4 @@ __ascii_art__ = """\n\n \u001b[\u001b[38;5;39m
                                                  @
 \u001b[0m"""
 
-max_len_keyword = len('inference-method')
+max_len_keyword = len('KerrBinary-amplitudes-nc-version')

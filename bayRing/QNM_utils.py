@@ -195,13 +195,13 @@ def read_Kerr_modes(modes_input, QQNM_modes, charge, l_NR, m, NR_metadata):
 
         if(charge): 
             interpolate_freq, interpolate_tau = pyRing_utils.qnm_interpolate_KN(2, l_ring, m_ring, n)
-            freq = (interpolate_freq(NR_metadata['af'], NR_metadata['qf']) / NR_metadata['Mf']) * (1./twopi)
-            tau  = -1./(interpolate_tau(NR_metadata['af'], NR_metadata['qf'])) * NR_metadata['Mf']
+            freq = (interpolate_freq(np.abs(NR_metadata['af']), NR_metadata['qf']) / NR_metadata['Mf']) * (1./twopi)
+            tau  = -1./(interpolate_tau(np.abs(NR_metadata['af']), NR_metadata['qf'])) * NR_metadata['Mf']
             qnm_cached[(2, l_ring, m_ring, n)] = {'f': freq, 'tau': tau}
 
         else      : 
 
-            omega, _, _ = qnm.modes_cache(s=-2,l=l_ring,m=m_ring,n=n)(a=NR_metadata['af'])
+            omega, _, _ = qnm.modes_cache(s=-2,l=l_ring,m=m_ring,n=n)(a=np.abs(NR_metadata['af']))
             freq        = (np.real(omega) / NR_metadata['Mf']) * (1./twopi)
             tau         = -1./(np.imag(omega)) * NR_metadata['Mf']
             qnm_cached[(2, l_ring, m_ring, n)] = {'f': freq, 'tau': tau}

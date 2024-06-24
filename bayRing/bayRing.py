@@ -72,31 +72,35 @@ def main():
     print_section('NR data loading')
     parameters['Injection-data']['modes-list'] = NR_waveforms.read_fake_NR(parameters['NR-data']['catalog'], parameters['Injection-data']['modes'])
 
-    NR_sim      = NR_waveforms.NR_simulation(parameters['NR-data']['catalog']                     , 
-                                             parameters['NR-data']['ID']                          , 
-                                             parameters['NR-data']['res-level']                   , 
-                                             parameters['NR-data']['extrap-order']                , 
-                                             parameters['NR-data']['pert-order']                  , 
-                                             parameters['NR-data']['dir']                         , 
-                                             parameters['NR-data']['properties-file']             ,
-                                             parameters['Injection-data']['modes-list']           , 
-                                             parameters['Injection-data']['times']                , 
-                                             parameters['Injection-data']['noise']                , 
-                                             parameters['Injection-data']['tail']                 , 
-                                             parameters['NR-data']['l-NR']                        , 
-                                             parameters['NR-data']['m']                           , 
-                                             parameters['I/O']['outdir']                          , 
-                                             download       = parameters['NR-data']['download']   , 
-                                             NR_error       = parameters['NR-data']['error']      , 
-                                             tM_start       = parameters['Inference']['t-start']  , 
-                                             tM_end         = parameters['Inference']['t-end']    , 
-                                             t_delay_scd    = parameters['Inference']['dt-scd']   , 
-                                             t_peak_22      = parameters['NR-data']['t-peak-22']  ,
-                                             t_min_mismatch = parameters['NR-data']['error-t-min'], 
-                                             t_max_mismatch = parameters['NR-data']['error-t-max'])
+    NR_sim      = NR_waveforms.NR_simulation(parameters['NR-data']['catalog']                       , 
+                                             parameters['NR-data']['ID']                            , 
+                                             parameters['NR-data']['res-level']                     , 
+                                             parameters['NR-data']['extrap-order']                  , 
+                                             parameters['NR-data']['pert-order']                    , 
+                                             parameters['NR-data']['dir']                           , 
+                                             parameters['NR-data']['properties-file']               ,
+                                             parameters['Injection-data']['modes-list']             , 
+                                             parameters['Injection-data']['times']                  , 
+                                             parameters['Injection-data']['noise']                  , 
+                                             parameters['Injection-data']['tail']                   , 
+                                             parameters['NR-data']['l-NR']                          , 
+                                             parameters['NR-data']['m']                             , 
+                                             parameters['I/O']['outdir']                            ,
+                                             waveform_type  = parameters['NR-data']['waveform-type'], 
+                                             download       = parameters['NR-data']['download']     , 
+                                             NR_error       = parameters['NR-data']['error']        , 
+                                             tM_start       = parameters['Inference']['t-start']    , 
+                                             tM_end         = parameters['Inference']['t-end']      , 
+                                             t_delay_scd    = parameters['Inference']['dt-scd']     , 
+                                             t_peak_22      = parameters['NR-data']['t-peak-22']    ,
+                                             t_min_mismatch = parameters['NR-data']['error-t-min']  , 
+                                             t_max_mismatch = parameters['NR-data']['error-t-max']  )
 
     error       = NR_sim.NR_cpx_err_cut
     NR_metadata = NR_waveforms.read_NR_metadata(NR_sim, parameters['NR-data']['catalog'])
+
+    print_section('Simulation metadata')
+    for key in NR_metadata.keys(): print('{}: {}'.format(key.ljust(len('omg_peak_22')), NR_metadata[key]))
 
     # =================#
     # Load Kerr modes. #
@@ -109,22 +113,24 @@ def main():
     # Load model. #
     # ============#
 
-    wf_model = template_waveforms.WaveformModel(NR_sim.t_NR_cut                                         , 
-                                                NR_sim.t_min                                            , 
-                                                NR_sim.t_peak                                           ,
-                                                parameters['Model']['template']                         , 
-                                                parameters['Model']['N-DS-modes']                       , 
-                                                Kerr_modes                                              , 
-                                                NR_metadata                                             , 
-                                                qnm_cached                                              , 
-                                                parameters['NR-data']['l-NR']                           , 
-                                                parameters['NR-data']['m']                              , 
-                                                tail              = parameters['Model']['Kerr-tail']    ,
-                                                tail_modes        = Kerr_tail_modes                     ,     
-                                                quadratic_modes   = Kerr_quad_modes                     , 
-                                                const_params      = parameters['NR-data']['add-const']  , 
-                                                TEOB_NR_fit       = parameters['Model']['TEOB-NR-fit']  ,
-                                                TEOB_template     = parameters['Model']['TEOB-template'],
+    wf_model = template_waveforms.WaveformModel(NR_sim.t_NR_cut                                                            , 
+                                                NR_sim.t_min                                                               , 
+                                                NR_sim.t_peak                                                              ,
+                                                parameters['Model']['template']                                            , 
+                                                parameters['Model']['N-DS-modes']                                          , 
+                                                Kerr_modes                                                                 , 
+                                                NR_metadata                                                                , 
+                                                qnm_cached                                                                 , 
+                                                parameters['NR-data']['l-NR']                                              , 
+                                                parameters['NR-data']['m']                                                 , 
+                                                tail                      = parameters['Model']['Kerr-tail']                   ,
+                                                tail_modes                = Kerr_tail_modes                                    ,     
+                                                quadratic_modes           = Kerr_quad_modes                                    , 
+                                                const_params              = parameters['NR-data']['add-const']                 , 
+                                                KerrBinary_version        = parameters['Model']['KerrBinary-version']              ,
+                                                KerrBinary_amp_nc_version = parameters['Model']['KerrBinary-amplitudes-nc-version'],
+                                                TEOB_NR_fit               = parameters['Model']['TEOB-NR-fit']                 ,
+                                                TEOB_template             = parameters['Model']['TEOB-template']               ,
                                                 )
 
     # ===============#
@@ -165,21 +171,22 @@ def main():
     if(  parameters['I/O']['run-type']=='full'           ): results_object = inference.run_inference(parameters, inference_model)
     elif(parameters['I/O']['run-type']=='post-processing'): results_object = postprocess.read_results_object_from_previous_inference(parameters)
     else                                                  : raise Exception("Unknown run type selected. Exiting.")
-            
+        
     #=========================#
     # Postprocessing section. #
     #=========================#
 
     print_section('Post-processing')
 
-    print('\n* Note: quantities are quoted at the start time of the fit (i.e. t_peak + t_0 [M]).\n')
+    print('\n* Note: except for free damped sinusoids fits, quantities are quoted at the selected peak time.\n')
     postprocess.print_point_estimate(results_object, inference_model.access_names(), parameters['Inference']['method'])
     postprocess.l2norm_residual_vs_nr(results_object, inference_model, NR_sim, parameters['I/O']['outdir'])
 
     # postprocess.plot_fancy_residual(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'])
     # postprocess.plot_fancy_reconstruction(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], method)
 
-    if('Kerr' in parameters['Model']['template'] ): postprocess.post_process_amplitudes(parameters['Inference']['t-start'], results_object, NR_metadata, qnm_cached, Kerr_modes, Kerr_quad_modes, parameters['I/O']['outdir'])
+    # Not needed now that we define everything directly at the peak.
+    # if(parameters['Model']['template']=='Kerr'): postprocess.post_process_amplitudes(parameters['Inference']['t-start'], results_object, NR_metadata, qnm_cached, Kerr_modes, Kerr_quad_modes, parameters['I/O']['outdir'])
     if(parameters['NR-data']['catalog']=='C2EFT' and 'Damped-sinusoids' in parameters['Model']['template']): postprocess.compare_with_GR_QNMs(results_object, qnm_cached, NR_sim, parameters['I/O']['outdir'])
 
     if(parameters['I/O']['run-type']=='full'):

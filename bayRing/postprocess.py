@@ -496,6 +496,8 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     NR_r, NR_i, NR_r_err, NR_i_err, NR_amp, NR_f, t_NR, t_peak                                                = NR_sim.NR_r, NR_sim.NR_i, np.real(NR_sim.NR_err_cmplx), np.imag(NR_sim.NR_err_cmplx), NR_sim.NR_amp, NR_sim.NR_freq, NR_sim.t_NR, NR_sim.t_peak
     t_cut, tM_start, tM_end, NR_r_cut, NR_i_cut, NR_r_err_cut, NR_i_err_cut, NR_amp_cut, NR_phi_cut, NR_f_cut = NR_sim.t_NR_cut, NR_sim.tM_start, NR_sim.tM_end, NR_sim.NR_r_cut, NR_sim.NR_i_cut, np.real(NR_sim.NR_cpx_err_cut), np.imag(NR_sim.NR_cpx_err_cut), NR_sim.NR_amp_cut, NR_sim.NR_phi_cut, NR_sim.NR_freq_cut
 
+    wf_data_type = NR_sim.waveform_type
+
     l,m = NR_sim.l, NR_sim.m
 
     if(NR_sim.NR_catalog=='cbhdb' or NR_sim.NR_catalog=='charged_raw'):
@@ -534,8 +536,12 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
         fontsize_labels = 23
         color_f_ring    = 'forestgreen'
 
-
-    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): tM_end = 80
+    if(not(tail_flag) and not(wf_data_type=='psi4') and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): tM_end = 80
+    if(wf_data_type=='psi4'): 
+        tM_end = 120
+        label_data = '\psi_{4,%s%s}'%(l,m)
+    else:
+        label_data = 'h_{%s%s}'%(l,m)
 
     ########################
     # Waveforms comparison #
@@ -567,14 +573,14 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     if not(tail_flag):
         ax1.plot(t_NR - t_peak, NR_r,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
         ax1.axvline(tM_start,                                                              c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
-        ax1.axvline(0.0,                          label=r'$\mathrm{t_{peak}}$',            c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
-        ax1.set_ylabel(r'$\mathrm{Re[h_{%s%s}]}$'%(l,m), fontsize=fontsize_labels)
+        ax1.axvline(0.0,                          label=r'$t_{\rm peak}$',            c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
+        ax1.set_ylabel(r'$\mathrm{Re[%s]}$'%(label_data), fontsize=fontsize_labels)
 
         ax3.plot(t_NR - t_peak, NR_i,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
-        ax3.axvline(tM_start, label=r'$\mathrm{t_{start} = t_{peak} \, + %d M}$'%tM_start, c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
+        ax3.axvline(tM_start, label=r'$t_{\rm start} = t_{\rm peak} \, + %d \mathrm{M}}$'%tM_start, c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax3.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
-        ax3.set_ylabel(r'$\mathrm{Im[h_{%s%s}]}$'%(l,m), fontsize=fontsize_labels)
-        ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$'    , fontsize=fontsize_labels)
+        ax3.set_ylabel(r'$\mathrm{Im[%s]}$'%(label_data), fontsize=fontsize_labels)
+        ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
 
     ax2.semilogy(t_NR - t_peak, NR_amp, label=r'$\mathrm{NR}$',                            c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
     ax2.axvline(tM_start,                                                                  c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
@@ -593,8 +599,11 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
         ax4.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
     ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$'    , fontsize=fontsize_labels)
 
+    # Find the index of zero
+    t_peak_idx = np.argmin(np.abs(t_NR - t_peak))
+    
     if not(tail_flag):
-        try   : ax4.set_ylim([-1.5*NR_f[np.argmax(NR_amp)+1], 3.5*NR_f[np.argmax(NR_amp)+1]])
+        try   : ax4.set_ylim([-1.5*NR_f[t_peak_idx], 3.5*NR_f[t_peak_idx]])
         except: pass
     else:
         ax4.set_ylim([-0.08, 0.28])
@@ -669,10 +678,10 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
                 if(method=='Minimization'): break
 
     if not(tail_flag):
-        ax1.set_ylabel(r'$\mathit{Re(h_{%s%s})}$'%(l,m), fontsize=fontsize_labels*rescale)
-        ax3.set_ylabel(r'$\mathit{Im(h_{%s%s})}$'%(l,m), fontsize=fontsize_labels*rescale)
-    ax2.set_ylabel(r'$\mathit{A(t)}$'                  , fontsize=fontsize_labels*rescale)
-    ax4.set_ylabel(r'$\mathit{f\,(t)}$'                , fontsize=fontsize_labels*rescale)
+        ax1.set_ylabel(r'$\mathit{Re(%s)}$'%(label_data), fontsize=fontsize_labels*rescale)
+        ax3.set_ylabel(r'$\mathit{Im(%s)}$'%(label_data), fontsize=fontsize_labels*rescale)
+    ax2.set_ylabel(    r'$\mathit{A_{%d%d}(t)}$'%(l,m)  , fontsize=fontsize_labels*rescale)
+    ax4.set_ylabel(    r'$\mathit{f_{%d%d}\,(t)}$'%(l,m), fontsize=fontsize_labels*rescale)
 
     plt.rcParams['legend.frameon'] = True
 
@@ -689,7 +698,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     ax2.get_shared_x_axes().join(ax2, ax4)
     ax2.set_xticklabels([])
     plt.tight_layout(rect=[0,0,1,0.95])
-    plt.subplots_adjust(hspace=0, wspace=0.22)
+    plt.subplots_adjust(hspace=0, wspace=0.27)
     if(tail_flag): leg_name_tail = '_tail'
     else         : leg_name_tail = ''
     plt.savefig(os.path.join(outdir, f'Plots/Comparisons/Waveform_reconstruction{leg_name_tail}.pdf'), bbox_inches='tight')
@@ -741,13 +750,13 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     ax1.legend(loc='best', fontsize=fontsize_legend)
     ax3.legend(loc='best', fontsize=fontsize_legend)
 
-    ax1.set_ylabel(r'$\mathit{Re(h_{%s%s})}$'%(l,m)     , fontsize=fontsize_labels)
-    ax2.set_ylabel(r'$\mathit{A(t)}$'                   , fontsize=fontsize_labels)
-    ax3.set_ylabel(r'$\mathit{Im(h_{%s%s})}$'%(l,m)     , fontsize=fontsize_labels)
-    ax4.set_ylabel(r'$\mathit{f\,(t)}$'                 , fontsize=fontsize_labels)
+    ax1.set_ylabel(r'$\mathit{Re(%s)}$'%(label_data), fontsize=fontsize_labels)
+    ax2.set_ylabel(r'$\mathit{A(t)}$'               , fontsize=fontsize_labels)
+    ax3.set_ylabel(r'$\mathit{Im(%s)}$'%(label_data), fontsize=fontsize_labels)
+    ax4.set_ylabel(r'$\mathit{f\,(t)}$'             , fontsize=fontsize_labels)
 
-    ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$'    , fontsize=fontsize_labels)
-    ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$'    , fontsize=fontsize_labels)
+    ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
+    ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
 
     ax1.get_shared_x_axes().join(ax1, ax3)
     ax2.get_shared_x_axes().join(ax2, ax4)
