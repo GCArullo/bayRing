@@ -409,4 +409,4 @@ __ascii_art__ = """\n\n \u001b[\u001b[38;5;39m
                                                  @
 \u001b[0m"""
 
-max_len_keyword = len('inference-method')
+max_len_keyword = len('KerrBinary-amplitudes-nc-version')

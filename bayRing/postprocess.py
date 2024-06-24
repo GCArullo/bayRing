@@ -488,11 +488,11 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     if not(tail_flag):
         ax1.plot(t_NR - t_peak, NR_r,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
         ax1.axvline(tM_start,                                                              c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
-        ax1.axvline(0.0,                          label=r'$\mathrm{t_{peak}}$',            c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
+        ax1.axvline(0.0,                          label=r'$t_{\rm peak}$',            c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax1.set_ylabel(r'$\mathrm{Re[%s]}$'%(label_data), fontsize=fontsize_labels)
 
         ax3.plot(t_NR - t_peak, NR_i,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
-        ax3.axvline(tM_start, label=r'$\mathrm{t_{start} = t_{peak} \, + %d M}$'%tM_start, c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
+        ax3.axvline(tM_start, label=r'$t_{\rm start} = t_{\rm peak} \, + %d \mathrm{M}}$'%tM_start, c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax3.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax3.set_ylabel(r'$\mathrm{Im[%s]}$'%(label_data), fontsize=fontsize_labels)
         ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
@@ -613,7 +613,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     ax2.get_shared_x_axes().join(ax2, ax4)
     ax2.set_xticklabels([])
     plt.tight_layout(rect=[0,0,1,0.95])
-    plt.subplots_adjust(hspace=0, wspace=0.22)
+    plt.subplots_adjust(hspace=0, wspace=0.27)
     if(tail_flag): leg_name_tail = '_tail'
     else         : leg_name_tail = ''
     plt.savefig(os.path.join(outdir, f'Plots/Comparisons/Waveform_reconstruction{leg_name_tail}.pdf'), bbox_inches='tight')
