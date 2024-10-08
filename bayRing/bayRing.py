@@ -196,12 +196,27 @@ def main():
         execution_time = (time.time() - execution_time)/60.0
         print('\nExecution time (min): {:.2f}\n'.format(execution_time))
 
-    try: 
-        postprocess.plot_NR_vs_model(               NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], tail_flag)
-        # In case a tail run is selected, do plots also without tail format
-        if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], False    )
-    except: print('Waveform reconstruction plot failed.')
-    try   : postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
-    except: print('Corner plot failed.')
+    try:
+        print("Attempting waveform reconstruction plot with tail_flag =", tail_flag)
 
-    if(parameters['I/O']['show-plots']): plt.show()
+        postprocess.plot_NR_vs_model(
+            NR_sim, wf_model, NR_metadata, results_object, inference_model,
+            parameters['I/O']['outdir'], parameters['Inference']['method'], tail_flag
+        )
+        # In case a tail run is selected, do plots also without tail format
+        if tail_flag:
+            postprocess.plot_NR_vs_model(
+                NR_sim, wf_model, NR_metadata, results_object, inference_model,
+                parameters['I/O']['outdir'], parameters['Inference']['method'], False
+            )
+    except Exception as e:
+        print(f"Waveform reconstruction plot failed with error: {e}")
+        import traceback
+        traceback.print_exc()
+
+    try:
+        postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
+    except Exception as e:
+        print(f"Corner plot failed with error: {e}")
+
+    if parameters['I/O']['show-plots']: plt.show()
