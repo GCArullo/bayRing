@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 # Standard python packages
-import matplotlib.pyplot as plt, numpy as np, os, time
+import matplotlib.pyplot as plt, numpy as np, os, time, traceback
 from optparse       import OptionParser
 try:                import configparser
 except ImportError: import ConfigParser as configparser
@@ -197,26 +197,17 @@ def main():
         print('\nExecution time (min): {:.2f}\n'.format(execution_time))
 
     try:
-        print("Attempting waveform reconstruction plot with tail_flag =", tail_flag)
-
-        postprocess.plot_NR_vs_model(
-            NR_sim, wf_model, NR_metadata, results_object, inference_model,
-            parameters['I/O']['outdir'], parameters['Inference']['method'], tail_flag
-        )
+        postprocess.plot_NR_vs_model(              NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], tail_flag)
         # In case a tail run is selected, do plots also without tail format
-        if tail_flag:
-            postprocess.plot_NR_vs_model(
-                NR_sim, wf_model, NR_metadata, results_object, inference_model,
-                parameters['I/O']['outdir'], parameters['Inference']['method'], False
-            )
+        if tail_flag: postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], False   )
     except Exception as e:
         print(f"Waveform reconstruction plot failed with error: {e}")
-        import traceback
         traceback.print_exc()
 
-    try:
+    try                  : 
         postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
-    except Exception as e:
+    except Exception as e: 
         print(f"Corner plot failed with error: {e}")
+        traceback.print_exc()
 
     if parameters['I/O']['show-plots']: plt.show()
