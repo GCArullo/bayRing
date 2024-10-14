@@ -14,11 +14,13 @@ Relies on [pyRing](https://git.ligo.org/lscsoft/pyring) for waveform interfacing
 
 # Installation
 
-**Currently requires the `hm_nc_fit` branch of pyRing**.
+For the vast majority of applications the software will need some edits, hence we suggest to install the "Developer version". For applications that do not require to modify the source code, the version obtainable through pip is enough.
 
-Tagged versions can be installed through: `pip install bayRing`.
+### Developer version
 
-The source code can be installed through: 
+First, install the `hm_nc_fit` branch of [pyRing](https://git.ligo.org/lscsoft/pyring), see instructions [here](https://lscsoft.docs.ligo.org/pyring/#install-and-run).
+
+Then, the bayRing source code can be installed through: 
 
   ```
   pip install -r requirements.txt
@@ -26,6 +28,12 @@ The source code can be installed through:
   ```
 
 An alternative to the latter instruction is `python setup.py install`.
+
+### pip version
+
+Tagged versions can be installed through: `pip install bayRing`. 
+
+Please be aware that the latest pip version might be outdated with respect to the source code.
 
 # Usage
 
