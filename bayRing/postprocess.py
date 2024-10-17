@@ -577,7 +577,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
         ax1.set_ylabel(r'$\mathrm{Re[%s]}$'%(label_data), fontsize=fontsize_labels)
 
         ax3.plot(t_NR - t_peak, NR_i,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
-        ax3.axvline(tM_start, label=r'$t_{\rm start} = t_{\rm peak} \, + %d \mathrm{M}}$'%tM_start, c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
+        ax3.axvline(tM_start, label=r'$t_{\rm start} = t_{\rm peak} \, + %d \mathrm{M}$'%tM_start, c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax3.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax3.set_ylabel(r'$\mathrm{Im[%s]}$'%(label_data), fontsize=fontsize_labels)
         ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
@@ -691,11 +691,11 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     if not(tail_flag): 
         ax1.legend(loc='best', fontsize=fontsize_legend, shadow=True)
         ax3.legend(loc='best', fontsize=fontsize_legend, shadow=True)
-        ax1.get_shared_x_axes().join(ax1, ax3)
+        ax1.set_xlim(ax3.get_xlim())
         ax1.set_xticklabels([])
         plt.suptitle('{}-{}'.format(NR_sim.NR_catalog, NR_sim.NR_ID), size=28)
 
-    ax2.get_shared_x_axes().join(ax2, ax4)
+    ax2.set_xlim(ax4.get_xlim())
     ax2.set_xticklabels([])
     plt.tight_layout(rect=[0,0,1,0.95])
     plt.subplots_adjust(hspace=0, wspace=0.27)
@@ -758,8 +758,8 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
     ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
 
-    ax1.get_shared_x_axes().join(ax1, ax3)
-    ax2.get_shared_x_axes().join(ax2, ax4)
+    ax3.set_xlim(ax1.get_xlim())  
+    ax4.set_xlim(ax2.get_xlim())
     ax1.set_xticklabels([])
     ax2.set_xticklabels([])
     plt.suptitle('{}-{} residuals'.format(NR_sim.NR_catalog, NR_sim.NR_ID), size=28)

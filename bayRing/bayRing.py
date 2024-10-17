@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 # Standard python packages
-import matplotlib.pyplot as plt, numpy as np, os, time
+import matplotlib.pyplot as plt, numpy as np, os, time, traceback
 from optparse       import OptionParser
 try:                import configparser
 except ImportError: import ConfigParser as configparser
@@ -204,15 +204,21 @@ def main():
         postprocess.plot_NR_vs_model(               NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], tail_flag)
         # In case a tail run is selected, do plots also without tail format
         if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], False    )
-    except: print('Waveform reconstruction plot failed.')
-    try   : postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
-    except: print('Corner plot failed.') 
-    
-    print('FIXME: think about units of time axis in mismatch computation.')
-    exit()
+    except Exception as e:
+        print(f"Waveform reconstruction plot failed with error: {e}")
+        traceback.print_exc()    
+
     if not(parameters['Mismatch']['asd-path']==''):
+        print('FIXME: think about units of time axis in mismatch computation.')
+        exit()
         acf = wf_utils.compute_acf_from_user_asd(parameters['Mismatch']['asd-path'], parameters['Mismatch']['f-min'], parameters['Mismatch']['f-max'], len())
         try   : postprocess.compute_mismatch(NR_sim, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], acf)
         except: print('Mismatch computation failed.')
 
-    if(parameters['I/O']['show-plots']): plt.show()
+    try                  : 
+        postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
+    except Exception as e: 
+        print(f"Corner plot failed with error: {e}")
+        traceback.print_exc()
+
+    if parameters['I/O']['show-plots']: plt.show()

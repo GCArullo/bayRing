@@ -722,15 +722,15 @@ class NR_simulation():
                 self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level)
 
             counter = 1
-            while(counter==0):
+            while(not(counter==0)):
                 try              : 
                     if(self.res_level-counter==0): raise ValueError("Only a single resolution available.")
-                    t_res,     NR_r_res,  NR_i_res  = self.read_waveform_lm_from_SXS(self.extrap_order,   self.res_level-counter)
+                    t_res, NR_r_res, NR_i_res = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level-counter)
                     print('Resolution error constructed with resolution level {}'.format(self.res_level-counter))
                     counter = 0
                 except ValueError: 
                     counter += 1
-            t_extr,    NR_r_extr, NR_i_extr = self.read_waveform_lm_from_SXS(self.extrap_order+1, self.res_level)
+            t_extr, NR_r_extr, NR_i_extr = self.read_waveform_lm_from_SXS(self.extrap_order+1, self.res_level)
 
         elif(self.NR_catalog=='RIT'):
         
@@ -1033,6 +1033,7 @@ class NR_simulation():
 
         return t_NR, NR_err_cmplx, t_peak
         
+    # FIXME: this function should be cleaned up
     def read_fake_NR_metadata(self):
         
         """
