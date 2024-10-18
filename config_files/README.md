@@ -2,6 +2,8 @@
 
 This directory collects a set of example configuration files to showcase the basic usage options of the package. All options are explorable through `bayRing --help`.
 
+The classes of models employed correspond to the ones described in e.g. [here](https://agenda.infn.it/event/39201/contributions/241342/attachments/125382/184845/TEONGrav.pdf) around slide 70 ("Agnostic" corresponds to "Damped-sinusoids").
+
 The `quick` files shows how to obtain quick and dirty results (decreasing the values of sampler settings, setting a constant NR error, imposing tight prior bounds, decreasing the duration of the data time series). The simplest of such examples can be run with:
 
 `bayRing --config-file config_SXS_0305_Kerr_220_quick.ini`
