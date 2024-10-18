@@ -209,8 +209,7 @@ def main():
         traceback.print_exc()    
 
     if not(parameters['Mismatch']['asd-path']==''):
-        print('FIXME: think about units of time axis in mismatch computation.')
-        exit()
+        print('\n\n\nFIXME: think about units of time axis in mismatch computation.\n\n\n')
         acf = wf_utils.compute_acf_from_user_asd(parameters['Mismatch']['asd-path'], parameters['Mismatch']['f-min'], parameters['Mismatch']['f-max'], len())
         try   : postprocess.compute_mismatch(NR_sim, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], acf)
         except: print('Mismatch computation failed.')

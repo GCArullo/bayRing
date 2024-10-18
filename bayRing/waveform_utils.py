@@ -272,8 +272,7 @@ def acf_from_asd(asd_filepath, f_min, f_max, N_points):
     psd_file  =  psd_file[freq_file < f_max]
     freq_file = freq_file[freq_file < f_max]
 
-    print('FIXME: edges should go to the same constant when taking the FT')
-    exit()
+    print('\n\n\nFIXME: edges should go to the same constant when taking the FT\n\n\n')
     PSD       = np.interp(f, freq_file, psd_file)
 
     # Compute the ACF. We are using the one-sided PSD, thus it is twice the Fourier transform of the autocorrelation function (see eq. 7.15 of Maggiore Vol.1). We take the real part just to convert the complex output of fft to a real numpy float. The imaginary part if already 0 when coming out of the fft.
