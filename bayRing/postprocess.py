@@ -1,4 +1,4 @@
-import corner, os, numpy as np, matplotlib.pyplot as plt, h5py, seaborn as sns
+import corner, h5py, matplotlib.pyplot as plt, numpy as np, os, qnm, seaborn as sns
 
 import bayRing.utils          as utils
 import bayRing.waveform_utils as waveform_utils
@@ -415,10 +415,13 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
 
     l,m = NR_sim.l, NR_sim.m
 
-    if(NR_sim.NR_catalog=='cbhdb' or NR_sim.NR_catalog=='charged_raw'):
-        f_rd_fundamental = template.qnm_cached[(2,l,m,0)]['f']
-    else:
-        f_rd_fundamental = template.qnm_cached[(2,l,m,0)]['f']
+    f_rd_fundamental    = template.qnm_cached[(2,l,m,0)]['f']
+    
+    plot_overtones_flag = 0
+    f_rd_overtones      = {}
+    for n in [1,3,7,9]: 
+        omega_n, _, _     = qnm.modes_cache(s=-2,l=l,m=m,n=n)(a=np.abs(metadata['af']))
+        f_rd_overtones[n] = (np.real(omega_n) / metadata['Mf']) * (1./twopi)
 
     try:
         m1, m2, chi1, chi2 = metadata['m1'], metadata['m2'], metadata['chi1'], metadata['chi2'],
@@ -435,6 +438,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     color_model     = '#cc0033'
     color_t_start   = 'mediumseagreen' #'#990066', '#cc0033', '#ff0000'
     color_t_peak    = 'royalblue'
+    color_f_overt   = 'darkorange'
 
     alpha_std       = 1.0
     alpha_med       = 0.8
@@ -504,8 +508,14 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     elif(  tail_flag  and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): ax2.set_ylim([2*1e-4, 2*np.max(NR_amp)])
     ax2.set_xlabel(r'$\mathrm{t - t_{peak} \, [M}]$', fontsize=fontsize_labels)
 
-    ax4.plot(t_NR - t_peak, NR_f,                                                          c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
-    ax4.axhline(f_rd_fundamental, label=r'$\mathit{f_{%d%d0}}$'%(l,m),                     c=color_f_ring,  lw=lw_std,    alpha=alpha_std, ls=ls_f)
+    ax4.plot(t_NR - t_peak, NR_f,                                                          c=color_NR,      lw=lw_std,     alpha=alpha_std, ls='-' )
+    ax4.axhline(f_rd_fundamental, label=r'$\mathit{f_{%d%d0}}$'%(l,m),                     c=color_f_ring,  lw=lw_std,     alpha=alpha_std, ls=ls_f)
+    if(plot_overtones_flag):
+        for n in [1,3,9]: 
+            if(n==1): leg = r'$\mathit{f_{%d%dn}}$'%(l,m)
+            else    : leg = None
+            ax4.axhline(f_rd_overtones[n], label=leg,         c=color_f_overt, lw=lw_std*0.4, alpha=alpha_std, ls=ls_f)
+
     if(tail_flag): 
         ax4.axhline(0.0,      label=r'$\mathit{f_{\rm tail}}$',                            c=color_model,   lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax4.axvline(tM_start, label=r'$\mathrm{t_{start} = t_{peak} \, + %d M}$'%tM_start, c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
