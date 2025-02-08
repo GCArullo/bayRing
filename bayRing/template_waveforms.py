@@ -176,29 +176,27 @@ class WaveformModel(cpnest.model.Model):
 
         nu = (self.metadata['m1']*self.metadata['m2'])/(self.metadata['m1']+self.metadata['m2'])**2
 
-        if(self.TEOB_NR_fit): 
+        if(self.TEOB_NR_fit):
             
             if(self.TEOB_template=='qc'):
                 NR_fit_coeffs = {
                                 (self.l_NR,self.m_NR): {
-                                                        'c3A'           : params[            'c3A_{}{}'.format(self.l_NR,self.m_NR)]   ,
-                                                        'c3p'           : params[            'c3p_{}{}'.format(self.l_NR,self.m_NR)]   ,
-                                                        'c4p'           : params[            'c4p_{}{}'.format(self.l_NR,self.m_NR)]   ,
-                                                        'omg_peak'      : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]   ,
-                                                        'A_peak_over_nu': self.metadata[  'A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu,
+                                                        'c3A'           : params[             'c3A_{}{}'.format(self.l_NR,self.m_NR)]            ,
+                                                        'c3p'           : params[             'c3p_{}{}'.format(self.l_NR,self.m_NR)]            ,
+                                                        'c4p'           : params[             'c4p_{}{}'.format(self.l_NR,self.m_NR)]            ,
                                                         }
                                 }
             elif(self.TEOB_template=='nc'):
                 NR_fit_coeffs = {
                                 (self.l_NR,self.m_NR): {
-                                                        'c2A'           : params[                  'c2A_{}{}'.format(self.l_NR,self.m_NR)]   ,
-                                                        'c3A'           : params[                  'c3A_{}{}'.format(self.l_NR,self.m_NR)]   ,
-                                                        'c2p'           : params[                  'c2p_{}{}'.format(self.l_NR,self.m_NR)]   ,
-                                                        'c3p'           : params[                  'c3p_{}{}'.format(self.l_NR,self.m_NR)]   ,
-                                                        'c4p'           : params[                  'c4p_{}{}'.format(self.l_NR,self.m_NR)]   ,
-                                                        'omg_peak'      : self.metadata[      'omg_peak_{}{}'.format(self.l_NR,self.m_NR)]   ,
-                                                        'A_peak_over_nu': self.metadata[        'A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu,
-                                                        'A_peakdotdot'  : params[         'A_peakdotdot_{}{}'.format(self.l_NR,self.m_NR)]/nu,
+                                                        'c2A'                 : params[       'c2A_{}{}'.format(self.l_NR,self.m_NR)]            ,
+                                                        'c3A'                 : params[       'c3A_{}{}'.format(self.l_NR,self.m_NR)]            ,
+                                                        'c2p'                 : params[       'c2p_{}{}'.format(self.l_NR,self.m_NR)]            ,
+                                                        'c3p'                 : params[       'c3p_{}{}'.format(self.l_NR,self.m_NR)]            ,
+                                                        'c4p'                 : params[       'c4p_{}{}'.format(self.l_NR,self.m_NR)]            ,
+                                                        'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]       ,
+                                                        'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu      ,
+                                                        'A_peakdotdot_over_nu': params[       'A_peakdotdot_{}{}'.format(self.l_NR,self.m_NR)]/nu,
                                                         }
                                 }
             else:
