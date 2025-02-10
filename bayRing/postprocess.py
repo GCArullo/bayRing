@@ -416,7 +416,8 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     l,m = NR_sim.l, NR_sim.m
 
     f_rd_fundamental    = template.qnm_cached[(2,l,m,0)]['f']
-    
+    tau_rd_fundamental  = template.qnm_cached[(2,l,m,0)]['tau']
+
     plot_overtones_flag = 0
     f_rd_overtones      = {}
     for n in [1,3,7,9]: 
@@ -428,6 +429,9 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
         f_peak             = utils.F_mrg_Nagar(m1, m2, chi1, chi2, geom=1)
     except:
         f_peak             = None
+
+    # get the amplitude at the time close to the peak
+    amp_peak = NR_amp[np.argmin(np.abs(t_NR - t_peak))]
 
     lw_small        = 0.5
     lw_medium       = 1.2
@@ -492,7 +496,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     if not(tail_flag):
         ax1.plot(t_NR - t_peak, NR_r,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
         ax1.axvline(tM_start,                                                              c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
-        ax1.axvline(0.0,                          label=r'$t_{\rm peak}$',            c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
+        ax1.axvline(0.0, label=r'$t_{\rm peak}$',                                          c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax1.set_ylabel(r'$\mathrm{Re[%s]}$'%(label_data), fontsize=fontsize_labels)
 
         ax3.plot(t_NR - t_peak, NR_i,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
@@ -501,10 +505,10 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
         ax3.set_ylabel(r'$\mathrm{Im[%s]}$'%(label_data), fontsize=fontsize_labels)
         ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
 
-    ax2.semilogy(t_NR - t_peak, NR_amp, label=r'$\mathrm{NR}$',                            c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
+    ax2.semilogy(t_NR - t_peak, NR_amp*np.e**((t_NR- t_peak)/tau_rd_fundamental), label=r'$\mathrm{NR}$',                            c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
     ax2.axvline(tM_start,                                                                  c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
     if(not(tail_flag)): ax2.axvline(0.0,                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
-    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): ax2.set_ylim([1e-6*np.max(NR_amp), 2*np.max(NR_amp)])
+    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): ax2.set_ylim([1e-1*amp_peak, 10*amp_peak])
     elif(  tail_flag  and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): ax2.set_ylim([2*1e-4, 2*np.max(NR_amp)])
     ax2.set_xlabel(r'$\mathrm{t - t_{peak} \, [M}]$', fontsize=fontsize_labels)
 
@@ -599,14 +603,13 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
                     ax2.semilogy(t_cut - t_peak, wf_amp,                                                       c='royalblue', lw=lw_std,       alpha=alpha_med, ls='--' )
                     ax4.plot(    t_cut - t_peak, wf_f,                                                         c='royalblue', lw=lw_std,       alpha=alpha_med, ls='--' )
 
-
                 if(method=='Minimization'): break
 
     if not(tail_flag):
-        ax1.set_ylabel(r'$\mathit{Re(%s)}$'%(label_data), fontsize=fontsize_labels*rescale)
-        ax3.set_ylabel(r'$\mathit{Im(%s)}$'%(label_data), fontsize=fontsize_labels*rescale)
-    ax2.set_ylabel(    r'$\mathit{A_{%d%d}(t)}$'%(l,m)  , fontsize=fontsize_labels*rescale)
-    ax4.set_ylabel(    r'$\mathit{f_{%d%d}\,(t)}$'%(l,m), fontsize=fontsize_labels*rescale)
+        ax1.set_ylabel(r'$\mathit{Re(%s)}$'%(label_data)                           , fontsize=fontsize_labels*rescale)
+        ax3.set_ylabel(r'$\mathit{Im(%s)}$'%(label_data)                           , fontsize=fontsize_labels*rescale)
+    ax2.set_ylabel(    r'$\mathit{A_{%d%d}(t)} \cdot e^{t/\tau_{%d%d0}}$'%(l,m,l,m), fontsize=fontsize_labels*rescale)
+    ax4.set_ylabel(    r'$\mathit{f_{%d%d}\,(t)}$'%(l,m)                           , fontsize=fontsize_labels*rescale)
 
     plt.rcParams['legend.frameon'] = True
 
