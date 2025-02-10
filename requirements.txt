@@ -1,9 +1,9 @@
 corner
 cpnest
 matplotlib
-numpy
+numpy==1.24.0
 pyRingGW
-qnm
+qnm==0.3.0
 raynest
 seaborn
 scipy

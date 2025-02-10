@@ -152,9 +152,12 @@ def read_config(Config):
 
         'Mismatch':
         {
-        'f-min'            : 20.0,
+        'f-min'            : 10.22,
         'f-max'            : 2048.0,
+        'M'                : 10,
+        'dL'               : 400,
         'asd-path'         : '',
+        'direction'        : 'below'
         },
 
     }
@@ -381,6 +384,9 @@ A dot is present at the end of each description line and is not to be intended a
         f-min            Minimum frequency (in Hz) to consider in the mismatch computation.         Default: 20.0.   
         f-max            Maximum frequency (in Hz) to consider in the mismatch computation.         Default: 2048.0.
         asd-path         Path to the ASD file, used to evaluate the mismatch at the end of the run. Default: ''.
+        M                The mass of the remnant (in solar masses).                                 Default: 10.
+        dL               The luminosity distance of the source with respect to the observer.        Default: 400.
+        direction        Where to apply the smoothing in the PSD before doing the FFT.             Default: below.
 
 """
                                                      

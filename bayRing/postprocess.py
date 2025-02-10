@@ -1,8 +1,33 @@
-import corner, os, numpy as np, matplotlib.pyplot as plt, h5py, scipy.linalg as sl, seaborn as sns
+import corner, os, numpy as np, matplotlib.pyplot as plt, h5py, scipy.linalg as sl, seaborn as sns, shutil
 import bayRing.utils          as utils
 import bayRing.waveform_utils as waveform_utils
+from pycbc.psd import from_txt
+import numba
+from scipy.interpolate import interp1d
+from pycbc.types.timeseries import TimeSeries
+from pycbc.psd import aLIGOZeroDetHighPower
+from pycbc.types.frequencyseries import FrequencySeries
+from pycbc.filter import sigma, overlap as compute_FD_overlap, overlap_cplx as compute_FD_overlap_cplx, match as compute_FD_match, matched_filter_core, matched_filter
 
+#units and costants
 twopi = 2.*np.pi
+c=2.99792458*1e8 #m/s
+G=6.67259*1e-11
+M_s=1.9885*1e30 #solar masses
+Mpc = 3.0857*1e22 #Megaparsec in meters
+
+#color palette
+colbBlue   = "#4477AA"
+colbRed    = "#EE6677"
+colbGreen  = "#228833"
+colbYellow = "#CCBB44"
+colbCyan   = "#66CCEE"
+colbPurple = "#AA3377"
+colbGray   = "#BBBBBB"
+
+#conversions
+C_mt=(M_s*G)/(c**3) #s, converts a mass expressed in solar masses into a time in seconds
+C_md=(M_s*G)/(Mpc*c**2) #adimensional, converts a mass expressed in solar masses to a distance in Megaparsec
 
 def read_results_object_from_previous_inference(parameters):
 
@@ -366,17 +391,94 @@ def compare_with_GR_QNMs(results_object, qnm_cached, NR_sim, outdir):
     plt.legend(loc='best')
     plt.savefig(os.path.join(outdir,'Plots/Results/f_fundamental.pdf'), bbox_inches='tight')
 
-    return 
+    return
 
-def compute_mismatch(NR_sim, results, inference_model, outdir, method, acf):
+def compute_FD_optimal_SNR(asd_file, h, n, f_min, f_max):
+
+        # Ensure PSD matches the waveform's `delta_f`
+        delta_f=2*f_max/n
+        psd = from_txt(
+            filename=asd_file,
+            length=n,
+            delta_f=delta_f,
+            low_freq_cutoff=f_min,
+            is_asd_file=True
+        )
+
+        h_tilde = h.to_frequencyseries(delta_f=delta_f)
+
+        fd_snr = sigma(h_tilde, psd=psd, low_frequency_cutoff=f_min)
+
+        return fd_snr
+
+@numba.njit
+def fast_interpolation(x, xp, fp):
+    """Numba-accelerated linear interpolation."""
+    return np.interp(x, xp, fp)
+
+def interpolate_waveform(t_start_g, t_end_g, M, wf_lNR, acf):
+    """
+    Interpolates the waveform to match the length of the autocovariance function (ACF).
+    
+    Parameters:
+    - t_start_g : float : Start time in geometrical units.
+    - t_end_g : float : End time in geometrical units.
+    - M : float : Mass of the system.
+    - wf_lNR : array : The original NR waveform data.
+    - acf : array : The autocovariance function (defines new length).
+
+    Returns:
+    - wf_int : array : Interpolated waveform with the same length as `acf`.
+    """
+    # Compute start and end time in physical units
+    t_start = t_start_g * C_mt * M
+    t_end = t_end_g * C_mt * M
+
+    # Generate time arrays
+    t_array = np.linspace(t_start, t_end, len(wf_lNR))  # Original waveform time
+    t_int = np.linspace(t_start, t_end, len(acf))       # Target interpolation time
+
+    # Use Numba-optimized interpolation
+    wf_int = fast_interpolation(t_int, t_array, wf_lNR)
+
+    return wf_int
+
+def convert_asd_to_pycbc_psd(asd_file, f_min, f_max, delta_f):
+    """
+    Load an ASD file, compute the PSD, and convert it to a PyCBC FrequencySeries.
+
+    Parameters:
+    asd_file (str): Path to the ASD file (two columns: frequency, ASD value)
+
+    Returns:
+    pycbc.types.FrequencySeries: The computed PSD as a FrequencySeries object.
+    """
+    
+    # Load ASD data from file
+    data = np.loadtxt(asd_file)
+    asd_values = data[:, 1]   # Second column: ASD values
+    
+    # Compute PSD by squaring ASD values
+    psd_values = asd_values ** 2
+
+    #frequency
+    #f = np.linspace(0)
+    #psd_interpolate = interp1d()
+    
+    print(f"Loaded ASD file: {asd_file}, PSD length: {len(psd_values)}")
+
+    # Convert to PyCBC FrequencySeries
+    psd = FrequencySeries(psd_values, delta_f=delta_f)
+    
+    return psd
+
+def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf, M, dL, t_start_g, t_end_g, window_size, k):
 
     """
-
-    Plot the NR waveform against the model waveform.
+    Performs sanity checks for mismatch computation.
 
     Parameters
     ----------
-
     NR_sim : NR_sim
         NR simulation object.
 
@@ -393,66 +495,303 @@ def compute_mismatch(NR_sim, results, inference_model, outdir, method, acf):
         Method used to fit the waveform.
 
     acf : array
-        Autocorrelation function of the noise.
+        Autocovariance function of the noise (expressed in seconds).
+
+    M : float
+        Mass of the remnant (expressed in solar masses).
+
+    dL: float
+        Luminosity distance of the source with respect to the observer (expressed in Megaparsec).
 
     Returns
     -------
-
-    Nothing, but computes the mismatch between the NR waveform and the model waveform, and saves the results to a file.
-
+    Nothing, does some plots for understanding if there is everything okay :)
     """
 
-    NR_r, NR_i, NR_c = NR_sim.NR_r_cut, NR_sim.NR_i_cut, NR_sim.NR_r_cut - 1j * NR_sim.NR_i_cut
+    # outdir
+    sanity_checks_dir = os.path.join(outdir, 'Algorithm', 'Sanity_Checks')
 
-    NR_dict = {'real': NR_r, 'imaginary': NR_i, 'complex': NR_c}
+    # create folder
+    os.makedirs(sanity_checks_dir, exist_ok=True)
 
-    # Create file on which to save results
-    outFile_mismatch = open(os.path.join(outdir,'Algorithm/Mismatch.txt'), 'w')
-    outFile_mismatch.write('#CI\tStrain_data\tmismatch\n')
-    outFile_mismatch.close()
-    
-    for NR_quant in NR_dict.keys():
+    #start and end times of the analysis [s]
+    t_start = t_start_g * C_mt * M
+    t_end = t_end_g * C_mt * M
+    t_trunc = np.linspace(t_start, t_end, len(NR_sim.t_NR_cut))
 
-        # NR scalar product
-        whiten_whiten_h_NR = sl.solve_toeplitz(acf, NR_dict[NR_quant], check_finite=False)
-        h_NR_h_NR_sqrt     = np.sqrt(np.dot(NR_dict[NR_quant], whiten_whiten_h_NR))
+    # Calculate scaled NR waveform components
+    NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
+    NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
 
-        # Load wf template
-        if(method=='Nested-sampler'):
+    # Initialize lists to store waveform components
+    models_re_list = []
+    models_im_list = []
+
+    if method == 'Nested-sampler':
+        models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
+        models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
+
+    wf_r_quantiles = {}
+    wf_i_quantiles = {}
+
+    for perc in [5, 50, 95]:
+        wf_r_quantiles[perc] = np.percentile(np.array(models_re_list), [perc], axis=0)[0] * (C_md * M) / dL
+        wf_i_quantiles[perc] = np.percentile(np.array(models_im_list), [perc], axis=0)[0] * (C_md * M) / dL
+
+    # Compute whitened NR components
+    whiten_NR_r = sl.solve_toeplitz(acf, NR_r, check_finite=False)
+    whiten_NR_i = sl.solve_toeplitz(acf, NR_i, check_finite=False)
+
+    # Compute whitened waveform quantiles
+    wf_r_whitened = {perc: sl.solve_toeplitz(acf, wf_r_quantiles[perc], check_finite=False) for perc in [5, 50, 95]}
+    wf_i_whitened = {perc: sl.solve_toeplitz(acf, wf_i_quantiles[perc], check_finite=False) for perc in [5, 50, 95]}
+
+    # Create Toeplitz matrix from acf and compute its inverse
+    acf_toeplitz = sl.toeplitz(acf)
+    acf_toeplitz_inv = np.linalg.inv(acf_toeplitz)
+
+    # Apply whitening using the Toeplitz inverse matrix
+    toeplitz_whitened_NR_r = np.dot(acf_toeplitz_inv, NR_r)
+    toeplitz_whitened_NR_i = np.dot(acf_toeplitz_inv, NR_i)
+    wf_r_toeplitz_whitened = {perc: np.dot(acf_toeplitz_inv, wf_r_quantiles[perc]) for perc in [5, 50, 95]}
+    wf_i_toeplitz_whitened = {perc: np.dot(acf_toeplitz_inv, wf_i_quantiles[perc]) for perc in [5, 50, 95]}
+
+    # Generate plot for real components (No Whitening)
+    plt.figure(figsize=(10, 6))
+    plt.plot(t_trunc, NR_r, label='NR_r', color='blue', linewidth=1.5)
+    plt.plot(t_trunc, wf_r_quantiles[5], label='5% CI', linestyle='--', color='green')
+    plt.plot(t_trunc, wf_r_quantiles[50], label='50% CI', linestyle='-', color='orange')
+    plt.plot(t_trunc, wf_r_quantiles[95], label='95% CI', linestyle='--', color='red')
+    plt.title('Real Component Comparison (No Whitening)')
+    plt.xlabel('Time [s]')
+    plt.ylabel('Amplitude')
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    filename = f"Real_Component_No_Whitening_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.png"
+    plt.savefig(os.path.join(sanity_checks_dir, filename))
+    plt.close()
+
+    # Generate plot for imaginary components (No Whitening)
+    plt.figure(figsize=(10, 6))
+    plt.plot(t_trunc, NR_i, label='NR_i', color='blue', linewidth=1.5)
+    plt.plot(t_trunc, wf_i_quantiles[5], label='5% CI', linestyle='--', color='green')
+    plt.plot(t_trunc, wf_i_quantiles[50], label='50% CI', linestyle='-', color='orange')
+    plt.plot(t_trunc, wf_i_quantiles[95], label='95% CI', linestyle='--', color='red')
+    plt.title('Imaginary Component Comparison (No Whitening)')
+    plt.xlabel('Time [s]')
+    plt.ylabel('Amplitude')
+    #plt.xlim(1.1285,1.13)
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    filename = f"Imaginary_Component_No_Whitening_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.png"
+    plt.savefig(os.path.join(sanity_checks_dir, filename))
+    plt.close()
+
+    # Generate plot for real components (Whitening with solve_toeplitz)
+    plt.figure(figsize=(10, 6))
+    plt.plot(t_trunc, whiten_NR_r, label='NR_r (whitened)', color='blue', linewidth=1.5)
+    plt.plot(t_trunc, wf_r_whitened[5], label='5% CI (whitened)', linestyle='--', color='green')
+    plt.plot(t_trunc, wf_r_whitened[50], label='50% CI (whitened)', linestyle='-', color='orange')
+    plt.plot(t_trunc, wf_r_whitened[95], label='95% CI (whitened)', linestyle='--', color='red')
+    plt.title('Real Component Comparison (Whitened with solve_toeplitz)')
+    plt.xlabel('Time [s]')
+    plt.ylabel('Amplitude (Whitened)')
+    #plt.xlim(1.1285,1.13)
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    filename = f"Real_Component_Whitened_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.png"
+    plt.savefig(os.path.join(sanity_checks_dir, filename))
+    plt.close()
+
+    # Generate plot for imaginary components (Whitening with solve_toeplitz)
+    plt.figure(figsize=(10, 6))
+    plt.plot(t_trunc, whiten_NR_i, label='NR_i (whitened)', color='blue', linewidth=1.5)
+    plt.plot(t_trunc, wf_i_whitened[5], label='5% CI (whitened)', linestyle='--', color='green')
+    plt.plot(t_trunc, wf_i_whitened[50], label='50% CI (whitened)', linestyle='-', color='orange')
+    plt.plot(t_trunc, wf_i_whitened[95], label='95% CI (whitened)', linestyle='--', color='red')
+    plt.title('Imaginary Component Comparison (Whitened with solve_toeplitz)')
+    plt.xlabel('Time [s]')
+    plt.ylabel('Amplitude (Whitened)')
+    #plt.xlim(1.1285,1.13)
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    filename = f"Imaginary_Component_Whitened_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.png"
+    plt.savefig(os.path.join(sanity_checks_dir, filename))
+    plt.close()
+
+    # Generate plot for real components (Toeplitz Whitening)
+    plt.figure(figsize=(10, 6))
+    plt.plot(t_trunc, toeplitz_whitened_NR_r, label='NR_r (Toeplitz whitened)', color='blue', linewidth=1.5)
+    plt.plot(t_trunc, wf_r_toeplitz_whitened[5], label='5% CI (Toeplitz whitened)', linestyle='--', color='green')
+    plt.plot(t_trunc, wf_r_toeplitz_whitened[50], label='50% CI (Toeplitz whitened)', linestyle='-', color='orange')
+    plt.plot(t_trunc, wf_r_toeplitz_whitened[95], label='95% CI (Toeplitz whitened)', linestyle='--', color='red')
+    plt.title('Real Component Comparison (Toeplitz Whitening)')
+    plt.xlabel('Time [s]')
+    plt.ylabel('Amplitude (Toeplitz Whitened)')
+    #plt.xlim(1.1285,1.13)
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    filename = f"Real_Component_Toeplitz_Whitening_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.png"
+    plt.savefig(os.path.join(sanity_checks_dir, filename))
+    plt.close()
+
+    # Generate plot for imaginary components (Toeplitz Whitening)
+    plt.figure(figsize=(10, 6))
+    plt.plot(t_trunc, toeplitz_whitened_NR_i, label='NR_i (Toeplitz whitened)', color='blue', linewidth=1.5)
+    plt.plot(t_trunc, wf_i_toeplitz_whitened[5], label='5% CI (Toeplitz whitened)', linestyle='--', color='green')
+    plt.plot(t_trunc, wf_i_toeplitz_whitened[50], label='50% CI (Toeplitz whitened)', linestyle='-', color='orange')
+    plt.plot(t_trunc, wf_i_toeplitz_whitened[95], label='95% CI (Toeplitz whitened)', linestyle='--', color='red')
+    plt.title('Imaginary Component Comparison (Toeplitz Whitening)')
+    plt.xlabel('Time [s]')
+    plt.ylabel('Amplitude (Toeplitz Whitened)')
+    #plt.xlim(1.1285,1.13)
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    filename = f"Imaginary_Component_Toeplitz_Whitening_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.png"
+    plt.savefig(os.path.join(sanity_checks_dir, filename))
+    plt.close()
+
+    # Plot ACF as a function of time
+    plt.figure(figsize=(10, 6))
+    plt.plot(t_trunc, acf, label='ACF', color='blue', linewidth=1.5)
+    plt.title('Autocorrelation Function')
+    plt.xlabel('Time [s]')
+    plt.ylabel('ACF')
+    #plt.xlim(1.1285, 1.13)
+    idx_start = np.searchsorted(t_trunc, 1.1285, side="left")
+    idx_end = np.searchsorted(t_trunc, 1.1295, side="right")
+    #plt.ylim(acf[idx_start:idx_end].min() * 0.9, acf[idx_start:idx_end].max() * 1.1)
+    plt.grid()
+    plt.tight_layout()
+    filename = f"ACF_Plot_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.png"
+    plt.savefig(os.path.join(sanity_checks_dir, filename))
+    plt.close()
+
+    print("Plots saved to:", os.path.join(outdir, 'Algorithm'))
+
+
+def compute_mismatch(NR_sim, results, inference_model, outdir, method, acf, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size, k, check_TD_FD, sanity_check_mm):
+    """
+    Compute the mismatch of the model with respect to NR simulations.
+    """
+
+    # File paths for saving results
+    mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.txt"
+    mismatch_filename_fd = f"Mismatch_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}_FD.txt"
+    outFile_path = os.path.join(outdir, 'Algorithm', mismatch_filename)
+    outFile_path_fd = os.path.join(outdir, 'Algorithm', mismatch_filename_fd)
+
+    with open(outFile_path, 'w') as outFile_mismatch, open(outFile_path_fd, 'w') as outFile_mismatch_fd:
+        outFile_mismatch.write('#CI\tStrain_data\tMismatch\n')
+        outFile_mismatch_fd.write('#CI\tStrain_data\tFD_Mismatch\n')
+
+    # Extract NR waveform components
+    NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
+    NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
+    NR_dict = {'real': NR_r, 'imaginary': NR_i}
+
+    for NR_quant, NR_data in NR_dict.items():
+        try:
+            NR_int = interpolate_waveform(t_start_g, t_end_g, M, wf_lNR=NR_data, acf=acf)
+            whiten_whiten_h_NR = sl.solve_toeplitz(acf, NR_int, check_finite=False)
+            h_NR_h_NR_sqrt = np.sqrt(abs(np.dot(NR_int, whiten_whiten_h_NR)))
+
+        except Exception as e:
+            print(f"Error in NR scalar product for {NR_quant}: {e}")
+            continue
+        
+        # Load waveform template
+        if method == 'Nested-sampler':
             models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
             models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
 
         for perc in [5, 50, 95]:
+            try:
+                wf_r = np.percentile(np.array(models_re_list), [perc], axis=0)[0]
+                wf_i = np.percentile(np.array(models_im_list), [perc], axis=0)[0]
 
-            if(method=='Nested-sampler'):
-                wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
-                wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
-            else:
-                wf_r = np.real(np.array(inference_model.model(results)))
-                wf_i = np.imag(np.array(inference_model.model(results)))
+                wf_r *= (C_md * M) / dL
+                wf_i *= (C_md * M) / dL
+                wf_quant = {'real': wf_r, 'imaginary': wf_i}
 
-            wf_quant = {'real': wf_r, 'imaginary': wf_i, 'complex': wf_r - 1j * wf_i}
+                wf_int = interpolate_waveform(t_start_g, t_end_g, M, wf_lNR=wf_quant[NR_quant], acf=acf)
+                whiten_whiten_h_wf = sl.solve_toeplitz(acf, wf_int, check_finite=False)
+                h_wf_h_wf_sqrt = np.sqrt(abs(np.dot(wf_int, whiten_whiten_h_wf)))
+                h_wf_h_NR = np.dot(wf_int, whiten_whiten_h_NR)
 
-            # Waveform template scalar product        
-            whiten_whiten_h_wf = sl.solve_toeplitz(acf, wf_quant[NR_quant], check_finite=False)
-            h_wf_h_wf_sqrt     = np.sqrt(np.dot(wf_quant[NR_quant], whiten_whiten_h_wf))
+                TD_match = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
+                TD_mismatch = 1 - TD_match
 
-            # Scalar product between NR and template
-            whiten_whiten_h_wf = sl.solve_toeplitz(acf, wf_quant[NR_quant], check_finite=False)
-            h_wf_h_NR          = np.dot(NR_dict[NR_quant], whiten_whiten_h_wf)
+                with open(outFile_path, 'a') as outFile_mismatch:
+                    outFile_mismatch.write(f'{perc}\t{NR_quant}\t{TD_mismatch}\n')
 
-            # Mismatch
-            mismatch = 1 - h_wf_h_NR/(h_NR_h_NR_sqrt*h_wf_h_wf_sqrt)
+                if check_TD_FD:
+                    psd = convert_asd_to_pycbc_psd(asd_file, f_min, f_max, delta_f=2*f_max/len(acf))
+                    h_TS = TimeSeries(wf_int, delta_t=1/(2*f_max))
+                    NR_TS = TimeSeries(NR_int, delta_t=1/(2*f_max))
 
-            # Output
-            print(f'Mismatch for {perc}% CI is {mismatch} with {NR_quant} strain data.')
+                    FD_match_m = float(compute_FD_match(h_TS, NR_TS, psd=psd, low_frequency_cutoff=f_min, high_frequency_cutoff=f_max)[0])
+                    FD_mismatch = 1 - FD_match_m
 
-            # Save results to file
-            outFile_mismatch = open(os.path.join(outdir,'Algorithm/Mismatch.txt'), 'a')
-            outFile_mismatch.write(f'{perc}\t{NR_quant}\t{mismatch}\n')
-            outFile_mismatch.close()
+                    with open(outFile_path_fd, 'a') as outFile_mismatch_fd:
+                        outFile_mismatch_fd.write(f'{perc}\t{NR_quant}\t{FD_mismatch}\n')
 
-    return
+            except Exception as e:
+                print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
+                continue
+
+def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size, k, check_TD_FD):
+    """
+    Compute the optimal SNR of the model waveform.
+    """
+
+    # File paths for saving results
+    optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.txt"
+    optimal_SNR_filename_fd = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}_FD.txt"
+    outFile_path = os.path.join(outdir, 'Algorithm', optimal_SNR_filename)
+    outFile_path_fd = os.path.join(outdir, 'Algorithm', optimal_SNR_filename_fd)
+
+    with open(outFile_path, 'w') as outFile_SNR, open(outFile_path_fd, 'w') as outFile_SNR_fd:
+        outFile_SNR.write('#CI\tStrain_data\tOptimal_SNR\n')
+        outFile_SNR_fd.write('#CI\tStrain_data\tOptimal_SNR_FD\n')
+
+    NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
+    NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
+    NR_dict = {'real': NR_r, 'imaginary': NR_i}
+
+    for NR_quant, NR_data in NR_dict.items():
+        print(f"\nProcessing NR component: {NR_quant}")
+
+        for perc in [5, 50, 95]:
+            try:
+                wf_r = np.percentile([np.real(np.array(inference_model.model(p))) for p in results], [perc], axis=0)[0]
+                wf_i = np.percentile([np.imag(np.array(inference_model.model(p))) for p in results], [perc], axis=0)[0]
+
+                wf_r *= (C_md * M) / dL
+                wf_i *= (C_md * M) / dL
+                wf_int = interpolate_waveform(t_start_g, t_end_g, M, wf_lNR=wf_r if NR_quant == "real" else wf_i, acf=acf)
+
+                optimal_SNR_TD = np.sqrt(abs(np.dot(wf_int, sl.solve_toeplitz(acf, wf_int, check_finite=False))))
+
+                with open(outFile_path, 'a') as outFile_SNR:
+                    outFile_SNR.write(f'{perc}\t{NR_quant}\t{optimal_SNR_TD}\n')
+
+                if check_TD_FD:
+                    h_TS = TimeSeries(wf_int, delta_t=1/(2*f_max))
+                    optimal_SNR_FD = compute_FD_optimal_SNR(asd_file, h_TS, len(acf), f_min, f_max)
+
+                    with open(outFile_path_fd, 'a') as outFile_SNR_fd:
+                        outFile_SNR_fd.write(f'{perc}\t{NR_quant}\t{optimal_SNR_FD}\n')
+
+            except Exception as e:
+                print(f"Error processing optimal SNR for {perc}% CI and {NR_quant}: {e}")
+                continue
 
 def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdir, method, tail_flag):
 
@@ -492,9 +831,12 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     """
 
     init_plotting()
-
+    
+    #take NR elements
     NR_r, NR_i, NR_r_err, NR_i_err, NR_amp, NR_f, t_NR, t_peak                                                = NR_sim.NR_r, NR_sim.NR_i, np.real(NR_sim.NR_err_cmplx), np.imag(NR_sim.NR_err_cmplx), NR_sim.NR_amp, NR_sim.NR_freq, NR_sim.t_NR, NR_sim.t_peak
     t_cut, tM_start, tM_end, NR_r_cut, NR_i_cut, NR_r_err_cut, NR_i_err_cut, NR_amp_cut, NR_phi_cut, NR_f_cut = NR_sim.t_NR_cut, NR_sim.tM_start, NR_sim.tM_end, NR_sim.NR_r_cut, NR_sim.NR_i_cut, np.real(NR_sim.NR_cpx_err_cut), np.imag(NR_sim.NR_cpx_err_cut), NR_sim.NR_amp_cut, NR_sim.NR_phi_cut, NR_sim.NR_freq_cut
+
+    #print("\n\nUsed t_start (M): ", tM_start)
 
     wf_data_type = NR_sim.waveform_type
 
@@ -1069,3 +1411,296 @@ def global_corner(x, names, output, truths=None):
     plt.savefig(os.path.join(output, 'Plots', 'Results', 'corner.png'), bbox_inches='tight')
 
     return
+
+def plot_multiple_psd(psd_data, f_min, f_max, outdir, direction, window):
+    """
+    Plot multiple smoothed PSD curves in function of frequency.
+
+    Parameters:
+        psd_data (dict): A dictionary where keys are labels (str) and values are PSD arrays (np.ndarray).
+        f_min (float): Minimum frequency.
+        f_max (float): Maximum frequency.
+        outdir (str): Output directory for saving the plot.
+        direction (str): 'below' or 'above' to distinguish between smoothing directions.
+        window (float): The smoothing window size.
+
+    Returns:
+        None
+    """
+    try:
+        # Determine subfolder based on direction
+        subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
+        save_path = os.path.join(outdir, "Algorithm", subfolder)
+
+        # Svuota la cartella se esiste, altrimenti creala
+        if os.path.exists(save_path):
+            shutil.rmtree(save_path)
+        os.makedirs(save_path, exist_ok=True)
+
+        # Set x-axis range based on direction
+        if direction == "below":
+            x_min, x_max = f_min/2, f_min + window
+        elif direction == "above":
+            x_min, x_max = f_max - window, f_max
+        elif direction == "below-and-above":
+            x_min, x_max = f_min, f_max
+
+        # Create the plot
+        plt.figure(figsize=(12, 8))
+
+        for label, PSD_smoothed in psd_data.items():
+            freq = np.linspace(0, f_max, len(PSD_smoothed))
+            plt.plot(freq, PSD_smoothed, label=label, linestyle="dotted", linewidth=1.5)
+
+        # Add labels, title, and grid
+        plt.xlabel("Frequency [Hz]")
+        plt.ylabel("PSD [Hz^-1]")
+        plt.title(f"Smoothed PSD for Various Parameters ({direction.capitalize()})")
+        plt.xscale("log")
+        plt.yscale("log")
+        plt.xlim(x_min, x_max)
+        #plt.legend()
+        plt.grid(True)
+
+        # Save the plot
+        filename = "Multiple_Smoothed_PSD.png"
+        path = os.path.join(save_path, filename)
+        plt.savefig(path)
+        plt.close()
+        #print(f"Saved smoothed PSD plot ({direction}) to {path}")
+    except Exception as e:
+        print(f"Failed to generate smoothed PSD plot ({direction}): {e}")
+
+def plot_multiple_acf_with_smoothing(acf_data, t_start_g, t_end_g, outdir, direction):
+    """
+    Plot multiple smoothed ACF curves.
+
+    Parameters:
+        acf_data (dict): A dictionary where keys are labels (str) and values are ACF arrays (np.ndarray).
+        dt (float): Time step used to calculate the time axis.
+        outdir (str): Output directory for saving the plot.
+        direction (str): 'left' or 'right' to distinguish between below and above smoothing.
+
+    Returns:
+        None
+    """
+    try:
+        # Determine subfolder based on direction
+        subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
+        save_path = os.path.join(outdir, "Algorithm", subfolder)
+        os.makedirs(save_path, exist_ok=True)
+
+        # Create the plot
+        plt.figure(figsize=(12, 8))
+
+        for label, ACF_smoothed in acf_data.items():
+            t_array = np.linspace(t_start_g, t_end_g, len(ACF_smoothed))
+            plt.plot(t_array, ACF_smoothed, label=label, linestyle="dotted", linewidth=1.5)
+
+        # Add labels, title, and grid
+        plt.xlabel("Time [s]")
+        plt.ylabel("ACF")
+        plt.title(f"Smoothed ACF for Various Parameters ({direction.capitalize()})")
+        plt.legend()
+        plt.grid(True)
+        if direction=='above':
+            plt.xlim(5, 17.5)
+            plt.ylim(0, 1e-43)
+
+        # Save the plot
+        filename = "Multiple_Smoothed_ACF.png"
+        path = os.path.join(save_path, filename)
+        plt.savefig(path)
+        plt.close()
+        #print(f"Saved smoothed ACF plot ({direction}) to {path}")
+    except Exception as e:
+        print(f"Failed to generate smoothed ACF plot ({direction}): {e}")
+
+def plot_acf_interpolated(t_array, t_trunc, ACF_smoothed, interpolated_acf, truncated_acf, outdir, direction):
+
+    # Determine subfolder based on direction
+    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing"
+    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    os.makedirs(save_path, exist_ok=True)
+
+    # Create the plot
+    plt.figure(figsize=(12, 8))
+
+    # Add labels, title, and grid
+    #plot acf interpolated
+    plt.plot(t_array,ACF_smoothed,label="original",linestyle="dotted")
+    plt.plot(t_array,interpolated_acf,label="interpolated",linestyle="-")
+    plt.plot(t_trunc,truncated_acf,label="truncated",linestyle="dotted")
+    plt.legend()
+    plt.xlabel("t [s]")
+    plt.xlim(t_trunc[0]*0.75,t_trunc[-1]*1.25)
+    idx_start = np.where(t_trunc == t_trunc[0])[0][0]
+    idx_end = np.where(t_trunc == t_trunc[-1])[0][0]
+    plt.ylim(truncated_acf[idx_end]*0.25, truncated_acf[idx_start]*1.75)
+
+    # Save the plot
+    filename = "Interpolated_ACF.png"
+    path = os.path.join(save_path, filename)
+    print(path)
+    plt.savefig(path)
+    plt.close()
+    
+def plot_mismatch_by_window(mismatch_data, outdir, direction, M, dL):
+    """
+    Plot mismatch for real, imaginary, and complex components against window_low or window_high for fixed k.
+
+    Parameters:
+        mismatch_data (dict): Dictionary where keys are (window_size, k) and values are another
+                              dictionary with keys ['real', 'imaginary', 'complex_real', 'complex_imag']
+                              containing percentiles.
+        outdir (str): Output directory for saving the plots.
+        direction (str): 'left' or 'right' to distinguish between below and above smoothing.
+
+    Returns:
+        None
+    """
+    components = ['real', 'imaginary']
+    percentiles = [50]
+
+    ## Determine subfolder based on direction
+    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
+    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    os.makedirs(save_path, exist_ok=True)
+
+    # Extract unique k values
+    k_values = sorted(set(k for _, k in mismatch_data.keys()))
+
+    for k in k_values:
+        for component in components:
+            plt.figure(figsize=(10, 6))
+
+            for perc in percentiles:
+                window_vals = []
+                mismatch_vals = []
+
+                for (window_size, k_val), data in mismatch_data.items():
+                    if k_val == k:
+                        window_vals.append(window_size)
+                        mismatch_vals.append(data[component][perc])
+
+                plt.plot(window_vals, mismatch_vals, label=f"{perc}% CI", marker='o', color=colbBlue)
+
+            plt.xlabel("Window Size [Hz]")
+            plt.ylabel("Mismatch")
+            #plt.title(f"Mismatch ({component.capitalize()}) vs Window Size (k={k}, {direction.capitalize()})")
+            plt.legend()
+            plt.grid(True)
+
+            # Save the plot
+            filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_k={k}_direction={direction}.png"
+            path = os.path.join(save_path, filename)
+            plt.savefig(path)
+            plt.close()
+            #print(f"Saved mismatch plot for {component}, k={k}, {direction} to {path}")
+
+def plot_optimal_SNR_by_window(optimal_SNR_data, outdir, direction, M, dL):
+    """
+    Plot optimal SNR for real and imaginary components against window_size for fixed k.
+
+    Parameters:
+        optimal_SNR_data (dict): Dictionary where keys are (window_size, k) and values are another
+                                 dictionary with keys ['real', 'imaginary']
+                                 containing percentiles [5, 50, 95].
+        outdir (str): Output directory for saving the plots.
+        direction (str): 'below', 'above', or 'below-and-above' to distinguish between smoothing types.
+        M (float): Mass of the remnant (in solar masses).
+        dL (float): Luminosity distance (in Mpc).
+
+    Returns:
+        None
+    """
+    components = ['real', 'imaginary']
+    percentiles = [50]
+
+    # Determine subfolder based on direction
+    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
+    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    os.makedirs(save_path, exist_ok=True)
+
+    # Extract unique k values
+    k_values = sorted(set(k for _, k in optimal_SNR_data.keys()))
+
+    for k in k_values:
+        for component in components:
+            plt.figure(figsize=(10, 6))
+
+            for perc in percentiles:
+                window_vals = []
+                snr_vals = []
+
+                for (window_size, k_val), data in optimal_SNR_data.items():
+                    if k_val == k:
+                        window_vals.append(window_size)
+                        snr_vals.append(data[component][perc])
+
+                plt.plot(window_vals, snr_vals, label=f"{perc}% CI", marker='o', color=colbRed)
+
+            plt.xlabel("Window Size [Hz]")
+            plt.ylabel("Optimal SNR")
+            #plt.title(f"Optimal SNR ({component.capitalize()}) vs Window Size (k={k}, {direction.capitalize()})")
+            plt.legend()
+            plt.grid(True)
+
+            # Save the plot
+            filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_k={k}_direction={direction}.png"
+            path = os.path.join(save_path, filename)
+            plt.savefig(path)
+            plt.close()
+            print(f"Saved optimal SNR plot for {component}, k={k}, {direction} to {path}")
+
+def plot_condition_numbers(outdir, condition_numbers, thresholds=(1e3, 1e6)):
+    """
+    Plot the condition numbers of the ACF Toeplitz matrix as a function of window size for different k values,
+    including shaded regions to indicate conditioning quality.
+    
+    Parameters:
+        condition_numbers (dict): Dictionary with keys as (window_size, k) and values as condition numbers.
+        outdir (str): Directory to save the plot.
+        thresholds (tuple): Thresholds for marking the zones (well-conditioned, moderately, poorly).
+                            Default: (1e3, 1e6).
+    """
+    import matplotlib.pyplot as plt
+    import os
+
+    # Ensure the input is a dictionary
+    if not isinstance(condition_numbers, dict):
+        raise ValueError("condition_numbers must be a dictionary.")
+
+    # Extract unique values of k and sorted window sizes
+    ks = sorted(set(k for _, k in condition_numbers.keys()))
+    window_sizes = sorted(set(ws for ws, _ in condition_numbers.keys()))
+
+    # Define the regions
+    low_threshold, high_threshold = thresholds
+
+    # Create the plot
+    plt.figure(figsize=(12, 8))
+
+    # Add shaded regions
+    plt.axhspan(0, low_threshold, color='green', alpha=0.1, label="Well-Conditioned")
+    plt.axhspan(low_threshold, high_threshold, color='yellow', alpha=0.1, label="Moderately Conditioned")
+    plt.axhspan(high_threshold, 10 * high_threshold, color='red', alpha=0.1, label="Poorly Conditioned")
+
+    for k in ks:
+        # Extract condition numbers for each window_size at the current k
+        cond_numbers = [condition_numbers[(ws, k)] for ws in window_sizes]
+        plt.plot(window_sizes, cond_numbers, label=f"k = {k}", linestyle="dotted")
+
+    # Configure plot
+    plt.xlabel("Window Size")
+    plt.ylabel("Condition Number")
+    plt.title("Condition Number of ACF Toeplitz Matrix vs Window Size")
+    plt.yscale("log")
+    plt.legend(title="Steepness (k)", loc="upper left")
+    plt.grid(True)
+
+    # Save plot to file
+    os.makedirs(outdir, exist_ok=True)
+    plot_file_path = os.path.join(outdir, "Algorithm/Condition_Numbers_Plot.png")
+    plt.savefig(plot_file_path)
+    print(f"Condition number plot saved to {plot_file_path}")
