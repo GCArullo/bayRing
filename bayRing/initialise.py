@@ -150,15 +150,34 @@ def read_config(Config):
         'min-iter-max'     : 1000,
         },
 
+        'PSD-settings':
+        {
+        'asd-path'         : '',
+        'direction'        : 'below',
+        'window_min'       : 0,
+        'window_max'       : 10,
+        'n_window'         : 1,
+        'steepness_min'    : 0.01,
+        'steepness_max'    : 5,
+        'n_steepness'      : 1,
+        'saturation_min'    : 1e-39,
+        'saturation_max'    : 1e-36,
+        'n_saturation'      : 1,
+        'n_FFT_points'     : 1,
+        },
+
         'Mismatch':
         {
-        'f-min'            : 10.22,
-        'f-max'            : 2048.0,
-        'M'                : 10,
-        'dL'               : 400,
-        'asd-path'         : '',
-        'direction'        : 'below'
+        'M'                : 60,
+        'dL'               : 410,
         },
+
+        'Flags': 
+        {
+        'check_TD_FD': False,
+        'C1_choice': True,
+        'sanity_check_mm': False,
+        }
 
     }
 
@@ -378,16 +397,17 @@ A dot is present at the end of each description line and is not to be intended a
 
 
     ******************************************************
-    * Parameters to be passed to the [Mismatch] section. *
+    * Parameters to be passed to the [PSD-settings] section. *
     ******************************************************  
-
-        f-min            Minimum frequency (in Hz) to consider in the mismatch computation.         Default: 20.0.   
-        f-max            Maximum frequency (in Hz) to consider in the mismatch computation.         Default: 2048.0.
         asd-path         Path to the ASD file, used to evaluate the mismatch at the end of the run. Default: ''.
-        M                The mass of the remnant (in solar masses).                                 Default: 10.
-        dL               The luminosity distance of the source with respect to the observer.        Default: 400.
         direction        Where to apply the smoothing in the PSD before doing the FFT.             Default: below.
 
+    ******************************************************
+    * Parameters to be passed to the [Mismatch] section. *
+    ******************************************************
+        M                The mass of the remnant (in solar masses).                                 Default: 10.
+        dL               The luminosity distance of the source with respect to the observer.        Default: 400.
+        
 """
                                                      
 try:

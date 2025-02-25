@@ -298,7 +298,7 @@ def acf_from_asd(asd_filepath, f_min, f_max, N_points):
 
     return ACF
 
-def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, multiplier_factor, k, window_size, direction):
+def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation, k, window_size, direction):
     """
     Apply smoothing saturation to specified frequency ranges.
 
@@ -307,7 +307,7 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, multiplier_fact
         values (np.ndarray): Array of corresponding values (e.g., PSD values).
         f_anchor_l (float): Low anchor frequency for smoothing (for 'below' or 'below-and-above').
         f_anchor_h (float): High anchor frequency for smoothing (for 'above' or 'below-and-above').
-        multiplier_factor (float): Multiplier factor for the target smoothing value.
+        saturation (float): Saturation value for the target smoothing.
         k (float): Smoothing steepness parameter (controls the exponential decay).
         window_size (float): Smoothing window size around anchor frequencies.
         direction (str): Direction of smoothing ('below', 'above', or 'below-and-above').
@@ -353,16 +353,16 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, multiplier_fact
 
     # Apply smoothing for 'below', 'above', or 'below-and-above'
     if direction == 'below':
-        target_value_l = values[0] * multiplier_factor
+        target_value_l = saturation
         values = smoothing_function(frequencies, values, f_anchor_l, window_size, target_value_l, k, is_above=False)
 
     elif direction == 'above':
-        target_value_h = values[-1] * multiplier_factor
+        target_value_h = saturation
         values = smoothing_function(frequencies, values, f_anchor_h, window_size, target_value_h, k, is_above=True)
 
     elif direction == 'below-and-above':
-        target_value_l = values[0] * multiplier_factor
-        target_value_h = values[-1] * multiplier_factor
+        target_value_l = saturation
+        target_value_h = saturation
         # Left smoothing
         values = smoothing_function(frequencies, values, f_anchor_l, window_size, target_value_l, k, is_above=False)
         # Right smoothing
@@ -410,7 +410,7 @@ def apply_C1(frequencies, values, f_start):
 
     return values
 
-def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size, k, multiplier_factor, direction, C1_flag):
+def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size, k, saturation, direction, C1_flag):
     """
     Compute the ACF from the ASD with smoothing applied.
 
@@ -421,7 +421,7 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size, k
         N_points (int): Number of frequency points.
         window_size (float): Smoothing window size.
         k (float): Smoothing steepness parameter.
-        multiplier_factor (float): Multiplier factor for smoothing.
+        saturation (float): Saturation value for smoothing target.
         direction (str): 'below' for smoothing near f_min, 'above' for smoothing near f_max.
 
     Returns:
@@ -446,12 +446,12 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size, k
 
     # Apply smoothing
     smoothed_PSD = PSD_band.copy()
-    smoothed_PSD = apply_smoothing(f, smoothed_PSD, f_min, f_max, multiplier_factor, k, window_size, direction)
+    smoothed_PSD = apply_smoothing(f, smoothed_PSD, f_min, f_max, saturation, k, window_size, direction)
 
     # Extend PSD for f < f_min
     f_below_min = f[f < f_min]
     if len(f_below_min) > 0:
-        PSD_below_min = np.full_like(f_below_min, PSD_band[0] * multiplier_factor)
+        PSD_below_min = np.full_like(f_below_min, saturation)
         smoothed_PSD[:len(f_below_min)] = PSD_below_min
 
     #-----------------------------------------------------C^1 fixing------------------------------------------------------------#
