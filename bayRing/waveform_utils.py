@@ -246,10 +246,82 @@ def compute_condition_number(acf):
     toeplitz_matrix = toeplitz(acf)
     return np.linalg.cond(toeplitz_matrix)
 
+def extract_NR_params(NR_sim):
+    """
+    Extracts key time-related parameters from an NR_sim object.
+
+    Parameters:
+        NR_sim (object): An object containing the attributes:
+            - t_peak
+            - t_NR_cut (list or array)
+            - NR_r_cut (list or array)
+
+    Returns:
+        tuple: (t_start_g, t_end_g, N_sim)
+    """
+    t_peak = NR_sim.t_peak
+    t_NR_cut = NR_sim.t_NR_cut
+    t_start_g, t_end_g = t_NR_cut[0] - t_peak, t_NR_cut[-1] - t_peak
+    N_sim = len(NR_sim.NR_r_cut)
+
+    print("t_start_g={0:.4f}M, t_end_g={1:.4f}M, N_sim={2:.0f}".format(t_start_g, t_end_g, N_sim))
+
+    return t_start_g, t_end_g, N_sim
+
+
+def extract_and_compute_psd_parameters(asd_path, psd):
+    """
+    Load the PSD file, extract key frequency parameters, and compute window properties.
+    
+    Parameters:
+        asd_path (str): Path to the ASD (Amplitude Spectral Density) file.
+        f_sample (float): Sampling frequency in Hz.
+        psd (dict): Dictionary containing window properties.
+    
+    Returns:
+        tuple: (f_min, f_max, dt, df, N_psd, n_iterations, window_sizes, steepness_values, saturation_DX_values, saturation_SX_values)
+            - f_min (float): Minimum frequency in Hz.
+            - f_max (float): Maximum frequency in Hz.
+            - dt (float): Time resolution (1 / 2*f_max).
+            - df (float): Frequency resolution (minimum difference between consecutive frequencies).
+            - N_points (int): Number of PSD points (f_sample / df).
+            - n_iterations (int): Number of FFT iterations from psd dictionary.
+            - window_sizes (list): Smoothed window sizes.
+            - steepness_values (list): Logarithmic values for steepness.
+            - saturation_DX_values (list): Logarithmic values for saturation_DX.
+            - saturation_SX_values (list): Logarithmic values for saturation_SX.
+    """
+    try:
+        # Load the frequency data from the ASD file
+        freq_file, _ = np.loadtxt(asd_path, unpack=True)
+        
+        # Extract required parameters
+        f_min, f_max = np.min(freq_file), np.max(freq_file)
+        dt = 1 / (2 * f_max)
+        df = np.min(np.diff(freq_file))
+        f_sample = 2*f_max
+        N_points = int(f_sample / df)
+        n_iterations = psd['n_FFT_points']
+        
+        # Print extracted values
+        print(f"f_min={f_min:.3f} Hz, f_max={f_max:.3f} Hz, dt={dt:.6f} s, df={df:.4f} Hz, N_points={N_points}, n_iterations={n_iterations}")
+        
+        # Compute window properties
+        window_sizes = np.linspace(psd['window'], psd['window_max'], psd['n_window']).tolist()
+        steepness_values = np.logspace(np.log10(psd['steepness']), np.log10(psd['steepness_max']), psd['n_steepness']).tolist()
+        saturation_DX_values = np.logspace(np.log10(psd['saturation_DX']), np.log10(psd['saturation_DX_max']), psd['n_saturation_DX']).tolist()
+        saturation_SX_values = np.logspace(np.log10(psd['saturation_SX']), np.log10(psd['saturation_SX_max']), psd['n_saturation_SX']).tolist()
+        
+        return f_min, f_max, dt, df, N_points, n_iterations, window_sizes, steepness_values, saturation_DX_values, saturation_SX_values
+    
+    except Exception as e:
+        print(f"Error processing PSD file {asd_path}: {e}")
+        return None, None, None, None, None, None, None, None, None, None
 
 def acf_from_asd(asd_filepath, f_min, f_max, N_points):
 
     ''' 
+        OLD VERSION
         Compute the autocovariance function (ACF) from a given amplitude spectral density (ASD),
         given a frequency range and the number of points of the corresponding time array. 
         Note that this function was rewritten with the smoothing implementation at the edges of the PSD.
@@ -298,7 +370,7 @@ def acf_from_asd(asd_filepath, f_min, f_max, N_points):
 
     return ACF
 
-def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation, k, window_size, direction):
+def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, saturation_SX, k, window_size, direction):
     """
     Apply smoothing saturation to specified frequency ranges.
 
@@ -353,16 +425,16 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation, k, 
 
     # Apply smoothing for 'below', 'above', or 'below-and-above'
     if direction == 'below':
-        target_value_l = saturation
+        target_value_l = saturation_DX
         values = smoothing_function(frequencies, values, f_anchor_l, window_size, target_value_l, k, is_above=False)
 
     elif direction == 'above':
-        target_value_h = saturation
+        target_value_h = saturation_SX
         values = smoothing_function(frequencies, values, f_anchor_h, window_size, target_value_h, k, is_above=True)
 
     elif direction == 'below-and-above':
-        target_value_l = saturation
-        target_value_h = saturation
+        target_value_l = saturation_DX
+        target_value_h = saturation_SX
         # Left smoothing
         values = smoothing_function(frequencies, values, f_anchor_l, window_size, target_value_l, k, is_above=False)
         # Right smoothing
@@ -373,7 +445,7 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation, k, 
 
     return values
 
-def apply_C1(frequencies, values, f_start):
+def apply_C1(frequencies, values, f_start, window_size):
     """
     Applies moving average in order to transform the acf to C1.
 
@@ -387,8 +459,8 @@ def apply_C1(frequencies, values, f_start):
     - Modified values after applying the transition.
     """
 
-    # Define the range for concavity control -> C1_window is fixed to 4Hz
-    C1_window=4
+    # Define the range for concavity control
+    C1_window=window_size*2
     f_up=f_start+C1_window
     f_down=f_start-C1_window
     indices = np.where((frequencies >= f_down) & (frequencies <= f_up))
@@ -410,7 +482,7 @@ def apply_C1(frequencies, values, f_start):
 
     return values
 
-def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size, k, saturation, direction, C1_flag):
+def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size, k, saturation_DX, saturation_SX, direction, C1_flag):
     """
     Compute the ACF from the ASD with smoothing applied.
 
@@ -446,12 +518,12 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size, k
 
     # Apply smoothing
     smoothed_PSD = PSD_band.copy()
-    smoothed_PSD = apply_smoothing(f, smoothed_PSD, f_min, f_max, saturation, k, window_size, direction)
+    smoothed_PSD = apply_smoothing(f, smoothed_PSD, f_min, f_max, saturation_DX, saturation_SX, k, window_size, direction)
 
     # Extend PSD for f < f_min
     f_below_min = f[f < f_min]
     if len(f_below_min) > 0:
-        PSD_below_min = np.full_like(f_below_min, saturation)
+        PSD_below_min = np.full_like(f_below_min, saturation_DX)
         smoothed_PSD[:len(f_below_min)] = PSD_below_min
 
     #-----------------------------------------------------C^1 fixing------------------------------------------------------------#
@@ -462,23 +534,23 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size, k
 
             # Apply the C1 fixing near f_min + window_low
             f_transition_start = f_min + window_size
-            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start)
+            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start, window_size)
 
         elif direction=='above':
 
             # Apply the C1 fixing near f_max - window_low
             f_transition_start = f_max - window_size
-            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start)
+            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start, window_size)
 
         elif direction=='below-and-above':
 
             # Apply the C1 fixing near f_min + window_low
             f_transition_start = f_min + window_size
-            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start)
+            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start, window_size)
 
             # Apply the C1 fixing near f_max - window_low
             f_transition_start = f_max - window_size
-            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start)
+            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start, window_size)
 
     # ACF for smoothed PSD
     ACF_smoothed = 0.5 * np.real(np.fft.irfft(smoothed_PSD * df)) * N_points

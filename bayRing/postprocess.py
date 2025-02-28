@@ -495,49 +495,15 @@ def clear_directory(directory_path):
                 print(f"Failed to delete {file_path}: {e}")
 
     else:
-        os.makedirs(directory_path, exist_ok=True)  # Create folder if it doesn't exist
-
-
-def extract_psd_parameters(asd_path, f_sample):
-    """
-    Load the PSD file and extract key frequency parameters.
-
-    Parameters:
-        asd_path (str): Path to the ASD (Amplitude Spectral Density) file.
-
-    Returns:
-        tuple: (f_min, f_max, dt, df)
-            - f_min (float): Minimum frequency in Hz.
-            - f_max (float): Maximum frequency in Hz.
-            - dt (float): Time resolution (1 / 2*f_max).
-            - df (float): Frequency resolution (minimum difference between consecutive frequencies).
-    """
-    try:
-        # Load the frequency data from the ASD file
-        freq_file, _ = np.loadtxt(asd_path, unpack=True)
-        
-        # Extract required parameters
-        f_min, f_max = np.min(freq_file), f_sample/2#np.max(freq_file)
-        dt = 1 / (2 * f_max)
-        df = np.min(np.diff(freq_file))
-
-        # Print extracted values
-        print(f"f_min={f_min:.3f} Hz, f_max={f_max:.3f} Hz, dt={dt:.6f} s, df={df:.4f} Hz")
-
-        return f_min, f_max, dt, df
-
-    except Exception as e:
-        print(f"Error reading PSD file {asd_path}: {e}")
-        return None, None, None, None
-
+        os.makedirs(directory_path, exist_ok=True)
 
 def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, t_start, t_end, N_sim):
     """
     Truncate and interpolate the Autocorrelation Function (ACF) based on time constraints.
 
     Parameters:
-        ACF_smoothed (np.ndarray): The original smoothed ACF array.
-        t_ACF: Time array associated to the ACF.
+        ACF_smoothed (np.ndarray): The original smoothed ACF.
+        t_ACF (np.ndarray): the time axis associated to ACF_smoothed.
         t_start (float): Start time for analysis.
         t_end (float): End time for analysis.
         N_sim (int): The number of points for the interpolated ACF.
@@ -547,13 +513,18 @@ def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, t_start, t_end, N_sim):
         np.ndarray: The new time array corresponding to the interpolated ACF.
     """
 
+    # First, we take only the first half of the ACF, which is the one associated to 
+    half_index = len(ACF_smoothed) // 2
+    t_ACF_half = t_ACF[:half_index]
+    ACF_smoothed_half = ACF_smoothed[:half_index]
+
     # Compute the truncation point (T_RD = t_end - t_start)
     T_RD = t_end - t_start
-    index = np.argmin(np.abs(t_ACF - T_RD))
+    index = np.argmin(np.abs(t_ACF_half - T_RD))
 
-    # Truncate the ACF (See https://arxiv.org/abs/2107.05609 for discussion on truncation)
-    ACF_truncated = ACF_smoothed[:index+1]
-    t_ACF_truncated = t_ACF[:index+1]
+    # Truncate the ACF to rigndown analysis (See https://arxiv.org/abs/2107.05609 for discussion on truncation)
+    ACF_truncated = ACF_smoothed_half[:index+1]
+    t_ACF_truncated = t_ACF_half[:index+1]
 
     # Define the new interpolated time array
     t_trunc = np.linspace(t_ACF_truncated[0], t_ACF_truncated[-1], N_sim)
@@ -564,9 +535,10 @@ def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, t_start, t_end, N_sim):
 
     """
     print("Truncation info:")
-    print("Original ACF time array: ", t_ACF)
-    print("Truncated ACF time array: ", t_ACF_truncated)
-    print("Truncated waveform time array: ", t_trunc)
+    print("ACF time array expr. in [s] (full): ", t_ACF)
+    print("ACF time array expr. in [s] (first half, associated to positive frequencies): ", t_ACF_half)
+    print("Truncated ACF time array expr. in [s] : ", t_ACF_truncated)
+    print("Truncated waveform time array expr. in [s] : ", t_trunc)
     """
 
     return t_trunc, ACF_trunc
@@ -1570,51 +1542,6 @@ def plot_multiple_psd(psd_data, f_min, f_max, outdir, direction, window):
     except Exception as e:
         print(f"Failed to generate smoothed PSD plot ({direction}): {e}")
 
-def plot_multiple_acf_with_smoothing(acf_data, t_start, t_end, outdir, direction):
-    """
-    Plot multiple smoothed ACF curves.
-
-    Parameters:
-        acf_data (dict): A dictionary where keys are labels (str) and values are ACF arrays (np.ndarray).
-        dt (float): Time step used to calculate the time axis.
-        outdir (str): Output directory for saving the plot.
-        direction (str): 'left' or 'right' to distinguish between below and above smoothing.
-
-    Returns:
-        None
-    """
-    try:
-        # Determine subfolder based on direction
-        subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-        save_path = os.path.join(outdir, "Algorithm", subfolder)
-        os.makedirs(save_path, exist_ok=True)
-
-        # Create the plot
-        plt.figure(figsize=(12, 8))
-
-        for label, ACF_smoothed in acf_data.items():
-            t_array = np.linspace(t_start_g, t_end_g, len(ACF_smoothed))
-            plt.plot(t_array, ACF_smoothed, label=label, linestyle="dotted", linewidth=1.5)
-
-        # Add labels, title, and grid
-        plt.xlabel("Time [s]")
-        plt.ylabel("ACF")
-        plt.title(f"Smoothed ACF for Various Parameters ({direction.capitalize()})")
-        plt.legend()
-        plt.grid(True)
-        if direction=='above':
-            plt.xlim(5, 17.5)
-            plt.ylim(0, 1e-43)
-
-        # Save the plot
-        filename = "Multiple_Smoothed_ACF.png"
-        path = os.path.join(save_path, filename)
-        plt.savefig(path)
-        plt.close()
-        #print(f"Saved smoothed ACF plot ({direction}) to {path}")
-    except Exception as e:
-        print(f"Failed to generate smoothed ACF plot ({direction}): {e}")
-
 def plot_psd_and_acf(psd_data, acf_data, f_min, f_max, t_start, t_end, outdir, direction, window):
     """
     Plot multiple smoothed PSD and ACF curves in a single figure with two subplots.
@@ -1645,29 +1572,20 @@ def plot_psd_and_acf(psd_data, acf_data, f_min, f_max, t_start, t_end, outdir, d
         # Clear the directory if it exists, otherwise create it
         os.makedirs(save_path, exist_ok=True)
 
-        # Set x-axis range based on direction
-        if direction == "below":
-            x_min, x_max = f_min / 2, f_min + window
-        elif direction == "above":
-            x_min, x_max = f_max - window, f_max
-        elif direction == "below-and-above":
-            x_min, x_max = f_min, f_max
-
         # Create a single figure with two subplots
         fig, axs = plt.subplots(2, 1, figsize=(12, 12))
 
-        # ------------------ Plot PSD ------------------
+        # ------------------ Plot PSD ------------------ #
         for i, (label, PSD_smoothed) in enumerate(psd_data.items()):
             freq = np.linspace(0, f_max, len(PSD_smoothed))
             alpha = max(0.3, 1 - (i * 0.15))  # Decrease opacity for different curves
-            axs[0].plot(freq, PSD_smoothed, label=label, linestyle="dotted", linewidth=2)#, color=colbBlue, alpha=alpha)
+            axs[0].plot(freq, PSD_smoothed, label=label, linestyle="dotted", linewidth=2, color=colbBlue, alpha=alpha)
 
         axs[0].set_xlabel("Frequency [Hz]")
         axs[0].set_ylabel("PSD [Hz^-1]")
         axs[0].set_title(f"Smoothed PSD ({direction.capitalize()})")
         axs[0].set_xscale("log")
         axs[0].set_yscale("log")
-        #axs[0].set_xlim(x_min, x_max)
         axs[0].grid(True)
 
         # Center the legend inside the plot
@@ -1680,19 +1598,14 @@ def plot_psd_and_acf(psd_data, acf_data, f_min, f_max, t_start, t_end, outdir, d
         for i, (label, ACF_smoothed) in enumerate(acf_data.items()):
             N_FFT = len(ACF_smoothed)
             T = N_FFT*dt
-            t_array = np.linspace(t_start, T, N_FFT)
+            t_array = np.linspace(0, T, N_FFT)
             alpha = max(0.3, 1 - (i * 0.15))  # Decrease opacity for different curves
-            axs[1].plot(t_array, ACF_smoothed, label=label, linestyle="dotted", linewidth=2)#, color=colbRed, alpha=alpha)
+            axs[1].plot(t_array, ACF_smoothed, label=label, linestyle="dotted", linewidth=2, color=colbRed, alpha=alpha)
 
         axs[1].set_xlabel("Time [s]")
         axs[1].set_ylabel("ACF")
         axs[1].set_title(f"Smoothed ACF ({direction.capitalize()})")
         axs[1].grid(True)
-
-        # Apply specific limits if direction is 'above'
-        if direction == 'above':
-            axs[1].set_xlim(5, 17.5)
-            axs[1].set_ylim(0, 1e-43)
 
         # Center the legend inside the plot
         axs[1].legend(loc="center", bbox_to_anchor=(0.5, 0.5))
@@ -1711,9 +1624,9 @@ def plot_psd_and_acf(psd_data, acf_data, f_min, f_max, t_start, t_end, outdir, d
 def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size, outdir, direction):
     """
     Plot PSD curves near f_min and f_max in a single figure with two side-by-side subplots.
-
+    
     Parameters:
-        psd_data (dict): A dictionary where keys are labels (str) and values are PSD arrays (np.ndarray).
+        psd_data (dict): Dictionary where keys are labels (str) and values are PSD arrays (np.ndarray).
         f_min (float): Minimum frequency.
         f_max (float): Maximum frequency.
         window_size (float): The smoothing window size.
@@ -1724,47 +1637,74 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size, outdir, directi
         None
     """
     try:
-        # Determine subfolder based on smoothing direction
-        subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-        save_path = os.path.join(outdir, "Algorithm", subfolder)
+        # Define fixed colors
+        colbBlue = "#4477AA"  # Base color for PSD
+        colbRed = "#EE6677"   # Alternative color if needed
 
-        # Clear the directory if it exists, otherwise create it
+        # Determine subfolder based on smoothing direction
+        subfolder = {
+            "below": "Left_smoothing",
+            "above": "Right_smoothing",
+            "below-and-above": "Both_edges_smoothing"
+        }.get(direction, "Unknown_smoothing")
+
+        save_path = os.path.join(outdir, "Algorithm", subfolder)
         os.makedirs(save_path, exist_ok=True)
 
         # Set x-axis limits for zoomed regions
-        x_min1, x_max1 = f_min / 2, f_min + window_size  # Zoom near f_min
-        x_min2, x_max2 = (f_max - window_size)*0.999, f_max * 1.01  # Zoom near f_max
+        x_min1, x_max1 = f_min / 2, (f_min + window_size)  # Zoom near f_min
+        x_min2, x_max2 = (f_max - window_size), f_max  # Zoom near f_max
 
         # Create figure with two side-by-side subplots
         fig, axs = plt.subplots(1, 2, figsize=(14, 6))
 
-        # ------------------ Plot PSD near f_min ------------------
-        for i, (label, PSD_smoothed) in enumerate(psd_data.items()):
-            freq = np.linspace(0, f_max, len(PSD_smoothed))
-            axs[0].plot(freq, PSD_smoothed, label=label, linestyle="-", linewidth=2)
+        # Initialize y-limits for both regions
+        y_min1, y_max1 = float("inf"), float("-inf")
+        y_min2, y_max2 = float("inf"), float("-inf")
 
+        # ------------------ Plot PSD near f_min and f_max ------------------
+        for i, (label, PSD_smoothed) in enumerate(psd_data.items()):
+            freq = np.linspace(0, f_max, len(PSD_smoothed))  # Generate frequency axis
+            alpha = max(0.3, 1 - (i * 0.15))  # Decrease opacity for different curves
+            
+            # Identify indices for zoomed regions
+            idx_min1, idx_max1 = np.searchsorted(freq, [x_min1, x_max1])
+            idx_min2, idx_max2 = np.searchsorted(freq, [x_min2, x_max2])
+
+            # Update y-axis limits dynamically
+            if idx_max1 > idx_min1:
+                y_min1 = min(y_min1, np.min(PSD_smoothed[idx_min1:idx_max1]))
+                y_max1 = max(y_max1, np.max(PSD_smoothed[idx_min1:idx_max1]))
+
+            if idx_max2 > idx_min2:
+                y_min2 = min(y_min2, np.min(PSD_smoothed[idx_min2:idx_max2]))
+                y_max2 = max(y_max2, np.max(PSD_smoothed[idx_min2:idx_max2]))
+
+            # Plot for both subplots with alpha variation
+            axs[0].plot(freq, PSD_smoothed, label=label, linewidth=1.5, color=colbBlue, alpha=alpha)
+            axs[1].plot(freq, PSD_smoothed, label=label, linewidth=1.5, color=colbRed, alpha=alpha)
+
+        # Adjust subplot 1 (f_min)
         axs[0].set_xlabel("Frequency [Hz]")
         axs[0].set_ylabel("PSD [Hz^-1]")
         axs[0].set_title(f"Smoothed PSD near f_min ({direction.capitalize()})")
         axs[0].set_xscale("log")
         axs[0].set_yscale("log")
-        axs[0].set_xlim(4, 40)
-        axs[0].grid(True)
-        #axs[0].legend()
+        axs[0].set_xlim(x_min1 * 0.99, x_max1 * 1.01)
+        axs[0].set_ylim(y_min1 * 0.9, y_max1 * 1.5)  # Add margin
+        #axs[0].grid(True)
+        #axs[0].legend(loc="upper right", fontsize=8)
 
-        # ------------------ Plot PSD near f_max ------------------
-        for i, (label, PSD_smoothed) in enumerate(psd_data.items()):
-            freq = np.linspace(0, f_max, len(PSD_smoothed))
-            axs[1].plot(freq, PSD_smoothed, label=label, linestyle="-", linewidth=2)
-
+        # Adjust subplot 2 (f_max)
         axs[1].set_xlabel("Frequency [Hz]")
         axs[1].set_ylabel("PSD [Hz^-1]")
         axs[1].set_title(f"Smoothed PSD near f_max ({direction.capitalize()})")
-        axs[1].set_xscale("log")
+        #axs[1].set_xscale("log")
         axs[1].set_yscale("log")
-        axs[1].set_xlim(x_min2, x_max2)
-        axs[1].grid(True)
-        #axs[1].legend()
+        axs[1].set_xlim(x_min2 * 0.999, x_max2 *1.001)
+        axs[1].set_ylim(y_min2 * 0.9, y_max2 * 1.5)  # Add margin
+        #axs[1].grid(True)
+        #axs[1].legend(loc="upper right", fontsize=8)
 
         # Adjust layout and save the plot
         plt.tight_layout()
@@ -1777,7 +1717,8 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size, outdir, directi
     except Exception as e:
         print(f"Failed to generate PSD plots near f_min and f_max ({direction}): {e}")
 
-def plot_acf_interpolated(t_array, t_trunc, ACF_smoothed, truncated_acf, outdir, window_size, k, saturation, direction):
+
+def plot_acf_interpolated(t_array, t_trunc, ACF_smoothed, truncated_acf, outdir, window_size, k, saturation_DX, saturation_SX, direction):
 
     # Determine subfolder based on direction
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
@@ -1787,18 +1728,16 @@ def plot_acf_interpolated(t_array, t_trunc, ACF_smoothed, truncated_acf, outdir,
     # Create the plot
     plt.figure(figsize=(12, 8))
 
-    # Add labels, title, and grid
-    #plot acf interpolated
-    plt.plot(t_array,ACF_smoothed,label="Original ACF")
-    plt.plot(t_trunc,truncated_acf,label="Truncated ACF",linestyle="dotted")
+    # Plot acf interpolated
+    plt.plot(t_array,ACF_smoothed,label="Original ACF", color=colbBlue)
+    plt.plot(t_trunc,truncated_acf,label="Truncated ACF",linestyle="dotted", color=colbRed)
     plt.legend()
     plt.xlabel("t [s]")
-    plt.xlim(t_trunc[0],t_trunc[-1]*3)
+    plt.xlim(t_trunc[0],t_trunc[-1]*1.5)
     plt.ylim(min(ACF_smoothed)*0.8, max(ACF_smoothed)*1.2)
 
-    print(saturation)
     # Save the plot
-    filename = f"Truncated_ACF_window={round(window_size,1)}_k={round(k,3)}_saturation={saturation}.png"
+    filename = f"Truncated_ACF_window={round(window_size,1)}_k={round(k,3)}_sat_DX={saturation_DX}_sat_SX={saturation_SX}.png"
     path = os.path.join(save_path, filename)
     print(path)
     plt.savefig(path)
@@ -1806,283 +1745,286 @@ def plot_acf_interpolated(t_array, t_trunc, ACF_smoothed, truncated_acf, outdir,
 
 def plot_mismatch_by_window(mismatch_data, outdir, direction, M, dL, N_fft):
     """
-    Plot mismatch for real, imaginary, and complex components against window_low or window_high for fixed k.
-
-    Parameters:
-        mismatch_data (dict): Dictionary where keys are (window_size, k, saturation) and values contain mismatch data.
-        outdir (str): Output directory for saving the plots.
-        direction (str): 'left', 'right', or 'both' to distinguish between smoothing types.
-        M (float): Mass of the remnant (in solar masses).
-        dL (float): Luminosity distance (in Mpc).
-        N_fft (list): List of FFT sizes to iterate over.
-
-    Returns:
-        None
+    Plot mismatch for real and imaginary components against window size for fixed k.
     """
     components = ['real', 'imaginary']
     percentiles = [50]
-
-    ## Determine subfolder based on direction
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)
     os.makedirs(save_path, exist_ok=True)
-
-    # Extract unique k values and saturation values
-    k_values = sorted(set(k for _, k, _ in mismatch_data.keys()))
-    saturation_values = sorted(set(s for _, _, s in mismatch_data.keys()))
-
-    # Loop over N_FFT
+    
+    k_values = sorted(set(k for _, k, _, _ in mismatch_data.keys()))
+    saturation_DX_values = sorted(set(s for _, _, s, _ in mismatch_data.keys()))
+    saturation_SX_values = sorted(set(s for _, _, _, s in mismatch_data.keys()))
+    
     for N_FFT in N_fft:
         for k in k_values:
-            for saturation in saturation_values:
-                for component in components:
-                    plt.figure(figsize=(10, 6))
-
-                    for perc in percentiles:
-                        window_vals = []
-                        mismatch_vals = []
-
-                        for (window_size, k_val, sat_val), data in mismatch_data.items():
-                            if k_val == k and sat_val == saturation:
-                                window_vals.append(window_size)
-                                mismatch_vals.append(data[component][perc])
-
-                        plt.plot(window_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
-
-                    plt.xlabel("Window Size [Hz]")
-                    plt.ylabel("Mismatch")
-                    plt.legend()
-                    plt.grid(True)
-
-                    # Save the plot with saturation included
-                    filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_k={k}_saturation={saturation:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
-                    path = os.path.join(save_path, filename)
-                    plt.savefig(path)
-                    plt.close()
-                    #print(f"\nSaved mismatch plot for {component}, k={k}, saturation={saturation} to {path}.\n")
+            for saturation_DX in saturation_DX_values:
+                for saturation_SX in saturation_SX_values:
+                    for component in components:
+                        plt.figure(figsize=(10, 6))
+                        for perc in percentiles:
+                            window_vals, mismatch_vals = [], []
+                            for (window_size, k_val, sat_DX, sat_SX), data in mismatch_data.items():
+                                if k_val == k and sat_DX == saturation_DX and sat_SX == saturation_SX:
+                                    window_vals.append(window_size)
+                                    mismatch_vals.append(data[component][perc])
+                            plt.plot(window_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
+                        plt.xlabel("Window Size [Hz]")
+                        plt.ylabel("Mismatch")
+                        plt.legend()
+                        plt.grid(True)
+                        filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_k={k}_saturationDX={saturation_DX:.2e}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        plt.savefig(os.path.join(save_path, filename))
+                        plt.close()
 
 def plot_optimal_SNR_by_window(optimal_SNR_data, outdir, direction, M, dL, N_fft):
     """
-    Plot optimal SNR for real and imaginary components against window_size for fixed k and saturation.
-
-    Parameters:
-        optimal_SNR_data (dict): Dictionary where keys are (window_size, k, saturation) and values contain optimal SNR data.
-        outdir (str): Output directory for saving the plots.
-        direction (str): 'below', 'above', or 'below-and-above' to distinguish between smoothing types.
-        M (float): Mass of the remnant (in solar masses).
-        dL (float): Luminosity distance (in Mpc).
-        N_fft (list): List of FFT sizes to iterate over.
-
-    Returns:
-        None
+    Plot optimal SNR for real and imaginary components against window size for fixed k and saturations.
     """
     components = ['real', 'imaginary']
     percentiles = [50]
-
-    ## Determine subfolder based on direction
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)
     os.makedirs(save_path, exist_ok=True)
-
-    # Extract unique k values and saturation values
-    k_values = sorted(set(k for _, k, _ in optimal_SNR_data.keys()))
-    saturation_values = sorted(set(s for _, _, s in optimal_SNR_data.keys()))
-
-    # Loop over N_FFT
+    
+    k_values = sorted(set(k for _, k, _, _ in optimal_SNR_data.keys()))
+    saturation_DX_values = sorted(set(s for _, _, s, _ in optimal_SNR_data.keys()))
+    saturation_SX_values = sorted(set(s for _, _, _, s in optimal_SNR_data.keys()))
+    
     for N_FFT in N_fft:
         for k in k_values:
-            for saturation in saturation_values:
-                for component in components:
-                    plt.figure(figsize=(10, 6))
-
-                    for perc in percentiles:
-                        window_vals = []
-                        snr_vals = []
-
-                        for (window_size, k_val, sat_val), data in optimal_SNR_data.items():
-                            if k_val == k and sat_val == saturation:
-                                window_vals.append(window_size)
-                                snr_vals.append(data[component][perc])
-
-                        plt.plot(window_vals, snr_vals, label=f"{perc}% CI", marker='o')
-
-                    plt.xlabel("Window Size [Hz]")
-                    plt.ylabel("Optimal SNR")
-                    plt.legend()
-                    plt.grid(True)
-
-                    # Save the plot with saturation included
-                    filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_k={k}_saturation={saturation:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
-                    path = os.path.join(save_path, filename)
-                    plt.savefig(path)
-                    plt.close()
-                    #print(f"\nSaved optimal SNR plot for {component}, k={k}, saturation={saturation} to {path}.\n")
+            for saturation_DX in saturation_DX_values:
+                for saturation_SX in saturation_SX_values:
+                    for component in components:
+                        plt.figure(figsize=(10, 6))
+                        for perc in percentiles:
+                            window_vals, snr_vals = [], []
+                            for (window_size, k_val, sat_DX, sat_SX), data in optimal_SNR_data.items():
+                                if k_val == k and sat_DX == saturation_DX and sat_SX == saturation_SX:
+                                    window_vals.append(window_size)
+                                    snr_vals.append(data[component][perc])
+                            plt.plot(window_vals, snr_vals, label=f"{perc}% CI", marker='o')
+                        plt.xlabel("Window Size [Hz]")
+                        plt.ylabel("Optimal SNR")
+                        plt.legend()
+                        plt.grid(True)
+                        filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_k={k}_saturationDX={saturation_DX:.2e}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        plt.savefig(os.path.join(save_path, filename))
+                        plt.close()
 
 def plot_mismatch_by_k(mismatch_data, outdir, direction, M, dL, N_fft):
     """
-    Plot mismatch for real and imaginary components by varying k, keeping window_size and saturation fixed.
+    Plot mismatch for real and imaginary components by varying k, keeping window size and saturations fixed.
     """
     components = ['real', 'imaginary']
     percentiles = [50]
-
-    # Define save path
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)
     os.makedirs(save_path, exist_ok=True)
-
-    # Extract unique values
-    window_sizes = sorted(set(w for w, _, _ in mismatch_data.keys()))
-    saturation_values = sorted(set(s for _, _, s in mismatch_data.keys()))
-
+    
+    window_sizes = sorted(set(w for w, _, _, _ in mismatch_data.keys()))
+    saturation_DX_values = sorted(set(s for _, _, s, _ in mismatch_data.keys()))
+    saturation_SX_values = sorted(set(s for _, _, _, s in mismatch_data.keys()))
+    
     for N_FFT in N_fft:
         for window_size in window_sizes:
-            for saturation in saturation_values:
-                for component in components:
-                    plt.figure(figsize=(10, 6))
-
-                    for perc in percentiles:
-                        k_vals, mismatch_vals = [], []
-                        for (w_size, k_val, sat_val), data in mismatch_data.items():
-                            if w_size == window_size and sat_val == saturation:
-                                k_vals.append(k_val)
-                                mismatch_vals.append(data[component][perc])
-
+            for saturation_DX in saturation_DX_values:
+                for saturation_SX in saturation_SX_values:
+                    for component in components:
+                        plt.figure(figsize=(10, 6))
+                        for perc in percentiles:
+                            k_vals, mismatch_vals = [], []
+                            for (w_size, k_val, sat_DX, sat_SX), data in mismatch_data.items():
+                                if w_size == window_size and sat_DX == saturation_DX and sat_SX == saturation_SX:
+                                    k_vals.append(k_val)
+                                    mismatch_vals.append(data[component][perc])
                         plt.plot(k_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
-
-                    plt.xlabel("k (Smoothing Steepness)")
-                    plt.ylabel("Mismatch")
-                    plt.legend()
-                    plt.grid(True)
-
-                    filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_saturation={saturation:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
-                    plt.savefig(os.path.join(save_path, filename))
-                    plt.close()
-                    #print(f"\nSaved mismatch plot for {component}, window_size={round(window_size,1)}, saturation={saturation}.\n")
-
-def plot_mismatch_by_saturation(mismatch_data, outdir, direction, M, dL, N_fft):
-    """
-    Plot mismatch for real and imaginary components by varying saturation, keeping window_size and k fixed.
-    """
-    components = ['real', 'imaginary']
-    percentiles = [50]
-
-    # Define save path
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-
-    # Extract unique values
-    window_sizes = sorted(set(w for w, _, _ in mismatch_data.keys()))
-    k_values = sorted(set(k for _, k, _ in mismatch_data.keys()))
-
-    for N_FFT in N_fft:
-        for window_size in window_sizes:
-            for k in k_values:
-                for component in components:
-                    plt.figure(figsize=(10, 6))
-
-                    for perc in percentiles:
-                        sat_vals, mismatch_vals = [], []
-                        for (w_size, k_val, sat_val), data in mismatch_data.items():
-                            if w_size == window_size and k_val == k:
-                                sat_vals.append(sat_val)
-                                mismatch_vals.append(data[component][perc])
-
-                        plt.plot(sat_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
-
-                    plt.xlabel("Saturation")
-                    plt.ylabel("Mismatch")
-                    plt.legend()
-                    plt.grid(True)
-
-                    filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={k}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
-                    plt.savefig(os.path.join(save_path, filename))
-                    plt.close()
-                    #print(f"\nSaved mismatch plot for {component}, window_size={round(window_size,1)}, k={k}.\n")
+                        plt.xlabel("k (Smoothing Steepness)")
+                        plt.ylabel("Mismatch")
+                        plt.legend()
+                        plt.grid(True)
+                        filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_saturationDX={saturation_DX:.2e}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        plt.savefig(os.path.join(save_path, filename))
+                        plt.close()
 
 def plot_optimal_SNR_by_k(optimal_SNR_data, outdir, direction, M, dL, N_fft):
     """
-    Plot optimal SNR for real and imaginary components by varying k, keeping window_size and saturation fixed.
+    Plot optimal SNR for real and imaginary components by varying k, keeping window size and saturations fixed.
     """
     components = ['real', 'imaginary']
     percentiles = [50]
-
-    # Define save path
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)
     os.makedirs(save_path, exist_ok=True)
-
-    # Extract unique values
-    window_sizes = sorted(set(w for w, _, _ in optimal_SNR_data.keys()))
-    saturation_values = sorted(set(s for _, _, s in optimal_SNR_data.keys()))
-
+    
+    window_sizes = sorted(set(w for w, _, _, _ in optimal_SNR_data.keys()))
+    saturation_DX_values = sorted(set(s for _, _, s, _ in optimal_SNR_data.keys()))
+    saturation_SX_values = sorted(set(s for _, _, _, s in optimal_SNR_data.keys()))
+    
     for N_FFT in N_fft:
         for window_size in window_sizes:
-            for saturation in saturation_values:
-                for component in components:
-                    plt.figure(figsize=(10, 6))
-
-                    for perc in percentiles:
-                        k_vals, snr_vals = [], []
-                        for (w_size, k_val, sat_val), data in optimal_SNR_data.items():
-                            if w_size == window_size and sat_val == saturation:
-                                k_vals.append(k_val)
-                                snr_vals.append(data[component][perc])
-
+            for saturation_DX in saturation_DX_values:
+                for saturation_SX in saturation_SX_values:
+                    for component in components:
+                        plt.figure(figsize=(10, 6))
+                        for perc in percentiles:
+                            k_vals, snr_vals = [], []
+                            for (w_size, k_val, sat_DX, sat_SX), data in optimal_SNR_data.items():
+                                if w_size == window_size and sat_DX == saturation_DX and sat_SX == saturation_SX:
+                                    k_vals.append(k_val)
+                                    snr_vals.append(data[component][perc])
                         plt.plot(k_vals, snr_vals, label=f"{perc}% CI", marker='o')
+                        plt.xlabel("k (Smoothing Steepness)")
+                        plt.ylabel("Optimal SNR")
+                        plt.legend()
+                        plt.grid(True)
+                        filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_saturationDX={saturation_DX:.2e}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        plt.savefig(os.path.join(save_path, filename))
+                        plt.close()
 
-                    plt.xlabel("k (Smoothing Steepness)")
-                    plt.ylabel("Optimal SNR")
-                    plt.legend()
-                    plt.grid(True)
-
-                    filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_saturation={saturation:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
-                    plt.savefig(os.path.join(save_path, filename))
-                    plt.close()
-                    #print(f"\nSaved optimal SNR plot for {component}, window_size={round(window_size,1)}, saturation={saturation}.\n")
-
-def plot_optimal_SNR_by_saturation(optimal_SNR_data, outdir, direction, M, dL, N_fft):
+def plot_mismatch_by_saturation_DX(mismatch_data, outdir, direction, M, dL, N_fft):
     """
-    Plot optimal SNR for real and imaginary components by varying saturation, keeping window_size and k fixed.
+    Plot mismatch for real and imaginary components by varying saturation_DX, keeping window size, k, and saturation_SX fixed.
     """
     components = ['real', 'imaginary']
     percentiles = [50]
-
-    # Define save path
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)
     os.makedirs(save_path, exist_ok=True)
-
-    # Extract unique values
-    window_sizes = sorted(set(w for w, _, _ in optimal_SNR_data.keys()))
-    k_values = sorted(set(k for _, k, _ in optimal_SNR_data.keys()))
-
+    
+    window_sizes = sorted(set(w for w, _, _, _ in mismatch_data.keys()))
+    k_values = sorted(set(k for _, k, _, _ in mismatch_data.keys()))
+    saturation_SX_values = sorted(set(s for _, _, _, s in mismatch_data.keys()))
+    
     for N_FFT in N_fft:
         for window_size in window_sizes:
             for k in k_values:
-                for component in components:
-                    plt.figure(figsize=(10, 6))
+                for saturation_SX in saturation_SX_values:
+                    for component in components:
+                        plt.figure(figsize=(10, 6))
+                        for perc in percentiles:
+                            sat_DX_vals, mismatch_vals = [], []
+                            for (w_size, k_val, sat_DX, sat_SX), data in mismatch_data.items():
+                                if w_size == window_size and k_val == k and sat_SX == saturation_SX:
+                                    sat_DX_vals.append(sat_DX)
+                                    mismatch_vals.append(data[component][perc])
+                        plt.plot(sat_DX_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
+                        plt.xlabel("Saturation DX")
+                        plt.ylabel("Mismatch")
+                        plt.legend()
+                        plt.grid(True)
+                        filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={k}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        plt.savefig(os.path.join(save_path, filename))
+                        plt.close()
 
-                    for perc in percentiles:
-                        sat_vals, snr_vals = [], []
-                        for (w_size, k_val, sat_val), data in optimal_SNR_data.items():
-                            if w_size == window_size and k_val == k:
-                                sat_vals.append(sat_val)
-                                snr_vals.append(data[component][perc])
+def plot_optimal_SNR_by_saturation_DX(optimal_SNR_data, outdir, direction, M, dL, N_fft):
+    """
+    Plot optimal SNR for real and imaginary components by varying saturation_DX, keeping window size, k, and saturation_SX fixed.
+    """
+    components = ['real', 'imaginary']
+    percentiles = [50]
+    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
+    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    os.makedirs(save_path, exist_ok=True)
+    
+    window_sizes = sorted(set(w for w, _, _, _ in optimal_SNR_data.keys()))
+    k_values = sorted(set(k for _, k, _, _ in optimal_SNR_data.keys()))
+    saturation_SX_values = sorted(set(s for _, _, _, s in optimal_SNR_data.keys()))
+    
+    for N_FFT in N_fft:
+        for window_size in window_sizes:
+            for k in k_values:
+                for saturation_SX in saturation_SX_values:
+                    for component in components:
+                        plt.figure(figsize=(10, 6))
+                        for perc in percentiles:
+                            sat_DX_vals, snr_vals = [], []
+                            for (w_size, k_val, sat_DX, sat_SX), data in optimal_SNR_data.items():
+                                if w_size == window_size and k_val == k and sat_SX == saturation_SX:
+                                    sat_DX_vals.append(sat_DX)
+                                    snr_vals.append(data[component][perc])
+                        plt.plot(sat_DX_vals, snr_vals, label=f"{perc}% CI", marker='o')
+                        plt.xlabel("Saturation DX")
+                        plt.ylabel("Optimal SNR")
+                        plt.legend()
+                        plt.grid(True)
+                        filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={k}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        plt.savefig(os.path.join(save_path, filename))
+                        plt.close()
 
-                        plt.plot(sat_vals, snr_vals, label=f"{perc}% CI", marker='o')
+def plot_mismatch_by_saturation_SX(mismatch_data, outdir, direction, M, dL, N_fft):
+    """
+    Plot mismatch for real and imaginary components by varying saturation_SX, keeping window size, k, and saturation_DX fixed.
+    """
+    components = ['real', 'imaginary']
+    percentiles = [50]
+    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
+    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    os.makedirs(save_path, exist_ok=True)
+    
+    window_sizes = sorted(set(w for w, _, _, _ in mismatch_data.keys()))
+    k_values = sorted(set(k for _, k, _, _ in mismatch_data.keys()))
+    saturation_DX_values = sorted(set(s for _, _, s, _ in mismatch_data.keys()))
+    
+    for N_FFT in N_fft:
+        for window_size in window_sizes:
+            for k in k_values:
+                for saturation_DX in saturation_DX_values:
+                    for component in components:
+                        plt.figure(figsize=(10, 6))
+                        for perc in percentiles:
+                            sat_SX_vals, mismatch_vals = [], []
+                            for (w_size, k_val, sat_DX, sat_SX), data in mismatch_data.items():
+                                if w_size == window_size and k_val == k and sat_DX == saturation_DX:
+                                    sat_SX_vals.append(sat_SX)
+                                    mismatch_vals.append(data[component][perc])
+                        plt.plot(sat_SX_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
+                        plt.xlabel("Saturation SX")
+                        plt.ylabel("Mismatch")
+                        plt.legend()
+                        plt.grid(True)
+                        filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={k}_saturationDX={saturation_DX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        plt.savefig(os.path.join(save_path, filename))
+                        plt.close()
 
-                    plt.xlabel("Saturation")
-                    plt.ylabel("Optimal SNR")
-                    plt.legend()
-                    plt.grid(True)
-
-                    filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={k}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
-                    plt.savefig(os.path.join(save_path, filename))
-                    plt.close()
-                    #print(f"\nSaved optimal SNR plot for {component}, window_size={round(window_size,1)}, k={k}.\n")
+def plot_optimal_SNR_by_saturation_SX(optimal_SNR_data, outdir, direction, M, dL, N_fft):
+    """
+    Plot optimal SNR for real and imaginary components by varying saturation_SX, keeping window size, k, and saturation_DX fixed.
+    """
+    components = ['real', 'imaginary']
+    percentiles = [50]
+    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
+    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    os.makedirs(save_path, exist_ok=True)
+    
+    window_sizes = sorted(set(w for w, _, _, _ in optimal_SNR_data.keys()))
+    k_values = sorted(set(k for _, k, _, _ in optimal_SNR_data.keys()))
+    saturation_DX_values = sorted(set(s for _, _, s, _ in optimal_SNR_data.keys()))
+    
+    for N_FFT in N_fft:
+        for window_size in window_sizes:
+            for k in k_values:
+                for saturation_DX in saturation_DX_values:
+                    for component in components:
+                        plt.figure(figsize=(10, 6))
+                        for perc in percentiles:
+                            sat_SX_vals, snr_vals = [], []
+                            for (w_size, k_val, sat_DX, sat_SX), data in optimal_SNR_data.items():
+                                if w_size == window_size and k_val == k and sat_DX == saturation_DX:
+                                    sat_SX_vals.append(sat_SX)
+                                    snr_vals.append(data[component][perc])
+                        plt.plot(sat_SX_vals, snr_vals, label=f"{perc}% CI", marker='o')
+                        plt.xlabel("Saturation SX")
+                        plt.ylabel("Optimal SNR")
+                        plt.legend()
+                        plt.grid(True)
+                        filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={k}_saturationDX={saturation_DX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        plt.savefig(os.path.join(save_path, filename))
+                        plt.close()
 
 def plot_condition_numbers(outdir, condition_numbers, thresholds=(1e3, 1e6)):
+
     """
     Plot the condition numbers of the ACF Toeplitz matrix as a function of window size for different k values,
     including shaded regions to indicate conditioning quality.
@@ -2093,8 +2035,6 @@ def plot_condition_numbers(outdir, condition_numbers, thresholds=(1e3, 1e6)):
         thresholds (tuple): Thresholds for marking the zones (well-conditioned, moderately, poorly).
                             Default: (1e3, 1e6).
     """
-    import matplotlib.pyplot as plt
-    import os
 
     # Ensure the input is a dictionary
     if not isinstance(condition_numbers, dict):
@@ -2133,3 +2073,54 @@ def plot_condition_numbers(outdir, condition_numbers, thresholds=(1e3, 1e6)):
     plot_file_path = os.path.join(outdir, "Algorithm/Condition_Numbers_Plot.png")
     plt.savefig(plot_file_path)
     print(f"Condition number plot saved to {plot_file_path}")
+
+def plot_all(mismatch_data, optimal_SNR_data, outdir, direction, M, dL, N_FFT):
+    """
+    Plots mismatch and optimal SNR data if the corresponding x-axis variable has dim > 1.
+    """
+
+    # Define plotting functions with their corresponding x-axis variables
+    plot_functions = {
+        "mismatch": {
+            "plot_mismatch_by_window": "window",
+            "plot_mismatch_by_k": "k",
+            "plot_mismatch_by_saturation_DX": "saturation_DX",
+            "plot_mismatch_by_saturation_SX": "saturation_SX",
+        },
+        "optimal_SNR": {
+            "plot_optimal_SNR_by_window": "window",
+            "plot_optimal_SNR_by_k": "k",
+            "plot_optimal_SNR_by_saturation_DX": "saturation_DX",
+            "plot_optimal_SNR_by_saturation_SX": "saturation_SX",
+        },
+    }
+
+    # Debug: Stampiamo i valori unici di ogni variabile
+    print("\n=== DEBUG: Checking data dimensions ===")
+    for category, functions in plot_functions.items():
+        data_dict = mismatch_data if category == "mismatch" else optimal_SNR_data
+        print(f"\nCategory: {category}")
+
+        for func_name, x_key in functions.items():
+            extracted_values = set()
+            for key in data_dict.keys():  
+                param_mapping = {
+                    "window": key[0],
+                    "k": key[1],
+                    "saturation_DX": key[2],
+                    "saturation_SX": key[3],
+                }
+                if x_key in param_mapping:
+                    extracted_values.add(param_mapping[x_key])
+
+            print(f"  - {x_key}: {len(extracted_values)} unique values ({extracted_values})")
+
+            if len(extracted_values) > 1:
+                plot_function = globals().get(func_name, None)
+                if plot_function:
+                    print(f"  -> Plotting {func_name} for {category} using {x_key} as x-axis")
+                    plot_function(data_dict, outdir, direction, M, dL, N_FFT)
+                else:
+                    print(f"  !! Warning: Function {func_name} not found in global scope.")
+
+    print("\n=== DEBUG: Finished Checking ===\n")

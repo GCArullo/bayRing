@@ -224,162 +224,172 @@ def main():
         print(f"Waveform reconstruction plot failed with error: {e}")
         traceback.print_exc()    
 
-    #===============================#
-    # Mismatch computation section. #
-    #===============================#
+    #----------------------------------------------------- Smoothing and Mismatch computation -----------------------------------------------------------------------------------------#
 
-    # Initialize dictionarie
-    psd_data, acf_data, mismatch_data, optimal_SNR_data = {}, {}, {}, {}
+    # Initialize dictionaries to store ASD, ACF, and mismatch data
+    psd_data = {}
+    acf_data = {}
+    mismatch_data = {}
+    optimal_SNR_data = {}
+    condition_numbers = {}
+    multiplier_factor=100
+    N_points = int(1e5)
+    window_sizes = np.linspace(0, 40, 10).tolist()
+    steepness_values = [0.1]
 
-    # Mass [M_{\odot}] and distance [Mpc]
-    M, dL = parameters['Mismatch']['M'], parameters['Mismatch']['dL']
+    # sensitivity in time [s] (inverse of the sampling frequency)
+    dt = 1.0 / (2 * parameters['Mismatch']['f-max'])
 
-    # Extract t-peak, t_start and t_end
-    t_start_g, t_end_g, N_sim = wf_utils.extract_NR_params(NR_sim)
+    #mass and distance (for the mismatch)
+    M = parameters['Mismatch']['M']
+    dL = parameters['Mismatch']['dL']
+    t_start_g=parameters['Inference']['t-start']
+    t_end_g=parameters['Inference']['t-end']
 
-    # Compute start and end time in physical units
+    #start and end times of the analysis [s]
     t_start = t_start_g * C_mt * M
     t_end = t_end_g * C_mt * M
-
-    # Loading PSD parameters
-    psd_d = parameters['PSD-settings']
-    asd_path, direction = psd_d['asd-path'], psd_d['direction']
-    f_min, f_max, dt, _, N_points, n_iterations, window_sizes, steepness_values, saturation_DX_values, saturation_SX_values = wf_utils.extract_and_compute_psd_parameters(asd_path, psd_d)
-
-    # Flags (to improve)
-    flags = parameters['Flags']
-    check_TD_FD = False
-    C1_choice = True
-    sanity_check_mm = False
-    print(check_TD_FD, C1_choice, sanity_check_mm)
-
-    # Choose if iterate or not on N_FFT
-    N_FFT = [N_points] if n_iterations == 1 else list(map(int, np.linspace(N_sim, N_points, n_iterations)))
-
-    # Define the directory path
-    smoothing_paths = ["Left_smoothing", "Right_smoothing", "Both_edges_smoothing"]
-    for smoothing_path in smoothing_paths:
-        algorithm_dir = os.path.join(parameters['I/O']['outdir'], "Algorithm", smoothing_path)
-
-        # Clear it before plotting
-        postprocess.clear_directory(algorithm_dir)
         
-    # Iterate over the number of FFT points
-    for N_fft in N_FFT:
+    # Iterate over the smoothing parameters and compute ACF
+    for window_size, k in [(w, s) for w in window_sizes for s in steepness_values]:
+        
+        if window_size<5:
+            C1_flag=False
+        else:
+            C1_flag=True
 
-        # Iterate over the smoothing parameters and compute ACF
-        for window_size, k, saturation_DX, saturation_SX in [(w, s, tdx, tsx) for w in window_sizes for s in steepness_values for tdx in saturation_DX_values for tsx in saturation_SX_values]:
-                
-            # Consistency check on starting time, end time and f_min 
-            if (t_end-t_start)>1/(f_min+window_size) and direction!='above':
-                print("Please provide (t_end-t_start)<1/(f_min+window_size).")
-                exit()
+        try:
+            # Compute ACF with smoothing
+            PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_with_smoothing(
+                parameters['Mismatch']['asd-path'],
+                parameters['Mismatch']['f-min'],
+                parameters['Mismatch']['f-max'],
+                N_points,
+                window_size=window_size,
+                k=k,
+                multiplier_factor=multiplier_factor,
+                direction=parameters['Mismatch']['direction'],
+                C1_flag=C1_flag
+            )
 
-            try:
-                
-                # Compute ACF with smoothing
-                PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_with_smoothing(
-                    asd_path,
-                    f_min, f_max,
-                    N_fft,
-                    window_size=window_size,
-                    k=k,
-                    saturation_DX=saturation_DX,
-                    saturation_SX=saturation_SX,
-                    direction=direction,
-                    C1_flag=C1_choice
-                )
+            # Store smoothed PSD/ACF data in dictionaries
+            psd_data[f"window_{window_size}_k_{k}_{parameters['Mismatch']['direction']}"] = PSD_smoothed
+            acf_data[f"window_{window_size}_k_{k}_{parameters['Mismatch']['direction']}"] = ACF_smoothed
+            
+            # Create a time array (in seconds) corresponding to the ACF_smoothed
+            t_array = np.linspace(0, (len(ACF_smoothed) - 1) * dt, len(ACF_smoothed))
+            #t_array = np.linspace(0, t_end, len(ACF_smoothed))
 
-                # Store smoothed PSD/ACF data in dictionaries
-                psd_data[f"window size={round(window_size,1)}Hz, k={k}, {direction}, N_FFT={N_fft}"] = PSD_smoothed
-                acf_data[f"window size={round(window_size,1)}Hz, k={k}, {direction}, N_FFT={N_fft}"] = ACF_smoothed
+            # Create an interpolation function for the ACF using interp1d
+            acf_interpolated_func = interp1d(t_array, ACF_smoothed, kind='cubic', fill_value="extrapolate")
 
-                #-------------------------------------------------- Mismatch computation -------------------------------------------------------#
+            # truncated time -> to check
+            #t_trunc = NR_sim.t_NR_cut*C_mt*M
+            t_peak=NR_sim.t_NR_cut[0]*C_mt*M
+            #t_trunc = np.linspace(t_start+t_peak, t_end+t_peak, len(NR_sim.t_NR_cut))
+            t_trunc = np.linspace(t_start, t_end, len(NR_sim.t_NR_cut))
 
-                # Truncate ACF to ringdown analysis lenght
-                t_ACF = np.linspace(0, (N_fft-1)*dt, len(ACF_smoothed))
-                t_trunc, ACF_trunc = postprocess.truncate_and_interpolate_acf(t_ACF, ACF_smoothed, t_start, t_end, N_sim)
+            # Interpolate ACF on the t_trunc array
+            truncated_acf = acf_interpolated_func(t_trunc)
 
-                # Call compute_mismatch with the subsampled smoothed ACF
-                postprocess.compute_mismatch(
-                    NR_sim, 
-                    results_object, 
-                    inference_model, 
-                    parameters['I/O']['outdir'],
-                    parameters['Inference']['method'], 
-                    ACF_trunc, N_fft,
-                    M, dL,
-                    t_start_g, t_end_g,
-                    f_min, f_max,
-                    asd_path,
-                    window_size, k,
-                    check_TD_FD,
-                    sanity_check_mm
-                )
+            #interpolated acf (for a check on the plot)
+            interpolated_acf = acf_interpolated_func(t_array)
 
-                # Read mismatch results from file
-                mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_fft}.txt"
-                mismatch_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', mismatch_filename)
+            # Calculate the condition number
+            condition_number = wf_utils.compute_condition_number(truncated_acf)
+            print("condition number: ", condition_number)
+        
+            # Save the condition number in the dictionary
+            condition_numbers[(window_size, k)] = condition_number
 
-                with open(mismatch_file, 'r') as f:
-                    lines = f.readlines()[1:]  # Skip the header
+            #-------------------------------------------------- Mismatch computation -------------------------------------------------------#
 
-                # Store mismatch results in mismatch_data (consider only real and imaginary for simplicity)
-                mismatch_data[(window_size, k, saturation_DX, saturation_SX)] = {'real': {}, 'imaginary': {}}
-                for line in lines:
-                    perc, component, mismatch = line.strip().split('\t')
-                    perc = int(perc)
-                    mismatch_data[(window_size, k, saturation_DX, saturation_SX)][component][perc] = float(mismatch)
+            # Call compute_mismatch with the subsampled smoothed ACF
+            postprocess.compute_mismatch(
+                NR_sim, 
+                results_object, 
+                inference_model, 
+                parameters['I/O']['outdir'],
+                parameters['Inference']['method'], 
+                truncated_acf,
+                M,
+                dL,
+                t_start_g,
+                window_size,
+                k
+            )
 
-                #-------------------------------------------------- optimal SNR computation -------------------------------------------------------#
+            # Perform sanity checks
+            postprocess.mismatch_sanity_checks(
+                NR_sim, 
+                results_object, 
+                inference_model, 
+                parameters['I/O']['outdir'],
+                parameters['Inference']['method'], 
+                truncated_acf,
+                M,
+                dL,
+                t_start_g,
+                window_size,
+                k,
+                t_trunc
+            )
 
-                # Plot ACF
-                postprocess.plot_acf_interpolated(t_ACF, t_trunc, 
-                                                  ACF_smoothed, ACF_trunc, 
-                                                  parameters['I/O']['outdir'], 
-                                                  window_size, k,
-                                                  saturation_DX, saturation_SX,
-                                                  direction)
+            # Read mismatch results from file
+            mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.txt"
+            mismatch_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', mismatch_filename)
 
-                # Call compute_mismatch with the subsampled smoothed ACF
-                postprocess.compute_optimal_SNR(
-                    NR_sim, 
-                    results_object, 
-                    inference_model, 
-                    parameters['I/O']['outdir'],
-                    parameters['Inference']['method'], 
-                    ACF_trunc,
-                    N_fft,
-                    M, dL,
-                    t_start_g, t_end_g,
-                    f_min, f_max,
-                    asd_path,
-                    window_size, k,
-                    check_TD_FD
-                )
+            with open(mismatch_file, 'r') as f:
+                lines = f.readlines()[1:]  # Skip the header
 
-                # Read optimal SNR results from file
-                optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_fft}.txt"
-                optimal_SNR_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', optimal_SNR_filename)
-                with open(optimal_SNR_file, 'r') as f:
-                    lines = f.readlines()[1:]  # Skip the header
+            # Store mismatch results in mismatch_data (consider only real and imaginary for simplicity)
+            mismatch_data[(window_size, k)] = {'real': {}, 'imaginary': {}}
+            for line in lines:
+                perc, component, mismatch = line.strip().split('\t')
+                perc = int(perc)
+                mismatch_data[(window_size, k)][component][perc] = float(mismatch)
 
-                # Store mismatch results in optimal_SNR_data (consider only real and imaginary for simplicity)
-                optimal_SNR_data[(window_size, k, saturation_DX, saturation_SX)] = {'real': {}, 'imaginary': {}}
-                for line in lines:
-                    perc, component, optimal_SNR = line.strip().split('\t')
-                    perc = int(perc)
-                    optimal_SNR_data[(window_size, k, saturation_DX, saturation_SX)][component][perc] = float(optimal_SNR)
+            #-------------------------------------------------- optimal SNR computation -------------------------------------------------------#
+    
+            # Call compute_mismatch with the subsampled smoothed ACF
+            postprocess.compute_optimal_SNR(
+                NR_sim, 
+                results_object, 
+                inference_model, 
+                parameters['I/O']['outdir'],
+                parameters['Inference']['method'], 
+                truncated_acf,
+                M,
+                dL,
+                t_start_g,
+                window_size,
+                k
+            )
 
-            except Exception as e:
-                print(f"Optimal SNR computation failed for window_size={window_size}, k={k}: {e}")
+            # Read optimal SNR results from file
+            optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.txt"
+            optimal_SNR_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', optimal_SNR_filename)
+            with open(optimal_SNR_file, 'r') as f:
+                lines = f.readlines()[1:]  # Skip the header
+
+            # Store mismatch results in optimal_SNR_data (consider only real and imaginary for simplicity)
+            optimal_SNR_data[(window_size, k)] = {'real': {}, 'imaginary': {}}
+            for line in lines:
+                perc, component, optimal_SNR = line.strip().split('\t')
+                perc = int(perc)
+                optimal_SNR_data[(window_size, k)][component][perc] = float(optimal_SNR)
+
+        except Exception as e:
+            print(f"Optimal SNR computation failed for window_size={window_size}, k={k}: {e}")
 
     #----------------------------------------------------------------------------------- Postprocessing --------------------------------------------------------------------------------------------------------------------------#
-
-    # Postprocess plots
-    postprocess.plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size, parameters['I/O']['outdir'], direction)
-    #postprocess.plot_psd_and_acf(psd_data, acf_data, f_min, f_max, t_start, t_end, parameters['I/O']['outdir'], direction, window_size)
-    postprocess.plot_all(mismatch_data, optimal_SNR_data, parameters['I/O']['outdir'], direction, M, dL, N_FFT)
+ 
+    # postprocess plots
+    postprocess.plot_multiple_psd(psd_data, parameters['Mismatch']['f-min'], parameters['Mismatch']['f-max'], parameters['I/O']['outdir'], parameters['Mismatch']['direction'], window_size)
+    postprocess.plot_multiple_acf_with_smoothing(acf_data, dt, parameters['I/O']['outdir'], parameters['Mismatch']['direction'])
+    postprocess.plot_mismatch_by_window(mismatch_data, parameters['I/O']['outdir'], parameters['Mismatch']['direction'], M, dL)
+    postprocess.plot_optimal_SNR_by_window(optimal_SNR_data, parameters['I/O']['outdir'], parameters['Mismatch']['direction'], M, dL)
+    postprocess.plot_condition_numbers(parameters['I/O']['outdir'], condition_numbers)
 
     # Attempt to generate the global corner plot
     try:

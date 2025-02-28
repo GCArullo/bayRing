@@ -1,0 +1,535 @@
+2024-10-19, 16:39:31 - cpnest.cpnest.CPNest                  : Running with 1 parallel threads
+2024-10-19, 16:39:31 - cpnest.sampler.Sampler                : Sampler process 77146: saved 32 prior samples in prior_samples_77146.dat
+2024-10-19, 16:39:31 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 8.47692818198891
+2024-10-19, 16:39:31 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 6.184736323720614
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 1: n:  20 NS_acc:0.500 S0_acc:0.712 sub_acc:0.800 H: 0.00 logL -4281321804.67852 --> -4149375245.17862 dZ: 4281238621.919 logZ: -4281321808.160 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 2: n:  20 NS_acc:0.667 S0_acc:0.714 sub_acc:0.900 H: 3.51 logL -4279310415.37098 --> -1854222019.18114 dZ: 4279227232.612 logZ: -4279310418.884 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 3: n:  20 NS_acc:0.750 S0_acc:0.713 sub_acc:0.600 H: 3.54 logL -4221377753.56139 --> -56934634.26941 dZ: 4221294570.802 logZ: -4221377757.105 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 4: n:  20 NS_acc:0.800 S0_acc:0.712 sub_acc:0.650 H: 3.58 logL -4188362554.61283 --> -2181801727.74920 dZ: 4188279371.854 logZ: -4188362558.188 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 5: n:  20 NS_acc:0.833 S0_acc:0.711 sub_acc:0.700 H: 3.61 logL -4149375245.17862 --> -835760244.66600 dZ: 4149292062.420 logZ: -4149375248.785 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 6: n:  20 NS_acc:0.857 S0_acc:0.709 sub_acc:0.600 H: 3.64 logL -4089371202.60430 --> -3562507127.47859 dZ: 4089288019.845 logZ: -4089371206.242 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 7: n:  20 NS_acc:0.875 S0_acc:0.709 sub_acc:0.650 H: 3.67 logL -4055364296.10966 --> -1337165188.90129 dZ: 4055281113.351 logZ: -4055364299.778 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 8: n:  20 NS_acc:0.889 S0_acc:0.709 sub_acc:0.700 H: 3.70 logL -4002206362.14076 --> -167798322.73342 dZ: 4002123179.382 logZ: -4002206365.841 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 9: n:  20 NS_acc:0.900 S0_acc:0.707 sub_acc:0.600 H: 3.73 logL -3957881516.00256 --> -1370540712.80726 dZ: 3957798333.243 logZ: -3957881519.734 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 10: n:  20 NS_acc:0.909 S0_acc:0.706 sub_acc:0.700 H: 3.76 logL -3773479046.50668 --> -3301950280.16029 dZ: 3773395863.748 logZ: -3773479050.269 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 11: n:  20 NS_acc:0.917 S0_acc:0.705 sub_acc:0.600 H: 3.79 logL -3705381788.59732 --> -2072232008.91262 dZ: 3705298605.838 logZ: -3705381792.391 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 12: n:  20 NS_acc:0.923 S0_acc:0.702 sub_acc:0.400 H: 3.83 logL -3582423250.89327 --> -3253731806.76314 dZ: 3582340068.134 logZ: -3582423254.718 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 13: n:  20 NS_acc:0.929 S0_acc:0.700 sub_acc:0.550 H: 3.86 logL -3562507127.47859 --> -8491469.42124 dZ: 3562423944.720 logZ: -3562507131.335 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 14: n:  20 NS_acc:0.933 S0_acc:0.698 sub_acc:0.550 H: 3.89 logL -3517983706.67834 --> -22492407.42740 dZ: 3517900523.919 logZ: -3517983710.566 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 15: n:  20 NS_acc:0.938 S0_acc:0.698 sub_acc:0.600 H: 3.92 logL -3333135154.45928 --> -1186421505.06030 dZ: 3333051971.700 logZ: -3333135158.378 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 16: n:  20 NS_acc:0.941 S0_acc:0.696 sub_acc:0.500 H: 3.95 logL -3301950280.16029 --> -2753227942.60778 dZ: 3301867097.401 logZ: -3301950284.110 logLmax: -83186.24
+2024-10-19, 16:39:31 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 6.413345178296273
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 17: n:  20 NS_acc:0.944 S0_acc:0.693 sub_acc:0.500 H: 3.98 logL -3253731806.76314 --> -109033107.71998 dZ: 3253648624.004 logZ: -3253731810.744 logLmax: -82718.56
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 18: n:  20 NS_acc:0.947 S0_acc:0.692 sub_acc:0.700 H: 4.01 logL -3147007339.61269 --> -699682938.37053 dZ: 3146924624.532 logZ: -3147007343.625 logLmax: -82718.56
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 19: n:  20 NS_acc:0.950 S0_acc:0.691 sub_acc:0.600 H: 4.04 logL -3141612119.38786 --> -2344189034.42341 dZ: 3141529404.307 logZ: -3141612123.432 logLmax: -82718.56
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 20: n:  20 NS_acc:0.952 S0_acc:0.691 sub_acc:0.650 H: 4.08 logL -3057824618.09614 --> -747834175.90039 dZ: 3057741903.015 logZ: -3057824622.171 logLmax: -82718.56
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 21: n:  20 NS_acc:0.955 S0_acc:0.690 sub_acc:0.700 H: 4.11 logL -2912152775.14620 --> -1574112881.74734 dZ: 2912070060.065 logZ: -2912152779.253 logLmax: -82718.56
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 22: n:  20 NS_acc:0.957 S0_acc:0.691 sub_acc:0.700 H: 4.14 logL -2753227942.60778 --> -486947731.76203 dZ: 2753145227.527 logZ: -2753227946.745 logLmax: -82718.56
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 23: n:  20 NS_acc:0.958 S0_acc:0.690 sub_acc:0.500 H: 4.17 logL -2344189034.42341 --> -15713573.55267 dZ: 2344106319.342 logZ: -2344189038.592 logLmax: -82718.56
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 24: n:  20 NS_acc:0.960 S0_acc:0.689 sub_acc:0.600 H: 4.20 logL -2181801727.74920 --> -1621001948.86930 dZ: 2181719012.668 logZ: -2181801731.949 logLmax: -82718.56
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 25: n:  20 NS_acc:0.962 S0_acc:0.686 sub_acc:0.600 H: 4.23 logL -2132103915.44284 --> -418641017.27135 dZ: 2132021200.362 logZ: -2132103919.674 logLmax: -82718.56
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 26: n:  20 NS_acc:0.963 S0_acc:0.684 sub_acc:0.600 H: 4.26 logL -2072232008.91262 --> -735237803.24543 dZ: 2072149293.832 logZ: -2072232013.175 logLmax: -82718.56
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 27: n:  20 NS_acc:0.964 S0_acc:0.681 sub_acc:0.450 H: 4.29 logL -1854222019.18114 --> -268692386.07770 dZ: 1854139304.100 logZ: -1854222023.475 logLmax: -82718.56
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 28: n:  20 NS_acc:0.966 S0_acc:0.680 sub_acc:0.600 H: 4.33 logL -1642333469.14365 --> -2830636.32270 dZ: 1642250754.063 logZ: -1642333473.469 logLmax: -82718.56
+2024-10-19, 16:39:31 - cpnest.NestedSampling.NestedSampler   : 29: n:  20 NS_acc:0.967 S0_acc:0.676 sub_acc:0.450 H: 4.36 logL -1621001948.86930 --> -1524572777.53384 dZ: 1620919233.788 logZ: -1621001953.226 logLmax: -82718.56
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 30: n:  20 NS_acc:0.968 S0_acc:0.675 sub_acc:0.400 H: 4.39 logL -1599062103.50553 --> -1213684457.54525 dZ: 1598979388.425 logZ: -1599062107.893 logLmax: -82718.56
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 31: n:  20 NS_acc:0.969 S0_acc:0.674 sub_acc:0.550 H: 4.42 logL -1577739275.57640 --> -898366128.32615 dZ: 1577656560.495 logZ: -1577739279.995 logLmax: -82718.56
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 32: n:  20 NS_acc:0.970 S0_acc:0.671 sub_acc:0.400 H: 4.45 logL -1574112881.74734 --> -16303894.89293 dZ: 1574030166.666 logZ: -1574112886.197 logLmax: -82718.56
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : Rolling KS test: D=0.111, p-value=0.786
+2024-10-19, 16:39:32 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 6.05907627149811
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 33: n:  20 NS_acc:0.971 S0_acc:0.668 sub_acc:0.350 H: 4.48 logL -1573747569.60751 --> -943082540.30355 dZ: 1573664854.527 logZ: -1573747574.089 logLmax: -82718.56
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 34: n:  20 NS_acc:0.971 S0_acc:0.666 sub_acc:0.450 H: 4.51 logL -1524572777.53384 --> -1199474975.01280 dZ: 1524490062.453 logZ: -1524572782.046 logLmax: -82718.56
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 35: n:  20 NS_acc:0.972 S0_acc:0.664 sub_acc:0.400 H: 4.54 logL -1427498751.52751 --> -82377630.55106 dZ: 1427416036.447 logZ: -1427498756.071 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 36: n:  20 NS_acc:0.973 S0_acc:0.661 sub_acc:0.400 H: 4.58 logL -1370540712.80726 --> -2356774.02048 dZ: 1370465247.870 logZ: -1370540717.382 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 37: n:  20 NS_acc:0.974 S0_acc:0.659 sub_acc:0.500 H: 4.61 logL -1337165188.90129 --> -418359642.30379 dZ: 1337089723.964 logZ: -1337165193.508 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 38: n:  20 NS_acc:0.974 S0_acc:0.656 sub_acc:0.450 H: 4.64 logL -1213684457.54525 --> -267015178.36902 dZ: 1213608992.608 logZ: -1213684462.183 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 39: n:  20 NS_acc:0.975 S0_acc:0.655 sub_acc:0.400 H: 4.67 logL -1199474975.01280 --> -433996818.33852 dZ: 1199399510.076 logZ: -1199474979.682 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 40: n:  20 NS_acc:0.976 S0_acc:0.650 sub_acc:0.450 H: 4.70 logL -1186421505.06030 --> -28473478.35924 dZ: 1186346040.123 logZ: -1186421509.760 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 41: n:  20 NS_acc:0.976 S0_acc:0.648 sub_acc:0.550 H: 4.73 logL -978661918.81566 --> -813095955.69322 dZ: 978586453.879 logZ: -978661923.547 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 42: n:  20 NS_acc:0.977 S0_acc:0.644 sub_acc:0.050 H: 4.76 logL -954010812.34523 --> -814628229.14598 dZ: 953935347.408 logZ: -954010817.108 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 43: n:  20 NS_acc:0.977 S0_acc:0.642 sub_acc:0.300 H: 4.79 logL -943082540.30355 --> -286760256.66639 dZ: 943007075.367 logZ: -943082545.097 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 44: n:  20 NS_acc:0.978 S0_acc:0.638 sub_acc:0.200 H: 4.83 logL -898366128.32615 --> -713844638.14451 dZ: 898290663.389 logZ: -898366133.151 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 45: n:  20 NS_acc:0.978 S0_acc:0.635 sub_acc:0.600 H: 4.86 logL -835760244.66600 --> -26719586.65097 dZ: 835684779.729 logZ: -835760249.522 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 46: n:  20 NS_acc:0.979 S0_acc:0.632 sub_acc:0.200 H: 4.89 logL -814628229.14598 --> -12160571.79418 dZ: 814552764.209 logZ: -814628234.034 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 47: n:  20 NS_acc:0.979 S0_acc:0.627 sub_acc:0.400 H: 4.92 logL -813095955.69322 --> -120030009.40587 dZ: 813020490.756 logZ: -813095960.612 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 48: n:  20 NS_acc:0.980 S0_acc:0.623 sub_acc:0.500 H: 4.95 logL -792471319.78730 --> -11670982.29543 dZ: 792395854.850 logZ: -792471324.737 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 18.986902539944822
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 49: n:  20 NS_acc:0.980 S0_acc:0.621 sub_acc:0.350 H: 4.98 logL -747834175.90039 --> -311783868.12673 dZ: 747758710.963 logZ: -747834180.882 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 50: n:  20 NS_acc:0.980 S0_acc:0.619 sub_acc:0.650 H: 5.01 logL -735237803.24543 --> -556672951.79080 dZ: 735162338.308 logZ: -735237808.258 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 51: n:  20 NS_acc:0.981 S0_acc:0.617 sub_acc:0.550 H: 5.04 logL -713844638.14451 --> -256502139.47639 dZ: 713769173.208 logZ: -713844643.188 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 52: n:  20 NS_acc:0.981 S0_acc:0.616 sub_acc:0.600 H: 5.08 logL -699682938.37053 --> -226168335.69568 dZ: 699607473.434 logZ: -699682943.446 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 53: n:  20 NS_acc:0.981 S0_acc:0.613 sub_acc:0.250 H: 5.11 logL -556672951.79080 --> -134498373.04333 dZ: 556597486.854 logZ: -556672956.897 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 54: n:  20 NS_acc:0.982 S0_acc:0.609 sub_acc:0.300 H: 5.14 logL -509544867.67073 --> -376442096.64988 dZ: 509469402.734 logZ: -509544872.808 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 55: n:  20 NS_acc:0.982 S0_acc:0.607 sub_acc:0.150 H: 5.17 logL -486947731.76203 --> -98988873.53810 dZ: 486872266.825 logZ: -486947736.931 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 56: n:  20 NS_acc:0.982 S0_acc:0.605 sub_acc:0.450 H: 5.20 logL -433996818.33852 --> -19696658.96498 dZ: 433921353.402 logZ: -433996823.539 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 57: n:  20 NS_acc:0.983 S0_acc:0.604 sub_acc:0.450 H: 5.23 logL -418641017.27135 --> -240746479.05559 dZ: 418565552.334 logZ: -418641022.503 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 58: n:  26 NS_acc:0.983 S0_acc:0.600 sub_acc:0.038 H: 5.26 logL -418359642.30379 --> -73637194.82703 dZ: 418284177.367 logZ: -418359647.566 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 59: n:  20 NS_acc:0.983 S0_acc:0.597 sub_acc:0.200 H: 5.29 logL -376442096.64988 --> -196207097.38407 dZ: 376366631.713 logZ: -376442101.944 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 60: n:  20 NS_acc:0.984 S0_acc:0.594 sub_acc:0.200 H: 5.33 logL -314957634.90226 --> -218432393.11256 dZ: 314882169.965 logZ: -314957640.227 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 61: n:  20 NS_acc:0.984 S0_acc:0.592 sub_acc:0.300 H: 5.36 logL -311783868.12673 --> -205375066.90881 dZ: 311708403.190 logZ: -311783873.483 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 62: n:  20 NS_acc:0.984 S0_acc:0.590 sub_acc:0.300 H: 5.39 logL -286760256.66639 --> -115159484.91089 dZ: 286684791.729 logZ: -286760262.054 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 63: n:  20 NS_acc:0.984 S0_acc:0.588 sub_acc:0.400 H: 5.42 logL -268692386.07770 --> -188120278.99250 dZ: 268616921.141 logZ: -268692391.497 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 64: n:  20 NS_acc:0.985 S0_acc:0.585 sub_acc:0.100 H: 5.45 logL -267015178.36902 --> -258793499.73193 dZ: 266939713.432 logZ: -267015183.819 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : Rolling KS test: D=0.234, p-value=0.0506
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 65: n:  20 NS_acc:0.985 S0_acc:0.583 sub_acc:0.350 H: 5.48 logL -258793499.73193 --> -131920474.73039 dZ: 258718034.795 logZ: -258793505.213 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 13.59679682244369
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 66: n:  20 NS_acc:0.985 S0_acc:0.582 sub_acc:0.600 H: 5.51 logL -256502139.47639 --> -34481437.59894 dZ: 256426674.539 logZ: -256502144.989 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 67: n:  20 NS_acc:0.985 S0_acc:0.581 sub_acc:0.500 H: 5.54 logL -240746479.05559 --> -257273.99676 dZ: 240671014.119 logZ: -240746484.599 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 68: n:  20 NS_acc:0.986 S0_acc:0.579 sub_acc:0.350 H: 5.58 logL -226168335.69568 --> -3496537.73317 dZ: 226092870.759 logZ: -226168341.271 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 69: n:  20 NS_acc:0.986 S0_acc:0.578 sub_acc:0.350 H: 5.61 logL -218432393.11256 --> -196615826.82148 dZ: 218356928.176 logZ: -218432398.719 logLmax: -75468.42
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 70: n:  20 NS_acc:0.986 S0_acc:0.576 sub_acc:0.300 H: 5.64 logL -205375066.90881 --> -75083.68965 dZ: 205299601.972 logZ: -205375072.546 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 71: n:  20 NS_acc:0.986 S0_acc:0.574 sub_acc:0.450 H: 5.67 logL -196615826.82148 --> -81795.36950 dZ: 196540746.613 logZ: -196615832.490 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 72: n:  20 NS_acc:0.986 S0_acc:0.573 sub_acc:0.350 H: 5.70 logL -196207097.38407 --> -88297116.05477 dZ: 196132017.176 logZ: -196207103.084 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 73: n:  20 NS_acc:0.986 S0_acc:0.572 sub_acc:0.550 H: 5.73 logL -193643229.23896 --> -122004000.60350 dZ: 193568149.031 logZ: -193643234.970 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 74: n:  20 NS_acc:0.987 S0_acc:0.570 sub_acc:0.250 H: 5.76 logL -188120278.99250 --> -8130261.57635 dZ: 188045198.784 logZ: -188120284.755 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 75: n:  20 NS_acc:0.987 S0_acc:0.568 sub_acc:0.350 H: 5.79 logL -167798322.73342 --> -3025927.07477 dZ: 167723242.525 logZ: -167798328.527 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 76: n:  20 NS_acc:0.987 S0_acc:0.568 sub_acc:0.550 H: 5.83 logL -134498373.04333 --> -19039723.56809 dZ: 134423292.835 logZ: -134498378.868 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 77: n:  20 NS_acc:0.987 S0_acc:0.565 sub_acc:0.200 H: 5.86 logL -131920474.73039 --> -22145683.44827 dZ: 131845394.522 logZ: -131920480.587 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 78: n:  20 NS_acc:0.987 S0_acc:0.563 sub_acc:0.300 H: 5.89 logL -122004000.60350 --> -147583.48183 dZ: 121928920.395 logZ: -122004006.491 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 79: n:  20 NS_acc:0.988 S0_acc:0.561 sub_acc:0.300 H: 5.92 logL -120030009.40587 --> -59599958.32541 dZ: 119954929.198 logZ: -120030015.325 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 80: n:  20 NS_acc:0.988 S0_acc:0.560 sub_acc:0.500 H: 5.95 logL -115159484.91089 --> -106270198.97291 dZ: 115084404.703 logZ: -115159490.861 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 81: n:  20 NS_acc:0.988 S0_acc:0.557 sub_acc:0.250 H: 5.98 logL -109033107.71998 --> -57391883.11642 dZ: 108958027.512 logZ: -109033113.701 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 11.942123245182328
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 82: n:  20 NS_acc:0.988 S0_acc:0.557 sub_acc:0.400 H: 6.01 logL -106270198.97291 --> -2088865.20883 dZ: 106195118.765 logZ: -106270204.985 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 83: n:  20 NS_acc:0.988 S0_acc:0.555 sub_acc:0.450 H: 6.04 logL -98988873.53810 --> -332648.54233 dZ: 98913793.330 logZ: -98988879.582 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 84: n:  20 NS_acc:0.988 S0_acc:0.555 sub_acc:0.650 H: 6.08 logL -88297116.05477 --> -61813147.56461 dZ: 88222035.846 logZ: -88297122.130 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 85: n:  20 NS_acc:0.988 S0_acc:0.553 sub_acc:0.150 H: 6.11 logL -82377630.55106 --> -28483834.44674 dZ: 82302550.343 logZ: -82377636.657 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 86: n:  20 NS_acc:0.989 S0_acc:0.551 sub_acc:0.300 H: 6.14 logL -73637194.82703 --> -42697509.03648 dZ: 73562114.619 logZ: -73637200.965 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 87: n:  20 NS_acc:0.989 S0_acc:0.549 sub_acc:0.100 H: 6.17 logL -61813147.56461 --> -50602949.87959 dZ: 61738067.356 logZ: -61813153.733 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 88: n:  20 NS_acc:0.989 S0_acc:0.547 sub_acc:0.350 H: 6.20 logL -59599958.32541 --> -54720507.38563 dZ: 59524878.117 logZ: -59599964.525 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 89: n:  20 NS_acc:0.989 S0_acc:0.544 sub_acc:0.050 H: 6.23 logL -57391883.11642 --> -18531187.84573 dZ: 57316802.908 logZ: -57391889.348 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 90: n:  25 NS_acc:0.989 S0_acc:0.542 sub_acc:0.040 H: 6.26 logL -56934634.26941 --> -13500120.41009 dZ: 56859554.061 logZ: -56934640.532 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 91: n:  20 NS_acc:0.989 S0_acc:0.540 sub_acc:0.150 H: 6.29 logL -54720507.38563 --> -4603925.61586 dZ: 54645427.177 logZ: -54720513.679 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 92: n:  20 NS_acc:0.989 S0_acc:0.538 sub_acc:0.250 H: 6.33 logL -50602949.87959 --> -16310614.89493 dZ: 50527869.671 logZ: -50602956.205 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 93: n:  20 NS_acc:0.989 S0_acc:0.537 sub_acc:0.250 H: 6.36 logL -42697509.03648 --> -3730954.66216 dZ: 42622428.828 logZ: -42697515.393 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 94: n:  40 NS_acc:0.979 S0_acc:0.530 sub_acc:0.300 H: 6.39 logL -34481437.59894 --> -76445.84455 dZ: 34406357.391 logZ: -34481443.987 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 95: n:  20 NS_acc:0.979 S0_acc:0.527 sub_acc:0.050 H: 6.42 logL -28483834.44674 --> -11536355.49877 dZ: 28408754.238 logZ: -28483840.866 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 96: n:  21 NS_acc:0.980 S0_acc:0.524 sub_acc:0.048 H: 6.45 logL -28473478.35924 --> -8540511.93433 dZ: 28398398.151 logZ: -28473484.809 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : Rolling KS test: D=0.119, p-value=0.712
+2024-10-19, 16:39:32 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 18.523245016434814
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 97: n:  20 NS_acc:0.980 S0_acc:0.523 sub_acc:0.400 H: 6.48 logL -26719586.65097 --> -2122843.52742 dZ: 26644506.443 logZ: -26719593.132 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 98: n:  20 NS_acc:0.980 S0_acc:0.521 sub_acc:0.400 H: 6.51 logL -22492407.42740 --> -18007512.66414 dZ: 22417327.219 logZ: -22492413.940 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 99: n:  28 NS_acc:0.980 S0_acc:0.518 sub_acc:0.036 H: 6.54 logL -22145683.44827 --> -5899788.82490 dZ: 22070603.240 logZ: -22145689.992 logLmax: -75083.69
+2024-10-19, 16:39:32 - cpnest.NestedSampling.NestedSampler   : 100: n:  20 NS_acc:0.980 S0_acc:0.516 sub_acc:0.200 H: 6.58 logL -19696658.96498 --> -9508151.68365 dZ: 19621578.757 logZ: -19696665.540 logLmax: -75083.69
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 101: n:  20 NS_acc:0.981 S0_acc:0.514 sub_acc:0.500 H: 6.61 logL -19039723.56809 --> -5591643.97805 dZ: 18964643.360 logZ: -19039730.174 logLmax: -75083.69
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 102: n:  20 NS_acc:0.981 S0_acc:0.510 sub_acc:0.150 H: 6.64 logL -18531187.84573 --> -11971413.36333 dZ: 18456107.637 logZ: -18531194.483 logLmax: -75083.69
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 103: n:  20 NS_acc:0.981 S0_acc:0.508 sub_acc:0.150 H: 6.67 logL -18007512.66414 --> -1341161.07193 dZ: 17932432.456 logZ: -18007519.333 logLmax: -75083.69
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 104: n:  20 NS_acc:0.981 S0_acc:0.507 sub_acc:0.300 H: 6.70 logL -16310614.89493 --> -3265371.96680 dZ: 16235534.687 logZ: -16310621.595 logLmax: -75083.69
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 105: n:  20 NS_acc:0.981 S0_acc:0.505 sub_acc:0.100 H: 6.73 logL -16303894.89293 --> -112228.04710 dZ: 16228814.685 logZ: -16303901.624 logLmax: -75083.69
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 106: n:  20 NS_acc:0.981 S0_acc:0.503 sub_acc:0.350 H: 6.76 logL -15713573.55267 --> -182983.54796 dZ: 15638493.344 logZ: -15713580.315 logLmax: -74913.87
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 107: n:  20 NS_acc:0.982 S0_acc:0.502 sub_acc:0.450 H: 6.79 logL -13500120.41009 --> -4329814.40490 dZ: 13425210.022 logZ: -13500127.204 logLmax: -74913.87
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 108: n:  20 NS_acc:0.982 S0_acc:0.501 sub_acc:0.450 H: 6.83 logL -12160571.79418 --> -1064838.82549 dZ: 12085661.406 logZ: -12160578.619 logLmax: -74913.87
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 109: n:  20 NS_acc:0.982 S0_acc:0.499 sub_acc:0.150 H: 6.86 logL -11971413.36333 --> -11772803.27210 dZ: 11896502.975 logZ: -11971420.220 logLmax: -74913.87
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 110: n:  20 NS_acc:0.982 S0_acc:0.498 sub_acc:0.350 H: 6.89 logL -11772803.27210 --> -7471517.10158 dZ: 11697892.884 logZ: -11772810.160 logLmax: -74913.87
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 111: n:  20 NS_acc:0.982 S0_acc:0.497 sub_acc:0.100 H: 6.92 logL -11670982.29543 --> -1600060.19255 dZ: 11596071.907 logZ: -11670989.214 logLmax: -74913.87
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 112: n:  20 NS_acc:0.982 S0_acc:0.495 sub_acc:0.100 H: 6.95 logL -11536355.49877 --> -11449451.47586 dZ: 11461445.111 logZ: -11536362.449 logLmax: -74913.87
+2024-10-19, 16:39:33 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 15.375766402166322
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 113: n:  20 NS_acc:0.983 S0_acc:0.494 sub_acc:0.350 H: 6.98 logL -11449451.47586 --> -812369.44022 dZ: 11374541.088 logZ: -11449458.457 logLmax: -74913.87
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 114: n:  20 NS_acc:0.983 S0_acc:0.494 sub_acc:0.400 H: 7.01 logL -9508151.68365 --> -4169452.45784 dZ: 9433241.296 logZ: -9508158.696 logLmax: -74913.87
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 115: n:  20 NS_acc:0.983 S0_acc:0.492 sub_acc:0.150 H: 7.04 logL -8540511.93433 --> -205776.70749 dZ: 8465601.546 logZ: -8540518.978 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 116: n:  20 NS_acc:0.983 S0_acc:0.491 sub_acc:0.350 H: 7.08 logL -8491469.42124 --> -980462.18662 dZ: 8416603.338 logZ: -8491476.496 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 117: n:  20 NS_acc:0.983 S0_acc:0.489 sub_acc:0.300 H: 7.11 logL -8130261.57635 --> -367614.06028 dZ: 8055395.493 logZ: -8130268.683 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 118: n:  20 NS_acc:0.983 S0_acc:0.488 sub_acc:0.200 H: 7.14 logL -7471517.10158 --> -7319519.08725 dZ: 7396651.019 logZ: -7471524.239 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 119: n:  20 NS_acc:0.983 S0_acc:0.487 sub_acc:0.350 H: 7.17 logL -7319519.08725 --> -4761113.68176 dZ: 7244653.004 logZ: -7319526.256 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 120: n:  20 NS_acc:0.984 S0_acc:0.486 sub_acc:0.200 H: 7.20 logL -5899788.82490 --> -2778993.48652 dZ: 5824922.742 logZ: -5899796.025 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 121: n:  20 NS_acc:0.984 S0_acc:0.485 sub_acc:0.400 H: 7.23 logL -5591643.97805 --> -585540.61831 dZ: 5516777.895 logZ: -5591651.209 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 122: n:  20 NS_acc:0.984 S0_acc:0.482 sub_acc:0.300 H: 7.26 logL -4761113.68176 --> -1234992.86611 dZ: 4686247.599 logZ: -4761120.944 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 123: n:  20 NS_acc:0.984 S0_acc:0.481 sub_acc:0.400 H: 7.29 logL -4603925.61586 --> -3536523.84789 dZ: 4529059.533 logZ: -4603932.910 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 124: n:  20 NS_acc:0.984 S0_acc:0.478 sub_acc:0.300 H: 7.33 logL -4329814.40490 --> -122127.96215 dZ: 4254948.322 logZ: -4329821.730 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 125: n:  20 NS_acc:0.984 S0_acc:0.478 sub_acc:0.400 H: 7.36 logL -4169452.45784 --> -1026505.35448 dZ: 4094586.375 logZ: -4169459.814 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 126: n:  20 NS_acc:0.984 S0_acc:0.476 sub_acc:0.300 H: 7.39 logL -3781205.17322 --> -678897.86338 dZ: 3706339.090 logZ: -3781212.561 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 127: n:  20 NS_acc:0.984 S0_acc:0.475 sub_acc:0.200 H: 7.42 logL -3730954.66216 --> -2766657.66557 dZ: 3656088.579 logZ: -3730962.081 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 128: n:  20 NS_acc:0.985 S0_acc:0.473 sub_acc:0.100 H: 7.45 logL -3536523.84789 --> -2036895.61509 dZ: 3461657.765 logZ: -3536531.298 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : Rolling KS test: D=0.135, p-value=0.558
+2024-10-19, 16:39:33 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 19.503018823258202
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 129: n:  20 NS_acc:0.985 S0_acc:0.471 sub_acc:0.350 H: 7.48 logL -3496537.73317 --> -1736076.78048 dZ: 3421671.650 logZ: -3496545.214 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 130: n:  21 NS_acc:0.985 S0_acc:0.469 sub_acc:0.048 H: 7.51 logL -3265371.96680 --> -337448.91258 dZ: 3190505.884 logZ: -3265379.479 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 131: n:  20 NS_acc:0.985 S0_acc:0.467 sub_acc:0.350 H: 7.54 logL -3025927.07477 --> -1097801.80082 dZ: 2951060.992 logZ: -3025934.619 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 132: n:  20 NS_acc:0.985 S0_acc:0.466 sub_acc:0.400 H: 7.58 logL -2830636.32270 --> -108659.49202 dZ: 2755770.240 logZ: -2830643.898 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 133: n:  27 NS_acc:0.985 S0_acc:0.464 sub_acc:0.037 H: 7.61 logL -2778993.48652 --> -186752.30053 dZ: 2704127.404 logZ: -2779001.093 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 134: n:  20 NS_acc:0.985 S0_acc:0.464 sub_acc:0.500 H: 7.64 logL -2766657.66557 --> -1135242.56898 dZ: 2691791.583 logZ: -2766665.303 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 135: n:  40 NS_acc:0.978 S0_acc:0.460 sub_acc:0.200 H: 7.67 logL -2356774.02048 --> -104010.70442 dZ: 2281907.937 logZ: -2356781.689 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 136: n:  20 NS_acc:0.978 S0_acc:0.458 sub_acc:0.050 H: 7.70 logL -2122843.52742 --> -109601.82432 dZ: 2047977.444 logZ: -2122851.227 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 137: n:  20 NS_acc:0.979 S0_acc:0.457 sub_acc:0.500 H: 7.73 logL -2088865.20883 --> -1824105.15651 dZ: 2013999.126 logZ: -2088872.940 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 138: n:  20 NS_acc:0.979 S0_acc:0.457 sub_acc:0.200 H: 7.76 logL -2036895.61509 --> -691987.09153 dZ: 1962029.532 logZ: -2036903.378 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 139: n:  20 NS_acc:0.979 S0_acc:0.456 sub_acc:0.500 H: 7.79 logL -1824105.15651 --> -201054.60343 dZ: 1749239.074 logZ: -1824112.950 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 140: n:  20 NS_acc:0.979 S0_acc:0.455 sub_acc:0.400 H: 7.83 logL -1736076.78048 --> -1676207.08602 dZ: 1661210.697 logZ: -1736084.606 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 141: n:  20 NS_acc:0.979 S0_acc:0.455 sub_acc:0.450 H: 7.86 logL -1676207.08602 --> -481852.51281 dZ: 1601341.003 logZ: -1676214.942 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 142: n:  40 NS_acc:0.973 S0_acc:0.452 sub_acc:0.200 H: 7.89 logL -1600060.19255 --> -653617.68159 dZ: 1525194.110 logZ: -1600068.080 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 26.12248185080651
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 143: n:  26 NS_acc:0.973 S0_acc:0.452 sub_acc:0.346 H: 7.92 logL -1341161.07193 --> -225914.02643 dZ: 1266294.989 logZ: -1341168.991 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 144: n:  26 NS_acc:0.973 S0_acc:0.451 sub_acc:0.308 H: 7.95 logL -1234992.86611 --> -243188.19084 dZ: 1160126.783 logZ: -1235000.816 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 145: n:  26 NS_acc:0.973 S0_acc:0.449 sub_acc:0.231 H: 7.98 logL -1135242.56898 --> -124532.10598 dZ: 1060376.486 logZ: -1135250.550 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 146: n:  26 NS_acc:0.973 S0_acc:0.448 sub_acc:0.385 H: 8.01 logL -1097801.80082 --> -190483.36686 dZ: 1022935.718 logZ: -1097809.813 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 147: n:  26 NS_acc:0.974 S0_acc:0.447 sub_acc:0.346 H: 8.04 logL -1064838.82549 --> -1058095.17520 dZ: 989972.742 logZ: -1064846.869 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 148: n:  26 NS_acc:0.974 S0_acc:0.446 sub_acc:0.538 H: 8.08 logL -1058095.17520 --> -723271.93780 dZ: 983229.092 logZ: -1058103.250 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 149: n:  26 NS_acc:0.974 S0_acc:0.446 sub_acc:0.385 H: 8.11 logL -1026505.35448 --> -669391.14843 dZ: 951639.271 logZ: -1026513.461 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 150: n:  26 NS_acc:0.974 S0_acc:0.445 sub_acc:0.346 H: 8.14 logL -980462.18662 --> -882016.89016 dZ: 905596.104 logZ: -980470.324 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 151: n:  26 NS_acc:0.974 S0_acc:0.444 sub_acc:0.462 H: 8.17 logL -882016.89016 --> -868732.35238 dZ: 807150.807 logZ: -882025.059 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 152: n:  26 NS_acc:0.974 S0_acc:0.443 sub_acc:0.154 H: 8.20 logL -868732.35238 --> -257290.81077 dZ: 793866.269 logZ: -868740.552 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 153: n:  26 NS_acc:0.975 S0_acc:0.441 sub_acc:0.308 H: 8.23 logL -812369.44022 --> -686324.36705 dZ: 737503.357 logZ: -812377.672 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 154: n:  26 NS_acc:0.975 S0_acc:0.440 sub_acc:0.269 H: 8.26 logL -723271.93780 --> -569398.76842 dZ: 648405.855 logZ: -723280.200 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 155: n:  26 NS_acc:0.975 S0_acc:0.440 sub_acc:0.423 H: 8.29 logL -719305.90546 --> -377884.89420 dZ: 644439.822 logZ: -719314.199 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 156: n:  26 NS_acc:0.975 S0_acc:0.438 sub_acc:0.192 H: 8.33 logL -691987.09153 --> -76370.72713 dZ: 617121.009 logZ: -691995.417 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 157: n:  26 NS_acc:0.975 S0_acc:0.437 sub_acc:0.385 H: 8.36 logL -686324.36705 --> -143513.76318 dZ: 611458.284 logZ: -686332.723 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 158: n:  26 NS_acc:0.975 S0_acc:0.435 sub_acc:0.231 H: 8.39 logL -678897.86338 --> -75394.99482 dZ: 604031.780 logZ: -678906.251 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 14.325973875250119
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 159: n:  26 NS_acc:0.975 S0_acc:0.434 sub_acc:0.038 H: 8.42 logL -669391.14843 --> -568227.34376 dZ: 594525.065 logZ: -669399.567 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 160: n:  20 NS_acc:0.976 S0_acc:0.433 sub_acc:0.250 H: 8.45 logL -653617.68159 --> -342361.53437 dZ: 578751.599 logZ: -653626.132 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : Rolling KS test: D=0.175, p-value=0.248
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 161: n:  20 NS_acc:0.976 S0_acc:0.432 sub_acc:0.250 H: 8.48 logL -585540.61831 --> -223714.13141 dZ: 510674.535 logZ: -585549.100 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 162: n:  40 NS_acc:0.970 S0_acc:0.430 sub_acc:0.150 H: 8.51 logL -569398.76842 --> -426783.84599 dZ: 494532.685 logZ: -569407.281 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 163: n:  32 NS_acc:0.970 S0_acc:0.428 sub_acc:0.031 H: 8.54 logL -568227.34376 --> -154034.76828 dZ: 493361.261 logZ: -568235.888 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 164: n:  20 NS_acc:0.970 S0_acc:0.428 sub_acc:0.400 H: 8.58 logL -481852.51281 --> -418403.19378 dZ: 406986.430 logZ: -481861.088 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 165: n:  20 NS_acc:0.971 S0_acc:0.427 sub_acc:0.300 H: 8.61 logL -426783.84599 --> -87525.93992 dZ: 351917.763 logZ: -426792.452 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 166: n:  20 NS_acc:0.971 S0_acc:0.426 sub_acc:0.100 H: 8.64 logL -418403.19378 --> -181481.65209 dZ: 343537.111 logZ: -418411.831 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 167: n:  20 NS_acc:0.971 S0_acc:0.425 sub_acc:0.250 H: 8.67 logL -377884.89420 --> -160236.83926 dZ: 303018.811 logZ: -377893.563 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 168: n:  20 NS_acc:0.971 S0_acc:0.424 sub_acc:0.300 H: 8.70 logL -367614.06028 --> -88721.15805 dZ: 292747.977 logZ: -367622.760 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 169: n:  20 NS_acc:0.971 S0_acc:0.424 sub_acc:0.200 H: 8.73 logL -342361.53437 --> -90795.18216 dZ: 267495.451 logZ: -342370.266 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 170: n:  20 NS_acc:0.971 S0_acc:0.422 sub_acc:0.200 H: 8.76 logL -337448.91258 --> -176800.95874 dZ: 262582.830 logZ: -337457.675 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 171: n:  20 NS_acc:0.972 S0_acc:0.422 sub_acc:0.450 H: 8.79 logL -332648.54233 --> -98271.58533 dZ: 257782.459 logZ: -332657.336 logLmax: -74869.56
+2024-10-19, 16:39:33 - cpnest.NestedSampling.NestedSampler   : 172: n:  20 NS_acc:0.972 S0_acc:0.421 sub_acc:0.300 H: 8.83 logL -257290.81077 --> -87446.41618 dZ: 182424.728 logZ: -257299.636 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 173: n:  20 NS_acc:0.972 S0_acc:0.420 sub_acc:0.050 H: 8.86 logL -257273.99676 --> -247208.79888 dZ: 182408.477 logZ: -257282.853 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 12.085762452509014
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 174: n:  20 NS_acc:0.972 S0_acc:0.419 sub_acc:0.400 H: 8.89 logL -247208.79888 --> -119952.07815 dZ: 172343.279 logZ: -247217.686 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 175: n:  20 NS_acc:0.972 S0_acc:0.418 sub_acc:0.150 H: 8.92 logL -243188.19084 --> -218282.92269 dZ: 168322.671 logZ: -243197.110 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 176: n:  20 NS_acc:0.972 S0_acc:0.418 sub_acc:0.250 H: 8.95 logL -225914.02643 --> -108564.33728 dZ: 151048.506 logZ: -225922.976 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 177: n:  20 NS_acc:0.973 S0_acc:0.417 sub_acc:0.200 H: 8.98 logL -223714.13141 --> -74870.07877 dZ: 148848.611 logZ: -223723.113 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 178: n:  20 NS_acc:0.973 S0_acc:0.416 sub_acc:0.100 H: 9.01 logL -218282.92269 --> -127607.74254 dZ: 143417.403 logZ: -218291.935 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 179: n:  20 NS_acc:0.973 S0_acc:0.415 sub_acc:0.400 H: 9.04 logL -205776.70749 --> -151669.42037 dZ: 130911.187 logZ: -205785.751 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 180: n:  20 NS_acc:0.973 S0_acc:0.415 sub_acc:0.300 H: 9.08 logL -201054.60343 --> -119662.85822 dZ: 126189.083 logZ: -201063.679 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 181: n:  20 NS_acc:0.973 S0_acc:0.413 sub_acc:0.050 H: 9.11 logL -190483.36686 --> -131306.52513 dZ: 115617.847 logZ: -190492.473 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 182: n:  20 NS_acc:0.973 S0_acc:0.412 sub_acc:0.050 H: 9.14 logL -186752.30053 --> -98201.78990 dZ: 111886.780 logZ: -186761.438 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 183: n:  20 NS_acc:0.973 S0_acc:0.411 sub_acc:0.250 H: 9.17 logL -182983.54796 --> -156322.26501 dZ: 108118.028 logZ: -182992.717 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 184: n:  20 NS_acc:0.974 S0_acc:0.410 sub_acc:0.350 H: 9.20 logL -181481.65209 --> -106152.71331 dZ: 106616.132 logZ: -181490.852 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 185: n:  20 NS_acc:0.974 S0_acc:0.409 sub_acc:0.150 H: 9.23 logL -176800.95874 --> -121074.69338 dZ: 101935.439 logZ: -176810.190 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 186: n:  20 NS_acc:0.974 S0_acc:0.409 sub_acc:0.400 H: 9.26 logL -160236.83926 --> -118589.30019 dZ: 85371.319 logZ: -160246.102 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 187: n:  20 NS_acc:0.974 S0_acc:0.407 sub_acc:0.050 H: 9.29 logL -156322.26501 --> -144264.76010 dZ: 81456.745 logZ: -156331.559 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 188: n:  20 NS_acc:0.974 S0_acc:0.407 sub_acc:0.200 H: 9.33 logL -154034.76828 --> -116640.43816 dZ: 79169.248 logZ: -154044.093 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 189: n:  20 NS_acc:0.974 S0_acc:0.405 sub_acc:0.050 H: 9.36 logL -151669.42037 --> -92801.03636 dZ: 76803.900 logZ: -151678.777 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 18.259736921196815
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 190: n:  20 NS_acc:0.974 S0_acc:0.403 sub_acc:0.350 H: 9.39 logL -147583.48183 --> -101296.10454 dZ: 72717.962 logZ: -147592.869 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 191: n:  20 NS_acc:0.974 S0_acc:0.402 sub_acc:0.100 H: 9.42 logL -144264.76010 --> -91323.48153 dZ: 69399.240 logZ: -144274.179 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 192: n:  20 NS_acc:0.975 S0_acc:0.401 sub_acc:0.250 H: 9.45 logL -143513.76318 --> -111748.13626 dZ: 68648.243 logZ: -143523.213 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : Rolling KS test: D=0.135, p-value=0.558
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 193: n:  20 NS_acc:0.975 S0_acc:0.401 sub_acc:0.250 H: 9.48 logL -140132.15309 --> -89342.49087 dZ: 65266.633 logZ: -140141.634 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 194: n:  20 NS_acc:0.975 S0_acc:0.401 sub_acc:0.450 H: 9.51 logL -131306.52513 --> -80451.41605 dZ: 56441.005 logZ: -131316.038 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 195: n:  20 NS_acc:0.975 S0_acc:0.399 sub_acc:0.100 H: 9.54 logL -127607.74254 --> -90030.77671 dZ: 52742.222 logZ: -127617.286 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 196: n:  20 NS_acc:0.975 S0_acc:0.399 sub_acc:0.300 H: 9.58 logL -124532.10598 --> -76068.36093 dZ: 49666.586 logZ: -124541.681 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 197: n:  20 NS_acc:0.975 S0_acc:0.398 sub_acc:0.150 H: 9.61 logL -122127.96215 --> -113756.63191 dZ: 47262.442 logZ: -122137.568 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 198: n:  20 NS_acc:0.975 S0_acc:0.397 sub_acc:0.200 H: 9.64 logL -121074.69338 --> -90140.36381 dZ: 46209.173 logZ: -121084.331 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 199: n:  20 NS_acc:0.975 S0_acc:0.396 sub_acc:0.250 H: 9.67 logL -119952.07815 --> -79825.36548 dZ: 45086.558 logZ: -119961.747 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 200: n:  20 NS_acc:0.976 S0_acc:0.396 sub_acc:0.450 H: 9.70 logL -119662.85822 --> -87071.28268 dZ: 44797.338 logZ: -119672.558 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 201: n:  20 NS_acc:0.976 S0_acc:0.396 sub_acc:0.300 H: 9.73 logL -118589.30019 --> -91923.10612 dZ: 43723.780 logZ: -118599.032 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 202: n:  20 NS_acc:0.976 S0_acc:0.395 sub_acc:0.200 H: 9.76 logL -116640.43816 --> -83324.76630 dZ: 41774.918 logZ: -116650.201 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 203: n:  20 NS_acc:0.976 S0_acc:0.395 sub_acc:0.200 H: 9.79 logL -113756.63191 --> -111471.93890 dZ: 38891.112 logZ: -113766.426 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 204: n:  20 NS_acc:0.976 S0_acc:0.395 sub_acc:0.500 H: 9.83 logL -112228.04710 --> -74869.00702 dZ: 37362.527 logZ: -112237.872 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 205: n:  20 NS_acc:0.976 S0_acc:0.394 sub_acc:0.400 H: 9.86 logL -111748.13626 --> -104775.53396 dZ: 36882.616 logZ: -111757.993 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 14.75521380010208
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 206: n:  20 NS_acc:0.976 S0_acc:0.393 sub_acc:0.200 H: 9.89 logL -111471.93890 --> -78084.90322 dZ: 36606.419 logZ: -111481.826 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 207: n:  25 NS_acc:0.976 S0_acc:0.393 sub_acc:0.040 H: 9.92 logL -109601.82432 --> -102523.54108 dZ: 34736.304 logZ: -109611.743 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 208: n:  20 NS_acc:0.977 S0_acc:0.393 sub_acc:0.500 H: 9.95 logL -108659.49202 --> -80955.38210 dZ: 33793.972 logZ: -108669.442 logLmax: -74869.00
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 209: n:  20 NS_acc:0.977 S0_acc:0.393 sub_acc:0.400 H: 9.98 logL -108564.33728 --> -74998.46587 dZ: 33698.817 logZ: -108574.319 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 210: n:  20 NS_acc:0.977 S0_acc:0.393 sub_acc:0.300 H: 10.01 logL -106152.71331 --> -83778.25540 dZ: 31287.326 logZ: -106162.726 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 211: n:  20 NS_acc:0.977 S0_acc:0.392 sub_acc:0.250 H: 10.04 logL -104775.53396 --> -103722.54995 dZ: 29910.147 logZ: -104785.578 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 212: n:  20 NS_acc:0.977 S0_acc:0.392 sub_acc:0.350 H: 10.08 logL -104010.70442 --> -81035.39516 dZ: 29145.317 logZ: -104020.779 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 213: n:  20 NS_acc:0.977 S0_acc:0.391 sub_acc:0.500 H: 10.11 logL -103722.54995 --> -93583.43748 dZ: 28857.163 logZ: -103732.656 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 214: n:  20 NS_acc:0.977 S0_acc:0.391 sub_acc:0.450 H: 10.14 logL -102523.54108 --> -75455.19292 dZ: 27658.154 logZ: -102533.679 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 215: n:  20 NS_acc:0.977 S0_acc:0.392 sub_acc:0.400 H: 10.17 logL -101296.10454 --> -81383.55214 dZ: 26430.717 logZ: -101306.273 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 216: n:  20 NS_acc:0.977 S0_acc:0.391 sub_acc:0.300 H: 10.20 logL -98271.58533 --> -76837.40893 dZ: 23406.198 logZ: -98281.785 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 217: n:  20 NS_acc:0.977 S0_acc:0.391 sub_acc:0.650 H: 10.23 logL -98201.78990 --> -96179.13816 dZ: 23336.403 logZ: -98212.021 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 218: n:  20 NS_acc:0.978 S0_acc:0.390 sub_acc:0.200 H: 10.26 logL -96179.13816 --> -82199.57168 dZ: 21313.751 logZ: -96189.401 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 219: n:  20 NS_acc:0.978 S0_acc:0.391 sub_acc:0.450 H: 10.29 logL -93583.43748 --> -76009.05087 dZ: 18718.050 logZ: -93593.731 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 220: n:  20 NS_acc:0.978 S0_acc:0.390 sub_acc:0.200 H: 10.33 logL -92801.03636 --> -82356.96115 dZ: 17935.649 logZ: -92811.361 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 221: n:  20 NS_acc:0.978 S0_acc:0.390 sub_acc:0.300 H: 10.36 logL -91923.10612 --> -77123.01925 dZ: 17057.719 logZ: -91933.462 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 9.799327147560833
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 222: n:  20 NS_acc:0.978 S0_acc:0.390 sub_acc:0.500 H: 10.39 logL -91323.48153 --> -79230.76430 dZ: 16458.094 logZ: -91333.869 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 223: n:  20 NS_acc:0.978 S0_acc:0.390 sub_acc:0.100 H: 10.42 logL -90795.18216 --> -75233.11743 dZ: 15929.795 logZ: -90805.601 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 224: n:  20 NS_acc:0.978 S0_acc:0.390 sub_acc:0.350 H: 10.45 logL -90140.36381 --> -76451.65127 dZ: 15274.976 logZ: -90150.814 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : Rolling KS test: D=0.236, p-value=0.0475
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 225: n:  20 NS_acc:0.978 S0_acc:0.389 sub_acc:0.350 H: 10.48 logL -90030.77671 --> -81820.60846 dZ: 15165.389 logZ: -90041.258 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 226: n:  40 NS_acc:0.974 S0_acc:0.388 sub_acc:0.450 H: 10.51 logL -89342.49087 --> -80987.37004 dZ: 14477.104 logZ: -89353.003 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 227: n:  20 NS_acc:0.974 S0_acc:0.389 sub_acc:0.400 H: 10.54 logL -88721.15805 --> -75150.35900 dZ: 13855.771 logZ: -88731.702 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 228: n:  20 NS_acc:0.974 S0_acc:0.389 sub_acc:0.400 H: 10.58 logL -87525.93992 --> -74912.99852 dZ: 12660.553 logZ: -87536.515 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 229: n:  20 NS_acc:0.974 S0_acc:0.389 sub_acc:0.500 H: 10.61 logL -87446.41618 --> -75710.22522 dZ: 12581.029 logZ: -87457.023 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 230: n:  60 NS_acc:0.966 S0_acc:0.387 sub_acc:0.500 H: 10.64 logL -87071.28268 --> -75546.00811 dZ: 12205.895 logZ: -87081.920 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 231: n:  20 NS_acc:0.967 S0_acc:0.387 sub_acc:0.450 H: 10.67 logL -83778.25540 --> -75021.15347 dZ: 8912.868 logZ: -83788.924 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 232: n:  20 NS_acc:0.967 S0_acc:0.386 sub_acc:0.300 H: 10.70 logL -83324.76630 --> -76599.88221 dZ: 8459.379 logZ: -83335.466 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 233: n:  20 NS_acc:0.967 S0_acc:0.386 sub_acc:0.350 H: 10.73 logL -82356.96115 --> -80484.90741 dZ: 7491.574 logZ: -82367.692 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 234: n:  20 NS_acc:0.967 S0_acc:0.386 sub_acc:0.500 H: 10.76 logL -82199.57168 --> -78222.15836 dZ: 7334.184 logZ: -82210.334 logLmax: -74868.87
+2024-10-19, 16:39:34 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 9.84085471881958
+2024-10-19, 16:39:34 - cpnest.NestedSampling.NestedSampler   : 235: n:  20 NS_acc:0.967 S0_acc:0.386 sub_acc:0.500 H: 10.79 logL -81820.60846 --> -74871.51192 dZ: 6955.221 logZ: -81831.402 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 236: n:  20 NS_acc:0.967 S0_acc:0.386 sub_acc:0.300 H: 10.83 logL -81795.36950 --> -80831.19208 dZ: 6930.246 logZ: -81806.195 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 237: n:  20 NS_acc:0.967 S0_acc:0.386 sub_acc:0.250 H: 10.86 logL -81383.55214 --> -75050.37405 dZ: 6518.428 logZ: -81394.408 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 238: n:  20 NS_acc:0.967 S0_acc:0.386 sub_acc:0.350 H: 10.89 logL -81035.39516 --> -75162.78450 dZ: 6170.271 logZ: -81046.283 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 239: n:  20 NS_acc:0.968 S0_acc:0.385 sub_acc:0.200 H: 10.92 logL -80987.37004 --> -76510.92453 dZ: 6122.246 logZ: -80998.289 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 240: n:  20 NS_acc:0.968 S0_acc:0.384 sub_acc:0.250 H: 10.95 logL -80955.38210 --> -80150.52413 dZ: 6090.258 logZ: -80966.332 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 241: n:  20 NS_acc:0.968 S0_acc:0.385 sub_acc:0.450 H: 10.98 logL -80831.19208 --> -79910.44703 dZ: 5966.068 logZ: -80842.173 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 242: n:  20 NS_acc:0.968 S0_acc:0.384 sub_acc:0.400 H: 11.01 logL -80484.90741 --> -75569.45700 dZ: 5619.783 logZ: -80495.920 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 243: n:  20 NS_acc:0.968 S0_acc:0.384 sub_acc:0.350 H: 11.04 logL -80451.41605 --> -76061.11194 dZ: 5586.292 logZ: -80462.460 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 244: n:  20 NS_acc:0.968 S0_acc:0.384 sub_acc:0.300 H: 11.08 logL -80150.52413 --> -79862.95582 dZ: 5285.400 logZ: -80161.599 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 245: n:  20 NS_acc:0.968 S0_acc:0.383 sub_acc:0.250 H: 11.11 logL -79910.44703 --> -76002.55501 dZ: 5045.323 logZ: -79921.553 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 246: n:  20 NS_acc:0.969 S0_acc:0.383 sub_acc:0.400 H: 11.14 logL -79862.95582 --> -79199.74349 dZ: 4997.832 logZ: -79874.093 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 247: n:  20 NS_acc:0.969 S0_acc:0.383 sub_acc:0.400 H: 11.17 logL -79825.36548 --> -74962.70391 dZ: 4960.242 logZ: -79836.534 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 248: n:  20 NS_acc:0.969 S0_acc:0.383 sub_acc:0.350 H: 11.20 logL -79230.76430 --> -77910.57207 dZ: 4365.640 logZ: -79241.964 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 249: n:  20 NS_acc:0.969 S0_acc:0.383 sub_acc:0.350 H: 11.23 logL -79199.74349 --> -75041.36552 dZ: 4334.620 logZ: -79210.975 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 250: n:  20 NS_acc:0.969 S0_acc:0.383 sub_acc:0.250 H: 11.26 logL -78222.15836 --> -74986.88775 dZ: 3357.034 logZ: -78233.421 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 9.147605129591836
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 251: n:  20 NS_acc:0.969 S0_acc:0.383 sub_acc:0.300 H: 11.29 logL -78084.90322 --> -76122.05894 dZ: 3219.779 logZ: -78096.197 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 252: n:  20 NS_acc:0.969 S0_acc:0.382 sub_acc:0.200 H: 11.33 logL -77910.57207 --> -75541.39262 dZ: 3045.448 logZ: -77921.897 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 253: n:  20 NS_acc:0.969 S0_acc:0.382 sub_acc:0.250 H: 11.36 logL -77123.01925 --> -76529.88581 dZ: 2257.895 logZ: -77134.376 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 254: n:  20 NS_acc:0.969 S0_acc:0.382 sub_acc:0.400 H: 11.39 logL -76837.40893 --> -75102.41339 dZ: 1972.285 logZ: -76848.797 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 255: n:  20 NS_acc:0.970 S0_acc:0.381 sub_acc:0.200 H: 11.42 logL -76599.88221 --> -76565.02487 dZ: 1734.758 logZ: -76611.301 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 256: n:  27 NS_acc:0.970 S0_acc:0.380 sub_acc:0.037 H: 11.45 logL -76565.02487 --> -75871.53302 dZ: 1699.901 logZ: -76576.475 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : Rolling KS test: D=0.122, p-value=0.683
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 257: n:  20 NS_acc:0.970 S0_acc:0.379 sub_acc:0.250 H: 11.48 logL -76529.88581 --> -75368.96295 dZ: 1664.762 logZ: -76541.367 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 258: n:  20 NS_acc:0.970 S0_acc:0.379 sub_acc:0.250 H: 11.51 logL -76510.92453 --> -75102.12858 dZ: 1645.801 logZ: -76522.437 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 259: n:  20 NS_acc:0.970 S0_acc:0.378 sub_acc:0.250 H: 11.54 logL -76451.65127 --> -75378.80669 dZ: 1586.527 logZ: -76463.195 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 260: n:  20 NS_acc:0.970 S0_acc:0.377 sub_acc:0.200 H: 11.55 logL -76445.84455 --> -74876.36506 dZ: 1580.718 logZ: -76457.417 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 261: n:  20 NS_acc:0.970 S0_acc:0.377 sub_acc:0.350 H: 11.61 logL -76370.72713 --> -75506.04746 dZ: 1505.603 logZ: -76382.333 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 262: n:  20 NS_acc:0.970 S0_acc:0.377 sub_acc:0.250 H: 11.64 logL -76122.05894 --> -74950.87201 dZ: 1256.935 logZ: -76133.697 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 263: n:  20 NS_acc:0.970 S0_acc:0.376 sub_acc:0.150 H: 11.67 logL -76068.36093 --> -75047.83354 dZ: 1203.237 logZ: -76080.030 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 264: n:  20 NS_acc:0.971 S0_acc:0.375 sub_acc:0.050 H: 11.69 logL -76061.11194 --> -75331.66027 dZ: 1195.987 logZ: -76072.811 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 265: n:  24 NS_acc:0.971 S0_acc:0.374 sub_acc:0.042 H: 11.73 logL -76009.05087 --> -75716.81754 dZ: 1143.927 logZ: -76020.782 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 266: n:  20 NS_acc:0.971 S0_acc:0.374 sub_acc:0.250 H: 11.75 logL -76002.55501 --> -75274.09252 dZ: 1137.430 logZ: -76014.316 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 12.67997506932753
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 267: n:  20 NS_acc:0.971 S0_acc:0.373 sub_acc:0.050 H: 11.79 logL -75871.53302 --> -75821.47607 dZ: 1006.409 logZ: -75883.327 logLmax: -74868.61
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 268: n:  20 NS_acc:0.971 S0_acc:0.373 sub_acc:0.450 H: 11.83 logL -75821.47607 --> -75099.66765 dZ: 956.352 logZ: -75833.301 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 269: n:  20 NS_acc:0.971 S0_acc:0.373 sub_acc:0.250 H: 11.86 logL -75716.81754 --> -74973.05331 dZ: 851.703 logZ: -75728.674 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 270: n:  20 NS_acc:0.971 S0_acc:0.373 sub_acc:0.250 H: 11.88 logL -75710.22522 --> -74965.66476 dZ: 845.109 logZ: -75722.111 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 271: n:  20 NS_acc:0.971 S0_acc:0.373 sub_acc:0.400 H: 11.92 logL -75569.45700 --> -75251.86343 dZ: 704.342 logZ: -75581.376 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 272: n:  20 NS_acc:0.971 S0_acc:0.372 sub_acc:0.350 H: 11.95 logL -75546.00811 --> -75475.61241 dZ: 680.893 logZ: -75557.958 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 273: n:  20 NS_acc:0.972 S0_acc:0.372 sub_acc:0.250 H: 11.92 logL -75541.39262 --> -75467.29838 dZ: 676.268 logZ: -75553.364 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 274: n:  20 NS_acc:0.972 S0_acc:0.372 sub_acc:0.300 H: 12.01 logL -75506.04746 --> -75014.76577 dZ: 640.933 logZ: -75518.060 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 275: n:  20 NS_acc:0.972 S0_acc:0.371 sub_acc:0.250 H: 12.04 logL -75475.61241 --> -74955.43576 dZ: 610.498 logZ: -75487.656 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 276: n:  20 NS_acc:0.972 S0_acc:0.371 sub_acc:0.350 H: 12.07 logL -75467.29838 --> -75020.83949 dZ: 602.183 logZ: -75479.373 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 277: n:  20 NS_acc:0.972 S0_acc:0.371 sub_acc:0.400 H: 12.11 logL -75455.19292 --> -75205.95582 dZ: 590.078 logZ: -75467.299 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 278: n:  20 NS_acc:0.972 S0_acc:0.371 sub_acc:0.500 H: 12.14 logL -75394.99482 --> -74930.98511 dZ: 529.880 logZ: -75407.132 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 279: n:  20 NS_acc:0.972 S0_acc:0.370 sub_acc:0.250 H: 12.17 logL -75378.80669 --> -75059.96976 dZ: 513.692 logZ: -75390.976 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 280: n:  20 NS_acc:0.972 S0_acc:0.370 sub_acc:0.300 H: 12.20 logL -75368.96295 --> -74928.45863 dZ: 503.848 logZ: -75381.163 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 281: n:  20 NS_acc:0.972 S0_acc:0.370 sub_acc:0.250 H: 12.23 logL -75331.66027 --> -75282.43678 dZ: 466.545 logZ: -75343.892 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 282: n:  20 NS_acc:0.972 S0_acc:0.369 sub_acc:0.200 H: 12.26 logL -75282.43678 --> -74984.83197 dZ: 417.322 logZ: -75294.699 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 11.548717718666335
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 283: n:  20 NS_acc:0.973 S0_acc:0.369 sub_acc:0.550 H: 12.29 logL -75274.09252 --> -75123.74786 dZ: 408.977 logZ: -75286.386 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 284: n:  20 NS_acc:0.973 S0_acc:0.369 sub_acc:0.350 H: 12.33 logL -75251.86343 --> -74882.22169 dZ: 386.749 logZ: -75264.188 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 285: n:  20 NS_acc:0.973 S0_acc:0.369 sub_acc:0.300 H: 12.36 logL -75233.11743 --> -75046.68502 dZ: 368.003 logZ: -75245.474 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 286: n:  20 NS_acc:0.973 S0_acc:0.369 sub_acc:0.200 H: 12.39 logL -75205.95582 --> -75133.53173 dZ: 340.841 logZ: -75218.343 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 287: n:  20 NS_acc:0.973 S0_acc:0.368 sub_acc:0.100 H: 12.42 logL -75162.78450 --> -75059.51648 dZ: 297.670 logZ: -75175.203 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 288: n:  20 NS_acc:0.973 S0_acc:0.368 sub_acc:0.350 H: 12.45 logL -75150.35900 --> -75099.98630 dZ: 285.244 logZ: -75162.809 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : Rolling KS test: D=0.123, p-value=0.673
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 289: n:  20 NS_acc:0.973 S0_acc:0.367 sub_acc:0.250 H: 12.48 logL -75133.53173 --> -75028.18130 dZ: 268.417 logZ: -75146.013 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 290: n:  20 NS_acc:0.973 S0_acc:0.367 sub_acc:0.400 H: 12.51 logL -75123.74786 --> -74883.45160 dZ: 258.633 logZ: -75136.260 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 291: n:  20 NS_acc:0.973 S0_acc:0.366 sub_acc:0.350 H: 12.54 logL -75102.41339 --> -74979.96572 dZ: 237.299 logZ: -75114.957 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 292: n:  20 NS_acc:0.973 S0_acc:0.365 sub_acc:0.300 H: 11.88 logL -75102.12858 --> -74871.76335 dZ: 236.439 logZ: -75114.129 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 293: n:  20 NS_acc:0.973 S0_acc:0.366 sub_acc:0.450 H: 12.01 logL -75099.98630 --> -74890.83929 dZ: 234.677 logZ: -75112.398 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 294: n:  20 NS_acc:0.974 S0_acc:0.366 sub_acc:0.250 H: 11.65 logL -75099.66765 --> -75060.63622 dZ: 233.905 logZ: -75111.657 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 295: n:  20 NS_acc:0.974 S0_acc:0.365 sub_acc:0.400 H: 12.67 logL -75083.68965 --> -74901.70718 dZ: 218.575 logZ: -75096.358 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 296: n:  20 NS_acc:0.974 S0_acc:0.365 sub_acc:0.400 H: 12.70 logL -75060.63622 --> -75057.55811 dZ: 195.521 logZ: -75073.336 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 297: n:  20 NS_acc:0.974 S0_acc:0.365 sub_acc:0.150 H: 12.08 logL -75059.96976 --> -74963.74404 dZ: 194.430 logZ: -75072.276 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 298: n:  20 NS_acc:0.974 S0_acc:0.365 sub_acc:0.400 H: 11.73 logL -75059.51648 --> -75044.60438 dZ: 193.707 logZ: -75071.584 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 12.878782129937923
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 299: n:  20 NS_acc:0.974 S0_acc:0.365 sub_acc:0.550 H: 12.02 logL -75057.55811 --> -75026.93445 dZ: 192.187 logZ: -75070.096 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 300: n:  20 NS_acc:0.974 S0_acc:0.365 sub_acc:0.300 H: 12.82 logL -75050.37405 --> -74932.63061 dZ: 185.258 logZ: -75063.198 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 301: n:  20 NS_acc:0.974 S0_acc:0.364 sub_acc:0.250 H: 12.59 logL -75047.83354 --> -74982.00109 dZ: 182.640 logZ: -75060.612 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 302: n:  20 NS_acc:0.974 S0_acc:0.364 sub_acc:0.350 H: 12.23 logL -75046.68502 --> -74909.12976 dZ: 181.267 logZ: -75059.270 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 303: n:  20 NS_acc:0.974 S0_acc:0.364 sub_acc:0.350 H: 12.40 logL -75044.60438 --> -74915.63245 dZ: 179.330 logZ: -75057.362 logLmax: -74868.60
+2024-10-19, 16:39:35 - cpnest.NestedSampling.NestedSampler   : 304: n:  20 NS_acc:0.974 S0_acc:0.364 sub_acc:0.500 H: 12.74 logL -75041.36552 --> -74881.61960 dZ: 176.205 logZ: -75054.269 logLmax: -74868.60
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 305: n:  20 NS_acc:0.974 S0_acc:0.365 sub_acc:0.600 H: 12.98 logL -75028.18130 --> -74880.85319 dZ: 163.067 logZ: -75041.163 logLmax: -74868.60
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 306: n:  20 NS_acc:0.975 S0_acc:0.364 sub_acc:0.550 H: 12.47 logL -75026.93445 --> -74889.84603 dZ: 161.561 logZ: -75039.687 logLmax: -74868.60
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 307: n:  20 NS_acc:0.975 S0_acc:0.365 sub_acc:0.400 H: 13.01 logL -75021.15347 --> -74882.15682 dZ: 156.035 logZ: -75034.193 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 308: n:  20 NS_acc:0.975 S0_acc:0.365 sub_acc:0.450 H: 12.37 logL -75020.83949 --> -74875.82271 dZ: 155.163 logZ: -75033.351 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 309: n:  20 NS_acc:0.975 S0_acc:0.365 sub_acc:0.500 H: 13.08 logL -75014.76577 --> -74871.77861 dZ: 149.649 logZ: -75027.868 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 310: n:  20 NS_acc:0.975 S0_acc:0.365 sub_acc:0.550 H: 13.14 logL -74998.46587 --> -74883.31298 dZ: 133.353 logZ: -75011.603 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 311: n:  20 NS_acc:0.975 S0_acc:0.365 sub_acc:0.400 H: 13.17 logL -74986.88775 --> -74881.64500 dZ: 121.775 logZ: -75000.057 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 312: n:  20 NS_acc:0.975 S0_acc:0.365 sub_acc:0.350 H: 12.84 logL -74984.83197 --> -74928.56185 dZ: 119.595 logZ: -74997.908 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 313: n:  20 NS_acc:0.975 S0_acc:0.365 sub_acc:0.350 H: 12.97 logL -74982.00109 --> -74875.00052 dZ: 116.821 logZ: -74995.166 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 32.26295177575301
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 314: n:  64 NS_acc:0.972 S0_acc:0.364 sub_acc:0.594 H: 12.85 logL -74979.96572 --> -74964.41958 dZ: 114.718 logZ: -74993.094 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 315: n:  32 NS_acc:0.972 S0_acc:0.364 sub_acc:0.531 H: 13.28 logL -74973.05331 --> -74941.01249 dZ: 107.939 logZ: -74986.346 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 316: n:  32 NS_acc:0.972 S0_acc:0.364 sub_acc:0.406 H: 13.32 logL -74965.66476 --> -74868.59438 dZ: 100.551 logZ: -74978.989 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 317: n:  32 NS_acc:0.972 S0_acc:0.364 sub_acc:0.406 H: 12.81 logL -74964.41958 --> -74962.09803 dZ: 99.046 logZ: -74977.516 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 318: n:  32 NS_acc:0.972 S0_acc:0.364 sub_acc:0.344 H: 12.48 logL -74963.74404 --> -74926.94209 dZ: 98.112 logZ: -74976.612 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 319: n:  32 NS_acc:0.973 S0_acc:0.364 sub_acc:0.281 H: 12.40 logL -74962.70391 --> -74872.91299 dZ: 97.113 logZ: -74975.645 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 320: n:  32 NS_acc:0.973 S0_acc:0.364 sub_acc:0.531 H: 12.26 logL -74962.09803 --> -74881.36429 dZ: 96.339 logZ: -74974.902 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : Rolling KS test: D=0.208, p-value=0.109
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 321: n:  32 NS_acc:0.973 S0_acc:0.364 sub_acc:0.312 H: 13.46 logL -74955.43576 --> -74878.83535 dZ: 90.320 logZ: -74968.915 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 322: n:  32 NS_acc:0.973 S0_acc:0.364 sub_acc:0.344 H: 13.45 logL -74950.87201 --> -74933.45266 dZ: 85.748 logZ: -74964.374 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 323: n:  32 NS_acc:0.973 S0_acc:0.364 sub_acc:0.438 H: 13.54 logL -74941.01249 --> -74868.65289 dZ: 75.899 logZ: -74954.556 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 324: n:  32 NS_acc:0.973 S0_acc:0.364 sub_acc:0.438 H: 13.57 logL -74933.45266 --> -74881.05129 dZ: 68.339 logZ: -74947.027 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 325: n:  32 NS_acc:0.973 S0_acc:0.364 sub_acc:0.375 H: 12.97 logL -74932.63061 --> -74911.04937 dZ: 67.143 logZ: -74945.863 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 326: n:  32 NS_acc:0.973 S0_acc:0.364 sub_acc:0.469 H: 12.96 logL -74930.98511 --> -74875.29839 dZ: 65.618 logZ: -74944.369 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 327: n:  32 NS_acc:0.973 S0_acc:0.364 sub_acc:0.406 H: 13.26 logL -74928.56185 --> -74878.45554 dZ: 63.337 logZ: -74942.119 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 328: n:  32 NS_acc:0.973 S0_acc:0.364 sub_acc:0.312 H: 12.78 logL -74928.45863 --> -74889.66431 dZ: 62.632 logZ: -74941.446 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 329: n:  32 NS_acc:0.973 S0_acc:0.364 sub_acc:0.375 H: 12.81 logL -74926.94209 --> -74897.79908 dZ: 61.449 logZ: -74940.294 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 10.294966178524467
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 330: n:  40 NS_acc:0.971 S0_acc:0.363 sub_acc:0.250 H: 13.76 logL -74915.63245 --> -74889.75328 dZ: 50.519 logZ: -74929.395 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 331: n:  20 NS_acc:0.971 S0_acc:0.363 sub_acc:0.650 H: 13.54 logL -74912.99852 --> -74907.91086 dZ: 47.814 logZ: -74926.721 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 332: n:  20 NS_acc:0.971 S0_acc:0.363 sub_acc:0.300 H: 13.39 logL -74911.04937 --> -74869.13057 dZ: 45.790 logZ: -74924.728 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 333: n:  20 NS_acc:0.971 S0_acc:0.363 sub_acc:0.550 H: 13.37 logL -74909.12976 --> -74901.84648 dZ: 43.855 logZ: -74922.825 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 334: n:  20 NS_acc:0.971 S0_acc:0.363 sub_acc:0.500 H: 13.17 logL -74907.91086 --> -74884.70704 dZ: 42.492 logZ: -74921.492 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 335: n:  20 NS_acc:0.971 S0_acc:0.364 sub_acc:0.350 H: 13.89 logL -74901.84648 --> -74868.59458 dZ: 36.730 logZ: -74915.762 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 336: n:  22 NS_acc:0.971 S0_acc:0.363 sub_acc:0.045 H: 13.23 logL -74901.70718 --> -74877.79530 dZ: 35.952 logZ: -74915.015 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 337: n:  20 NS_acc:0.971 S0_acc:0.363 sub_acc:0.350 H: 13.79 logL -74897.79908 --> -74872.07742 dZ: 32.647 logZ: -74911.742 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 338: n:  20 NS_acc:0.971 S0_acc:0.363 sub_acc:0.250 H: 14.00 logL -74890.83929 --> -74874.23045 dZ: 25.725 logZ: -74904.851 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 339: n:  20 NS_acc:0.971 S0_acc:0.363 sub_acc:0.300 H: 13.44 logL -74889.84603 --> -74875.60285 dZ: 24.409 logZ: -74903.566 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 340: n:  20 NS_acc:0.971 S0_acc:0.362 sub_acc:0.100 H: 13.03 logL -74889.75328 --> -74872.76665 dZ: 23.807 logZ: -74902.995 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 341: n:  40 NS_acc:0.969 S0_acc:0.362 sub_acc:0.350 H: 12.75 logL -74889.66431 --> -74870.23418 dZ: 23.397 logZ: -74902.617 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 342: n:  20 NS_acc:0.969 S0_acc:0.361 sub_acc:0.150 H: 14.00 logL -74884.70704 --> -74874.43980 dZ: 19.571 logZ: -74898.822 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 343: n:  20 NS_acc:0.969 S0_acc:0.361 sub_acc:0.150 H: 13.59 logL -74883.45160 --> -74869.04921 dZ: 18.076 logZ: -74897.357 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 21.611641763211164
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 344: n:  21 NS_acc:0.969 S0_acc:0.360 sub_acc:0.238 H: 13.18 logL -74883.31298 --> -74868.89544 dZ: 17.426 logZ: -74896.739 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 345: n:  21 NS_acc:0.969 S0_acc:0.360 sub_acc:0.286 H: 13.10 logL -74882.22169 --> -74872.47403 dZ: 16.548 logZ: -74895.893 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 346: n:  21 NS_acc:0.969 S0_acc:0.360 sub_acc:0.190 H: 12.87 logL -74882.15682 --> -74873.53423 dZ: 16.053 logZ: -74895.429 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 347: n:  21 NS_acc:0.969 S0_acc:0.359 sub_acc:0.238 H: 12.74 logL -74881.64500 --> -74874.43914 dZ: 15.552 logZ: -74894.958 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 348: n:  21 NS_acc:0.969 S0_acc:0.359 sub_acc:0.190 H: 12.59 logL -74881.61960 --> -74871.55896 dZ: 15.203 logZ: -74894.641 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 349: n:  21 NS_acc:0.969 S0_acc:0.359 sub_acc:0.286 H: 12.47 logL -74881.36429 --> -74870.94791 dZ: 14.879 logZ: -74894.349 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 350: n:  21 NS_acc:0.970 S0_acc:0.358 sub_acc:0.286 H: 12.39 logL -74881.05129 --> -74869.40423 dZ: 14.558 logZ: -74894.059 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 351: n:  21 NS_acc:0.970 S0_acc:0.358 sub_acc:0.095 H: 12.32 logL -74880.85319 --> -74868.79551 dZ: 14.267 logZ: -74893.799 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 352: n:  21 NS_acc:0.970 S0_acc:0.358 sub_acc:0.143 H: 12.99 logL -74878.83535 --> -74875.68756 dZ: 13.253 logZ: -74892.816 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : Rolling KS test: D=0.205, p-value=0.119
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 353: n:  21 NS_acc:0.970 S0_acc:0.357 sub_acc:0.333 H: 13.00 logL -74878.45554 --> -74868.84587 dZ: 12.587 logZ: -74892.182 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 354: n:  21 NS_acc:0.970 S0_acc:0.357 sub_acc:0.429 H: 13.02 logL -74877.79530 --> -74869.86939 dZ: 11.924 logZ: -74891.550 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 355: n:  21 NS_acc:0.970 S0_acc:0.356 sub_acc:0.333 H: 13.37 logL -74876.36506 --> -74868.94478 dZ: 10.829 logZ: -74890.486 logLmax: -74868.59
+2024-10-19, 16:39:36 - cpnest.NestedSampling.NestedSampler   : 356: n:  21 NS_acc:0.970 S0_acc:0.356 sub_acc:0.429 H: 13.31 logL -74875.82271 --> -74873.34697 dZ: 10.060 logZ: -74889.748 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 357: n:  21 NS_acc:0.970 S0_acc:0.356 sub_acc:0.238 H: 13.13 logL -74875.68756 --> -74872.42230 dZ: 9.571 logZ: -74889.291 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 358: n:  21 NS_acc:0.970 S0_acc:0.356 sub_acc:0.286 H: 12.96 logL -74875.60285 --> -74871.75287 dZ: 9.213 logZ: -74888.964 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 359: n:  21 NS_acc:0.970 S0_acc:0.356 sub_acc:0.190 H: 12.83 logL -74875.29839 --> -74868.61595 dZ: 8.870 logZ: -74888.651 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 10.712534030449044
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 360: n:  20 NS_acc:0.970 S0_acc:0.355 sub_acc:0.300 H: 12.75 logL -74875.00052 --> -74870.06034 dZ: 8.538 logZ: -74888.351 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 361: n:  20 NS_acc:0.970 S0_acc:0.355 sub_acc:0.450 H: 12.74 logL -74874.43980 --> -74868.75075 dZ: 8.142 logZ: -74887.986 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 362: n:  20 NS_acc:0.971 S0_acc:0.356 sub_acc:0.350 H: 12.66 logL -74874.43914 --> -74868.82771 dZ: 7.851 logZ: -74887.726 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 363: n:  20 NS_acc:0.971 S0_acc:0.355 sub_acc:0.250 H: 12.60 logL -74874.23045 --> -74868.73784 dZ: 7.579 logZ: -74887.485 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 364: n:  20 NS_acc:0.971 S0_acc:0.355 sub_acc:0.500 H: 12.65 logL -74873.53423 --> -74868.81888 dZ: 7.199 logZ: -74887.136 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 365: n:  20 NS_acc:0.971 S0_acc:0.355 sub_acc:0.100 H: 12.65 logL -74873.34697 --> -74870.00945 dZ: 6.872 logZ: -74886.841 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 366: n:  20 NS_acc:0.971 S0_acc:0.355 sub_acc:0.500 H: 12.68 logL -74872.91299 --> -74869.35452 dZ: 6.517 logZ: -74886.516 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 367: n:  20 NS_acc:0.971 S0_acc:0.355 sub_acc:0.200 H: 12.66 logL -74872.76665 --> -74871.76497 dZ: 6.216 logZ: -74886.246 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 368: n:  20 NS_acc:0.971 S0_acc:0.355 sub_acc:0.300 H: 12.65 logL -74872.47403 --> -74869.00041 dZ: 5.917 logZ: -74885.978 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 369: n:  20 NS_acc:0.971 S0_acc:0.355 sub_acc:0.450 H: 12.61 logL -74872.42230 --> -74868.60701 dZ: 5.671 logZ: -74885.762 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 370: n:  20 NS_acc:0.971 S0_acc:0.354 sub_acc:0.400 H: 12.60 logL -74872.07742 --> -74868.59442 dZ: 5.406 logZ: -74885.527 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 371: n:  20 NS_acc:0.971 S0_acc:0.353 sub_acc:0.500 H: 12.61 logL -74871.77861 --> -74870.98551 dZ: 5.134 logZ: -74885.285 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 372: n:  20 NS_acc:0.971 S0_acc:0.353 sub_acc:0.100 H: 12.57 logL -74871.76497 --> -74868.64979 dZ: 4.913 logZ: -74885.093 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 373: n:  20 NS_acc:0.971 S0_acc:0.353 sub_acc:0.250 H: 12.53 logL -74871.76335 --> -74870.20526 dZ: 4.727 logZ: -74884.937 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 374: n:  20 NS_acc:0.971 S0_acc:0.353 sub_acc:0.350 H: 12.48 logL -74871.75287 --> -74868.68898 dZ: 4.564 logZ: -74884.804 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 375: n:  20 NS_acc:0.972 S0_acc:0.352 sub_acc:0.150 H: 12.44 logL -74871.55896 --> -74868.59562 dZ: 4.399 logZ: -74884.668 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 14.361016492271254
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 376: n:  20 NS_acc:0.972 S0_acc:0.352 sub_acc:0.350 H: 12.40 logL -74871.51192 --> -74868.59830 dZ: 4.248 logZ: -74884.546 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 377: n:  20 NS_acc:0.972 S0_acc:0.352 sub_acc:0.200 H: 12.41 logL -74870.98551 --> -74869.69532 dZ: 4.047 logZ: -74884.374 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 378: n:  20 NS_acc:0.972 S0_acc:0.351 sub_acc:0.450 H: 12.40 logL -74870.94791 --> -74869.42762 dZ: 3.871 logZ: -74884.226 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 379: n:  20 NS_acc:0.972 S0_acc:0.351 sub_acc:0.350 H: 12.50 logL -74870.23418 --> -74868.84460 dZ: 3.606 logZ: -74883.985 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 380: n:  20 NS_acc:0.972 S0_acc:0.351 sub_acc:0.350 H: 12.53 logL -74870.20526 --> -74869.72573 dZ: 3.388 logZ: -74883.792 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 381: n:  20 NS_acc:0.972 S0_acc:0.351 sub_acc:0.350 H: 12.55 logL -74870.07877 --> -74868.71453 dZ: 3.188 logZ: -74883.615 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 382: n:  20 NS_acc:0.972 S0_acc:0.351 sub_acc:0.350 H: 12.54 logL -74870.06034 --> -74869.56144 dZ: 3.016 logZ: -74883.467 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 383: n:  20 NS_acc:0.972 S0_acc:0.351 sub_acc:0.400 H: 12.52 logL -74870.00945 --> -74869.59699 dZ: 2.862 logZ: -74883.335 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 384: n:  20 NS_acc:0.972 S0_acc:0.350 sub_acc:0.250 H: 12.51 logL -74869.86939 --> -74869.44092 dZ: 2.712 logZ: -74883.206 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : Rolling KS test: D=0.18, p-value=0.22
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 385: n:  20 NS_acc:0.972 S0_acc:0.350 sub_acc:0.250 H: 12.49 logL -74869.72573 --> -74868.98075 dZ: 2.565 logZ: -74883.080 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 386: n:  20 NS_acc:0.972 S0_acc:0.350 sub_acc:0.300 H: 12.48 logL -74869.69532 --> -74868.85872 dZ: 2.433 logZ: -74882.967 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 387: n:  20 NS_acc:0.972 S0_acc:0.350 sub_acc:0.400 H: 12.46 logL -74869.59699 --> -74868.66465 dZ: 2.307 logZ: -74882.859 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 388: n:  20 NS_acc:0.972 S0_acc:0.350 sub_acc:0.300 H: 12.44 logL -74869.56144 --> -74868.68749 dZ: 2.192 logZ: -74882.762 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 389: n:  20 NS_acc:0.973 S0_acc:0.349 sub_acc:0.050 H: 12.42 logL -74869.44092 --> -74868.71147 dZ: 2.079 logZ: -74882.665 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 390: n:  20 NS_acc:0.973 S0_acc:0.349 sub_acc:0.250 H: 12.41 logL -74869.42762 --> -74868.81498 dZ: 1.977 logZ: -74882.578 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 391: n:  20 NS_acc:0.973 S0_acc:0.348 sub_acc:0.200 H: 12.38 logL -74869.40423 --> -74868.60744 dZ: 1.882 logZ: -74882.499 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 20.251230172379554
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 392: n:  20 NS_acc:0.973 S0_acc:0.348 sub_acc:0.350 H: 12.36 logL -74869.35452 --> -74868.70288 dZ: 1.793 logZ: -74882.424 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 393: n:  20 NS_acc:0.973 S0_acc:0.347 sub_acc:0.200 H: 12.36 logL -74869.13057 --> -74868.67463 dZ: 1.698 logZ: -74882.340 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 394: n:  20 NS_acc:0.973 S0_acc:0.347 sub_acc:0.150 H: 12.35 logL -74869.04921 --> -74868.78123 dZ: 1.607 logZ: -74882.259 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 395: n:  40 NS_acc:0.971 S0_acc:0.345 sub_acc:0.150 H: 12.34 logL -74869.00702 --> -74868.73758 dZ: 1.523 logZ: -74882.183 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 396: n:  20 NS_acc:0.971 S0_acc:0.345 sub_acc:0.400 H: 12.33 logL -74869.00041 --> -74868.61119 dZ: 1.445 logZ: -74882.115 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 397: n:  20 NS_acc:0.971 S0_acc:0.345 sub_acc:0.200 H: 12.31 logL -74868.98075 --> -74868.64433 dZ: 1.374 logZ: -74882.051 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 398: n:  20 NS_acc:0.971 S0_acc:0.345 sub_acc:0.300 H: 12.30 logL -74868.94478 --> -74868.61472 dZ: 1.306 logZ: -74881.991 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 399: n:  20 NS_acc:0.971 S0_acc:0.345 sub_acc:0.150 H: 12.28 logL -74868.89544 --> -74868.82042 dZ: 1.242 logZ: -74881.933 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 400: n:  20 NS_acc:0.971 S0_acc:0.345 sub_acc:0.300 H: 12.27 logL -74868.85872 --> -74868.59674 dZ: 1.182 logZ: -74881.878 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 401: n:  20 NS_acc:0.971 S0_acc:0.344 sub_acc:0.200 H: 12.26 logL -74868.84587 --> -74868.60124 dZ: 1.125 logZ: -74881.827 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 402: n:  20 NS_acc:0.971 S0_acc:0.343 sub_acc:0.200 H: 12.24 logL -74868.84460 --> -74868.60170 dZ: 1.073 logZ: -74881.780 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 403: n:  20 NS_acc:0.971 S0_acc:0.343 sub_acc:0.200 H: 12.23 logL -74868.82771 --> -74868.62672 dZ: 1.024 logZ: -74881.736 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 404: n:  40 NS_acc:0.969 S0_acc:0.341 sub_acc:0.300 H: 12.22 logL -74868.82042 --> -74868.73033 dZ: 0.978 logZ: -74881.694 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 405: n:  20 NS_acc:0.969 S0_acc:0.341 sub_acc:0.150 H: 12.20 logL -74868.81888 --> -74868.69443 dZ: 0.935 logZ: -74881.655 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 26.898371495163985
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 406: n:  26 NS_acc:0.969 S0_acc:0.340 sub_acc:0.154 H: 12.19 logL -74868.81498 --> -74868.60142 dZ: 0.894 logZ: -74881.619 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 407: n:  26 NS_acc:0.969 S0_acc:0.340 sub_acc:0.308 H: 12.18 logL -74868.79551 --> -74868.61445 dZ: 0.856 logZ: -74881.584 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 408: n:  26 NS_acc:0.969 S0_acc:0.340 sub_acc:0.308 H: 12.16 logL -74868.78123 --> -74868.77855 dZ: 0.819 logZ: -74881.551 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 409: n:  26 NS_acc:0.969 S0_acc:0.340 sub_acc:0.231 H: 12.15 logL -74868.77855 --> -74868.69552 dZ: 0.785 logZ: -74881.520 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 410: n:  78 NS_acc:0.965 S0_acc:0.338 sub_acc:0.115 H: 12.14 logL -74868.75075 --> -74868.59438 dZ: 0.752 logZ: -74881.490 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 411: n:  52 NS_acc:0.963 S0_acc:0.337 sub_acc:0.192 H: 12.13 logL -74868.73784 --> -74868.61234 dZ: 0.721 logZ: -74881.462 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 412: n:  26 NS_acc:0.963 S0_acc:0.337 sub_acc:0.231 H: 12.12 logL -74868.73758 --> -74868.63388 dZ: 0.692 logZ: -74881.435 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 413: n:  26 NS_acc:0.963 S0_acc:0.336 sub_acc:0.192 H: 12.11 logL -74868.73033 --> -74868.60251 dZ: 0.664 logZ: -74881.409 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 414: n:  52 NS_acc:0.961 S0_acc:0.335 sub_acc:0.192 H: 12.10 logL -74868.71453 --> -74868.59451 dZ: 0.637 logZ: -74881.385 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 415: n:  26 NS_acc:0.961 S0_acc:0.335 sub_acc:0.115 H: 12.09 logL -74868.71147 --> -74868.70094 dZ: 0.612 logZ: -74881.361 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 416: n:  26 NS_acc:0.961 S0_acc:0.334 sub_acc:0.231 H: 12.08 logL -74868.70288 --> -74868.59887 dZ: 0.587 logZ: -74881.339 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : Rolling KS test: D=0.206, p-value=0.115
+2024-10-19, 16:39:37 - cpnest.NestedSampling.NestedSampler   : 417: n:  26 NS_acc:0.961 S0_acc:0.334 sub_acc:0.308 H: 12.07 logL -74868.70094 --> -74868.62686 dZ: 0.564 logZ: -74881.318 logLmax: -74868.59
+2024-10-19, 16:39:37 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 17.35421030844059
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 418: n:  20 NS_acc:0.961 S0_acc:0.334 sub_acc:0.400 H: 12.06 logL -74868.69552 --> -74868.67554 dZ: 0.543 logZ: -74881.298 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 419: n:  20 NS_acc:0.961 S0_acc:0.334 sub_acc:0.250 H: 12.05 logL -74868.69443 --> -74868.60494 dZ: 0.522 logZ: -74881.278 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 420: n:  20 NS_acc:0.961 S0_acc:0.333 sub_acc:0.250 H: 12.04 logL -74868.68898 --> -74868.68297 dZ: 0.502 logZ: -74881.260 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 421: n:  20 NS_acc:0.961 S0_acc:0.333 sub_acc:0.200 H: 12.03 logL -74868.68749 --> -74868.64763 dZ: 0.483 logZ: -74881.242 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 422: n:  20 NS_acc:0.961 S0_acc:0.332 sub_acc:0.350 H: 12.02 logL -74868.68297 --> -74868.59969 dZ: 0.465 logZ: -74881.226 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 423: n:  20 NS_acc:0.961 S0_acc:0.332 sub_acc:0.400 H: 12.02 logL -74868.67554 --> -74868.64490 dZ: 0.447 logZ: -74881.210 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 424: n:  20 NS_acc:0.961 S0_acc:0.332 sub_acc:0.150 H: 12.01 logL -74868.67463 --> -74868.59970 dZ: 0.431 logZ: -74881.194 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 425: n:  40 NS_acc:0.959 S0_acc:0.331 sub_acc:0.250 H: 12.00 logL -74868.66465 --> -74868.59490 dZ: 0.415 logZ: -74881.179 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 426: n:  20 NS_acc:0.959 S0_acc:0.331 sub_acc:0.350 H: 12.00 logL -74868.65289 --> -74868.64479 dZ: 0.400 logZ: -74881.165 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 427: n:  20 NS_acc:0.960 S0_acc:0.331 sub_acc:0.200 H: 11.99 logL -74868.64979 --> -74868.59582 dZ: 0.385 logZ: -74881.151 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 428: n:  40 NS_acc:0.957 S0_acc:0.330 sub_acc:0.300 H: 11.98 logL -74868.64763 --> -74868.62880 dZ: 0.371 logZ: -74881.138 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 429: n:  20 NS_acc:0.958 S0_acc:0.330 sub_acc:0.250 H: 11.98 logL -74868.64490 --> -74868.64453 dZ: 0.358 logZ: -74881.125 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 430: n:  20 NS_acc:0.958 S0_acc:0.330 sub_acc:0.300 H: 11.97 logL -74868.64479 --> -74868.64356 dZ: 0.345 logZ: -74881.113 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 431: n:  20 NS_acc:0.958 S0_acc:0.330 sub_acc:0.350 H: 11.96 logL -74868.64453 --> -74868.59540 dZ: 0.332 logZ: -74881.102 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 10.820291225477595
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 432: n:  20 NS_acc:0.958 S0_acc:0.330 sub_acc:0.250 H: 11.96 logL -74868.64433 --> -74868.61090 dZ: 0.321 logZ: -74881.090 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 433: n:  20 NS_acc:0.958 S0_acc:0.330 sub_acc:0.250 H: 11.95 logL -74868.64356 --> -74868.62464 dZ: 0.309 logZ: -74881.080 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 434: n:  20 NS_acc:0.958 S0_acc:0.330 sub_acc:0.300 H: 11.95 logL -74868.63388 --> -74868.60945 dZ: 0.298 logZ: -74881.069 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 435: n:  20 NS_acc:0.958 S0_acc:0.330 sub_acc:0.200 H: 11.94 logL -74868.62880 --> -74868.59511 dZ: 0.288 logZ: -74881.059 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 436: n:  20 NS_acc:0.958 S0_acc:0.329 sub_acc:0.150 H: 11.94 logL -74868.62686 --> -74868.60185 dZ: 0.278 logZ: -74881.050 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 437: n:  20 NS_acc:0.958 S0_acc:0.329 sub_acc:0.150 H: 11.93 logL -74868.62672 --> -74868.62241 dZ: 0.268 logZ: -74881.041 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 438: n:  60 NS_acc:0.954 S0_acc:0.328 sub_acc:0.250 H: 11.93 logL -74868.62464 --> -74868.62223 dZ: 0.259 logZ: -74881.032 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 439: n:  20 NS_acc:0.954 S0_acc:0.328 sub_acc:0.300 H: 11.92 logL -74868.62241 --> -74868.60023 dZ: 0.250 logZ: -74881.023 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 440: n:  20 NS_acc:0.954 S0_acc:0.327 sub_acc:0.250 H: 11.92 logL -74868.62223 --> -74868.59757 dZ: 0.241 logZ: -74881.015 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 441: n:  20 NS_acc:0.955 S0_acc:0.327 sub_acc:0.200 H: 11.92 logL -74868.61595 --> -74868.60054 dZ: 0.233 logZ: -74881.007 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 442: n:  20 NS_acc:0.955 S0_acc:0.327 sub_acc:0.200 H: 11.91 logL -74868.61472 --> -74868.59487 dZ: 0.225 logZ: -74880.999 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 443: n:  20 NS_acc:0.955 S0_acc:0.327 sub_acc:0.400 H: 11.91 logL -74868.61445 --> -74868.61067 dZ: 0.218 logZ: -74880.992 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 444: n:  20 NS_acc:0.955 S0_acc:0.327 sub_acc:0.250 H: 11.90 logL -74868.61234 --> -74868.60625 dZ: 0.210 logZ: -74880.985 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 445: n:  20 NS_acc:0.955 S0_acc:0.326 sub_acc:0.350 H: 11.90 logL -74868.61119 --> -74868.60663 dZ: 0.203 logZ: -74880.978 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 9.985399368363478
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 446: n:  20 NS_acc:0.955 S0_acc:0.326 sub_acc:0.300 H: 11.90 logL -74868.61090 --> -74868.60233 dZ: 0.196 logZ: -74880.972 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 447: n:  20 NS_acc:0.955 S0_acc:0.326 sub_acc:0.300 H: 11.89 logL -74868.61067 --> -74868.59592 dZ: 0.190 logZ: -74880.965 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 448: n:  20 NS_acc:0.955 S0_acc:0.326 sub_acc:0.300 H: 11.89 logL -74868.60945 --> -74868.59452 dZ: 0.183 logZ: -74880.959 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : Rolling KS test: D=0.244, p-value=0.0367
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 449: n:  20 NS_acc:0.955 S0_acc:0.326 sub_acc:0.350 H: 11.89 logL -74868.60744 --> -74868.60341 dZ: 0.177 logZ: -74880.953 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 450: n:  29 NS_acc:0.955 S0_acc:0.326 sub_acc:0.034 H: 11.88 logL -74868.60701 --> -74868.59537 dZ: 0.171 logZ: -74880.948 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 451: n:  20 NS_acc:0.956 S0_acc:0.325 sub_acc:0.350 H: 11.88 logL -74868.60663 --> -74868.60231 dZ: 0.166 logZ: -74880.942 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 452: n:  40 NS_acc:0.954 S0_acc:0.325 sub_acc:0.350 H: 11.88 logL -74868.60625 --> -74868.59505 dZ: 0.160 logZ: -74880.937 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 453: n:  20 NS_acc:0.954 S0_acc:0.325 sub_acc:0.350 H: 11.88 logL -74868.60494 --> -74868.59469 dZ: 0.155 logZ: -74880.932 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 454: n:  20 NS_acc:0.954 S0_acc:0.324 sub_acc:0.100 H: 11.87 logL -74868.60341 --> -74868.59545 dZ: 0.150 logZ: -74880.927 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 455: n:  20 NS_acc:0.954 S0_acc:0.324 sub_acc:0.200 H: 11.87 logL -74868.60251 --> -74868.59527 dZ: 0.145 logZ: -74880.922 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 456: n:  20 NS_acc:0.954 S0_acc:0.324 sub_acc:0.150 H: 11.87 logL -74868.60233 --> -74868.59591 dZ: 0.140 logZ: -74880.917 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 457: n:  40 NS_acc:0.952 S0_acc:0.323 sub_acc:0.050 H: 11.86 logL -74868.60231 --> -74868.60023 dZ: 0.135 logZ: -74880.913 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 458: n:  20 NS_acc:0.952 S0_acc:0.322 sub_acc:0.200 H: 11.86 logL -74868.60185 --> -74868.59460 dZ: 0.131 logZ: -74880.909 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 459: n:  20 NS_acc:0.952 S0_acc:0.322 sub_acc:0.350 H: 11.86 logL -74868.60170 --> -74868.59445 dZ: 0.127 logZ: -74880.905 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.sampler.Sampler                : Sampler 77146 -- ACL(phi_mrg_22)  = 17.904052739363678
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 460: n:  20 NS_acc:0.952 S0_acc:0.322 sub_acc:0.400 H: 11.86 logL -74868.60142 --> -74868.60022 dZ: 0.123 logZ: -74880.901 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 461: n:  20 NS_acc:0.952 S0_acc:0.323 sub_acc:0.450 H: 11.86 logL -74868.60124 --> -74868.59770 dZ: 0.119 logZ: -74880.897 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 462: n:  20 NS_acc:0.953 S0_acc:0.322 sub_acc:0.250 H: 11.85 logL -74868.60054 --> -74868.59695 dZ: 0.115 logZ: -74880.893 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 463: n:  20 NS_acc:0.953 S0_acc:0.322 sub_acc:0.150 H: 11.85 logL -74868.60023 --> -74868.59826 dZ: 0.111 logZ: -74880.889 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 464: n:  20 NS_acc:0.953 S0_acc:0.322 sub_acc:0.300 H: 11.85 logL -74868.60023 --> -74868.59483 dZ: 0.107 logZ: -74880.886 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 465: n:  20 NS_acc:0.953 S0_acc:0.322 sub_acc:0.400 H: 11.85 logL -74868.60022 --> -74868.59824 dZ: 0.104 logZ: -74880.883 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 466: n:  20 NS_acc:0.953 S0_acc:0.322 sub_acc:0.250 H: 11.85 logL -74868.59970 --> -74868.59687 dZ: 0.101 logZ: -74880.879 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : 467: n:  20 NS_acc:0.953 S0_acc:0.321 sub_acc:0.300 H: 11.84 logL -74868.59969 --> -74868.59486 dZ: 0.097 logZ: -74880.876 logLmax: -74868.59
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : Final evidence: -74880.80
+2024-10-19, 16:39:38 - cpnest.NestedSampling.NestedSampler   : Information: 11.79
+2024-10-19, 16:39:38 - cpnest.sampler.Sampler                : Sampler process 77146: MCMC samples accumulated = 23381
+2024-10-19, 16:39:38 - cpnest.NestedSampling._NSintegralState: Saved nested sampling plot as SXS_0305_TEOBPM_22_0M_const_error/Algorithm/logXlogL.png
+2024-10-19, 16:39:39 - cpnest.sampler.Sampler                : Sampler process 77146: saved 23381 mcmc samples in mcmc_chain_77146.dat
+2024-10-19, 16:39:39 - cpnest.sampler.Sampler                : Sampler process 77146 - mean acceptance 0.322: exiting
+2024-10-19, 16:39:39 - cpnest.NestedSampling.NestedSampler   : Final KS test: D=0.0551, p-value=0.113
+2024-10-19, 16:39:39 - cpnest.cpnest.CPNest                  : Saving nested samples in SXS_0305_TEOBPM_22_0M_const_error/Algorithm/
+2024-10-19, 16:39:39 - cpnest.cpnest.CPNest                  : Saving posterior samples in SXS_0305_TEOBPM_22_0M_const_error/Algorithm/
+2024-10-19, 16:39:39 - cpnest.nest2pos                       : Computed log_evidences: (-74880.99308947458,)
+2024-10-19, 16:39:39 - cpnest.nest2pos                       : Relative weights of input files: [1.0]
+2024-10-19, 16:39:39 - cpnest.nest2pos                       : Relative weights of input files taking into account their length: [1.0]
+2024-10-19, 16:39:39 - cpnest.nest2pos                       : Number of input samples: [499]
+2024-10-19, 16:39:39 - cpnest.nest2pos                       : Expected number of samples from each input file [59]
+2024-10-19, 16:39:39 - cpnest.nest2pos                       : Samples produced: 59
+2024-10-19, 16:39:39 - cpnest.nest2pos                       : Number of input samples: 23381
+2024-10-19, 16:39:39 - cpnest.nest2pos                       : Measured autocorrelation length 10
+2024-10-19, 16:39:39 - cpnest.nest2pos                       : Returned number of samples 1210
+2024-10-19, 16:39:39 - cpnest.cpnest.CPNest                  : ERROR, no prior samples found!
+2024-10-19, 16:39:39 - cpnest.cpnest.CPNest                  : ERROR, no MCMC samples found!
