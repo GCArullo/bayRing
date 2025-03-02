@@ -5,6 +5,13 @@ from scipy.optimize    import fmin, minimize as min
 from scipy.signal      import find_peaks
 import os
 
+#constants
+twopi = 2.*np.pi
+c=2.99792458*10**8 #m/s
+G=6.67259*1e-11
+M_s=1.9885*10**30 #solar masses
+C_mt=(M_s*G)/c**3 #s, converts a mass expressed in solar masses into a time in seconds
+
 def amp_phase_from_re_im(h_re, h_im):
 
     """
@@ -246,7 +253,7 @@ def compute_condition_number(acf):
     toeplitz_matrix = toeplitz(acf)
     return np.linalg.cond(toeplitz_matrix)
 
-def extract_NR_params(NR_sim):
+def extract_NR_params(NR_sim, M):
     """
     Extracts key time-related parameters from an NR_sim object.
 
@@ -263,10 +270,14 @@ def extract_NR_params(NR_sim):
     t_NR_cut = NR_sim.t_NR_cut
     t_start_g, t_end_g = t_NR_cut[0] - t_peak, t_NR_cut[-1] - t_peak
     N_sim = len(NR_sim.NR_r_cut)
+    t_NR_s = (t_NR_cut - t_peak - t_start_g) * M * C_mt
 
     print("t_start_g={0:.4f}M, t_end_g={1:.4f}M, N_sim={2:.0f}".format(t_start_g, t_end_g, N_sim))
 
-    return t_start_g, t_end_g, N_sim
+    #print("t_NR_cut - t_peak - t_start_g (geometric units): ", t_NR_s/(M * C_mt))
+    #print("t_NR_cut - t_peak (s): ", (t_NR_cut - t_peak) * M * C_mt)
+
+    return t_start_g, t_end_g, t_NR_s, N_sim
 
 
 def extract_and_compute_psd_parameters(asd_path, psd):
@@ -297,9 +308,9 @@ def extract_and_compute_psd_parameters(asd_path, psd):
         
         # Extract required parameters
         f_min, f_max = np.min(freq_file), np.max(freq_file)
-        dt = 1 / (2 * f_max)
+        f_sample = 2 * f_max
+        dt = 1 / f_sample
         df = np.min(np.diff(freq_file))
-        f_sample = 2*f_max
         N_points = int(f_sample / df)
         n_iterations = psd['n_FFT_points']
         
@@ -505,7 +516,7 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size, k
     psd_file = asd_file ** 2
 
     # Sampling settings
-    s_rate = f_max * 2
+    s_rate = 2 * f_max
     dt = 1. / s_rate
     df = s_rate / N_points
     f = np.fft.rfftfreq(N_points, d=dt)

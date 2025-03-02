@@ -439,6 +439,9 @@ def interpolate_waveform(t_start_g, t_end_g, M, wf_lNR, acf):
     t_array = np.linspace(t_start, t_end, len(wf_lNR))  # Original waveform time
     t_int = np.linspace(t_start, t_end, len(acf))       # Target interpolation time
 
+    #print(t_array)
+    #print(t_int)
+
     # Use Numba-optimized interpolation
     wf_int = fast_interpolation(t_int, t_array, wf_lNR)
 
@@ -497,51 +500,48 @@ def clear_directory(directory_path):
     else:
         os.makedirs(directory_path, exist_ok=True)
 
-def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, t_start, t_end, N_sim):
+def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s):
     """
     Truncate and interpolate the Autocorrelation Function (ACF) based on time constraints.
 
     Parameters:
-        ACF_smoothed (np.ndarray): The original smoothed ACF.
+        ACF_smoothed (np.ndarray): the original smoothed ACF.
         t_ACF (np.ndarray): the time axis associated to ACF_smoothed.
-        t_start (float): Start time for analysis.
-        t_end (float): End time for analysis.
+        t_start (float): Start time for analysis [geometric units].
+        t_end (float): End time for analysis [geometric units].
+        t_NR_s (np.ndarray): NR array in seconds, starting at 0, and ending at t_end-t_start.
         N_sim (int): The number of points for the interpolated ACF.
 
     Returns:
-        np.ndarray: The interpolated ACF array.
-        np.ndarray: The new time array corresponding to the interpolated ACF.
+        np.ndarray: The new time array corresponding to the interpolated ACF on the NR array.
     """
 
-    # First, we take only the first half of the ACF, which is the one associated to 
+    # First, we take only the first half of the ACF, which is the one associated to positive frequencies
     half_index = len(ACF_smoothed) // 2
     t_ACF_half = t_ACF[:half_index]
     ACF_smoothed_half = ACF_smoothed[:half_index]
 
     # Compute the truncation point (T_RD = t_end - t_start)
-    T_RD = t_end - t_start
+    T_RD = (t_end_g - t_start_g) * C_mt * M
     index = np.argmin(np.abs(t_ACF_half - T_RD))
 
     # Truncate the ACF to rigndown analysis (See https://arxiv.org/abs/2107.05609 for discussion on truncation)
     ACF_truncated = ACF_smoothed_half[:index+1]
     t_ACF_truncated = t_ACF_half[:index+1]
 
-    # Define the new interpolated time array
-    t_trunc = np.linspace(t_ACF_truncated[0], t_ACF_truncated[-1], N_sim)
-
     # Perform linear interpolation
     interpolator = interp1d(t_ACF_truncated, ACF_truncated, kind='linear', fill_value="extrapolate")
-    ACF_trunc = interpolator(t_trunc)
+    ACF_trunc = interpolator(t_NR_s)
 
     """
     print("Truncation info:")
     print("ACF time array expr. in [s] (full): ", t_ACF)
     print("ACF time array expr. in [s] (first half, associated to positive frequencies): ", t_ACF_half)
     print("Truncated ACF time array expr. in [s] : ", t_ACF_truncated)
-    print("Truncated waveform time array expr. in [s] : ", t_trunc)
+    print("Truncated waveform time array expr. in geometrical units : ", t_NR_s/(M*C_mt))
     """
 
-    return t_trunc, ACF_trunc
+    return ACF_trunc
 
 def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf, M, dL, t_start_g, t_end_g, window_size, k):
 
@@ -746,14 +746,14 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
 
     print("Plots saved to:", os.path.join(outdir, 'Algorithm'))
 
-def compute_mismatch(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size, k, check_TD_FD, sanity_check_mm):
+def compute_mismatch_check_FD(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size, k, check_TD_FD, sanity_check_mm):
     """
     Compute the mismatch of the model with respect to NR simulations.
     """
 
     # File paths for saving results
-    mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}.txt"
-    mismatch_filename_fd = f"Mismatch_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}_FD.txt"
+    mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}.txt"
+    mismatch_filename_fd = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}_FD.txt"
     outFile_path = os.path.join(outdir, 'Algorithm', mismatch_filename)
     outFile_path_fd = os.path.join(outdir, 'Algorithm', mismatch_filename_fd)
 
@@ -816,14 +816,76 @@ def compute_mismatch(NR_sim, results, inference_model, outdir, method, acf, N_FF
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
                 continue
 
+def compute_mismatch(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g_true, window_size, k):
+    """
+    Compute the mismatch of the model with respect to NR simulations.
+    """
+
+    # File paths for saving results
+    mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}.txt"
+    outFile_path = os.path.join(outdir, 'Algorithm', mismatch_filename)
+    
+    with open(outFile_path, 'w') as outFile_mismatch:
+        outFile_mismatch.write('#CI\tStrain_data\tMismatch\n')
+
+    # Extract NR waveform components (physical units)
+    NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
+    NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
+    NR_dict = {'real': NR_r, 'imaginary': NR_i}
+
+    for NR_quant, NR_data in NR_dict.items():
+        try:
+
+            # Compute <NR|NR>
+            whiten_whiten_h_NR = sl.solve_toeplitz(acf, NR_data, check_finite=False)
+            h_NR_h_NR_sqrt = np.sqrt(abs(np.dot(NR_data, whiten_whiten_h_NR)))
+
+        except Exception as e:
+            print(f"Error in NR scalar product for {NR_quant}: {e}")
+            continue
+        
+        # Load waveform template
+        if method == 'Nested-sampler':
+            models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
+            models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
+
+        for perc in [5, 50, 95]:
+            try:
+
+                # Extract waveform (geometric units)
+                wf_r = np.percentile(np.array(models_re_list), [perc], axis=0)[0]
+                wf_i = np.percentile(np.array(models_im_list), [perc], axis=0)[0]
+
+                # Convert to physical units
+                wf_r *= (C_md * M) / dL
+                wf_i *= (C_md * M) / dL
+                wf_quant = {'real': wf_r, 'imaginary': wf_i}
+
+                # Compute scalar products with h_wf
+                whiten_whiten_h_wf = sl.solve_toeplitz(acf, wf_quant[NR_quant], check_finite=False)
+                h_wf_h_wf_sqrt = np.sqrt(abs(np.dot(wf_quant[NR_quant], whiten_whiten_h_wf)))
+                h_wf_h_NR = np.dot(wf_quant[NR_quant], whiten_whiten_h_NR)
+
+                # Match/mismatch computations
+                TD_match = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
+                TD_mismatch = 1 - TD_match
+
+                with open(outFile_path, 'a') as outFile_mismatch:
+                    outFile_mismatch.write(f'{perc}\t{NR_quant}\t{TD_mismatch}\n')
+
+            except Exception as e:
+                print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
+                continue
+
+
 def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size, k, check_TD_FD):
     """
     Compute the optimal SNR of the model waveform.
     """
 
     # File paths for saving results
-    optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}.txt"
-    optimal_SNR_filename_fd = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}_FD.txt"
+    optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}.txt"
+    optimal_SNR_filename_fd = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}_FD.txt"
     outFile_path = os.path.join(outdir, 'Algorithm', optimal_SNR_filename)
     outFile_path_fd = os.path.join(outdir, 'Algorithm', optimal_SNR_filename_fd)
 
@@ -1843,6 +1905,7 @@ def plot_mismatch_by_k(mismatch_data, outdir, direction, M, dL, N_fft):
                         plt.xlabel("k (Smoothing Steepness)")
                         plt.ylabel("Mismatch")
                         plt.legend()
+                        plt.xscale("log")
                         plt.grid(True)
                         filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_saturationDX={saturation_DX:.2e}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
                         plt.savefig(os.path.join(save_path, filename))
@@ -1878,6 +1941,7 @@ def plot_optimal_SNR_by_k(optimal_SNR_data, outdir, direction, M, dL, N_fft):
                         plt.xlabel("k (Smoothing Steepness)")
                         plt.ylabel("Optimal SNR")
                         plt.legend()
+                        plt.xscale("log")
                         plt.grid(True)
                         filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_saturationDX={saturation_DX:.2e}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
                         plt.savefig(os.path.join(save_path, filename))
@@ -1906,14 +1970,15 @@ def plot_mismatch_by_saturation_DX(mismatch_data, outdir, direction, M, dL, N_ff
                         for perc in percentiles:
                             sat_DX_vals, mismatch_vals = [], []
                             for (w_size, k_val, sat_DX, sat_SX), data in mismatch_data.items():
-                                if w_size == window_size and k_val == k and sat_SX == saturation_SX:
+                                if (w_size, k_val, sat_SX) == (window_size, k, saturation_SX):
                                     sat_DX_vals.append(sat_DX)
                                     mismatch_vals.append(data[component][perc])
                         plt.plot(sat_DX_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
-                        plt.xlabel("Saturation DX")
+                        plt.xlabel("Saturation DX [Hz^-1]")
                         plt.ylabel("Mismatch")
                         plt.legend()
                         plt.grid(True)
+                        plt.xscale("log")
                         filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={k}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
                         plt.savefig(os.path.join(save_path, filename))
                         plt.close()
@@ -1945,10 +2010,11 @@ def plot_optimal_SNR_by_saturation_DX(optimal_SNR_data, outdir, direction, M, dL
                                     sat_DX_vals.append(sat_DX)
                                     snr_vals.append(data[component][perc])
                         plt.plot(sat_DX_vals, snr_vals, label=f"{perc}% CI", marker='o')
-                        plt.xlabel("Saturation DX")
+                        plt.xlabel("Saturation DX [Hz^-1]")
                         plt.ylabel("Optimal SNR")
                         plt.legend()
                         plt.grid(True)
+                        plt.xscale("log")
                         filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={k}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
                         plt.savefig(os.path.join(save_path, filename))
                         plt.close()
@@ -1980,10 +2046,11 @@ def plot_mismatch_by_saturation_SX(mismatch_data, outdir, direction, M, dL, N_ff
                                     sat_SX_vals.append(sat_SX)
                                     mismatch_vals.append(data[component][perc])
                         plt.plot(sat_SX_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
-                        plt.xlabel("Saturation SX")
+                        plt.xlabel("Saturation SX [Hz^-1]")
                         plt.ylabel("Mismatch")
                         plt.legend()
                         plt.grid(True)
+                        plt.xscale("log")
                         filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={k}_saturationDX={saturation_DX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
                         plt.savefig(os.path.join(save_path, filename))
                         plt.close()
@@ -2015,10 +2082,11 @@ def plot_optimal_SNR_by_saturation_SX(optimal_SNR_data, outdir, direction, M, dL
                                     sat_SX_vals.append(sat_SX)
                                     snr_vals.append(data[component][perc])
                         plt.plot(sat_SX_vals, snr_vals, label=f"{perc}% CI", marker='o')
-                        plt.xlabel("Saturation SX")
+                        plt.xlabel("Saturation SX [Hz^-1]")
                         plt.ylabel("Optimal SNR")
                         plt.legend()
                         plt.grid(True)
+                        plt.xscale("log")
                         filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={k}_saturationDX={saturation_DX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
                         plt.savefig(os.path.join(save_path, filename))
                         plt.close()
@@ -2096,10 +2164,10 @@ def plot_all(mismatch_data, optimal_SNR_data, outdir, direction, M, dL, N_FFT):
     }
 
     # Debug: Stampiamo i valori unici di ogni variabile
-    print("\n=== DEBUG: Checking data dimensions ===")
+    #print("\n=== DEBUG: Checking data dimensions ===")
     for category, functions in plot_functions.items():
         data_dict = mismatch_data if category == "mismatch" else optimal_SNR_data
-        print(f"\nCategory: {category}")
+        #print(f"\nCategory: {category}")
 
         for func_name, x_key in functions.items():
             extracted_values = set()
@@ -2113,14 +2181,14 @@ def plot_all(mismatch_data, optimal_SNR_data, outdir, direction, M, dL, N_FFT):
                 if x_key in param_mapping:
                     extracted_values.add(param_mapping[x_key])
 
-            print(f"  - {x_key}: {len(extracted_values)} unique values ({extracted_values})")
+            #print(f"  - {x_key}: {len(extracted_values)} unique values ({extracted_values})")
 
             if len(extracted_values) > 1:
                 plot_function = globals().get(func_name, None)
                 if plot_function:
-                    print(f"  -> Plotting {func_name} for {category} using {x_key} as x-axis")
+                    #print(f"  -> Plotting {func_name} for {category} using {x_key} as x-axis")
                     plot_function(data_dict, outdir, direction, M, dL, N_FFT)
                 else:
                     print(f"  !! Warning: Function {func_name} not found in global scope.")
 
-    print("\n=== DEBUG: Finished Checking ===\n")
+    #print("\n=== DEBUG: Finished Checking ===\n")
