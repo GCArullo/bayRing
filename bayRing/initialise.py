@@ -158,13 +158,13 @@ def read_config(Config):
         'window_max'       : 10.0,
         'n_window'         : 1,
         'steepness'    : 150,
-        'steepness_max'    : 5,
+        'steepness_max'    : 200,
         'n_steepness'      : 1,
-        'saturation_DX'    : 1e-38,
-        'saturation_DX_max'    : 1e-38,
+        'saturation_DX'    : 1e-39,
+        'saturation_DX_max'    : 1e-32,
         'n_saturation_DX'      : 1,
         'saturation_SX'    : 1e-44,
-        'saturation_SX_max'    : 1e-44,
+        'saturation_SX_max'    : 1e-42,
         'n_saturation_SX'      : 1,
         'n_FFT_points'     : 1,
         },
@@ -173,6 +173,9 @@ def read_config(Config):
         {
         'M'                : 60,
         'dL'               : 410,
+        'ra'               : 1.375,
+        'dec'              : -0.2108,
+        'psi'              : 2.659,
         },
 
         'Flags': 

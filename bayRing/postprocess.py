@@ -192,7 +192,6 @@ def store_and_print_amp_phi(amp_name, phi_name, t0, omega, tau, results_object, 
 
     return
 
-
 def post_process_amplitudes(t0, results_object, NR_metadata, qnm_cached, modes, quad_modes, outdir):
 
     """
@@ -412,6 +411,38 @@ def compute_FD_optimal_SNR(asd_file, h, n, f_min, f_max):
 
         return fd_snr
 
+def compute_F_plus(theta, phi, psi):
+    """
+    Computes F_plus(θ, φ, ψ) based on the given equation.
+
+    Parameters:
+    theta (float): The θ angle in radians.
+    phi (float): The φ angle in radians.
+    psi (float): The ψ angle in radians.
+
+    Returns:
+    float: The value of F_plus.
+    """
+    term1 = 0.5 * (1 + np.cos(theta)**2) * np.cos(2 * phi) * np.cos(2 * psi)
+    term2 = -np.cos(theta) * np.sin(2 * phi) * np.sin(2 * psi)
+    return term1 + term2
+
+def compute_F_cross(theta, phi, psi):
+    """
+    Computes F_cross(θ, φ, ψ) based on the given equation.
+
+    Parameters:
+    theta (float): The θ angle in radians.
+    phi (float): The φ angle in radians.
+    psi (float): The ψ angle in radians.
+
+    Returns:
+    float: The value of F_cross.
+    """
+    term1 = 0.5 * (1 + np.cos(theta)**2) * np.cos(2 * phi) * np.sin(2 * psi)
+    term2 = np.cos(theta) * np.sin(2 * phi) * np.cos(2 * psi)
+    return term1 + term2
+
 @numba.njit
 def fast_interpolation(x, xp, fp):
     """Numba-accelerated linear interpolation."""
@@ -509,11 +540,11 @@ def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_N
         t_ACF (np.ndarray): the time axis associated to ACF_smoothed.
         t_start (float): Start time for analysis [geometric units].
         t_end (float): End time for analysis [geometric units].
-        t_NR_s (np.ndarray): NR array in seconds, starting at 0, and ending at t_end-t_start.
+        t_NR_s (np.ndarray): NR time array in seconds, starting at 0, and ending at t_end-t_start.
         N_sim (int): The number of points for the interpolated ACF.
 
     Returns:
-        np.ndarray: The new time array corresponding to the interpolated ACF on the NR array.
+        np.ndarray: The new array corresponding to the interpolated ACF on the NR time array.
     """
 
     # First, we take only the first half of the ACF, which is the one associated to positive frequencies
@@ -525,7 +556,7 @@ def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_N
     T_RD = (t_end_g - t_start_g) * C_mt * M
     index = np.argmin(np.abs(t_ACF_half - T_RD))
 
-    # Truncate the ACF to rigndown analysis (See https://arxiv.org/abs/2107.05609 for discussion on truncation)
+    # Truncate the ACF to ringdown analysis (See https://arxiv.org/abs/2107.05609 for discussion on truncation)
     ACF_truncated = ACF_smoothed_half[:index+1]
     t_ACF_truncated = t_ACF_half[:index+1]
 
@@ -877,6 +908,60 @@ def compute_mismatch(NR_sim, results, inference_model, outdir, method, acf, N_FF
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
                 continue
 
+def compute_mismatch_h(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, ra, dec, psi, t_start_g_true, window_size, k):
+    """
+    Compute the mismatch of the model with respect to NR simulations.
+    """
+
+    # File paths for saving results
+    mismatch_filename = f"Mismatch_h_tot_M_{M}_dL_{dL}_alpha_{ra}_delta_{dec}_psi_{psi}_t_s_{round(t_start_g_true,1)}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}.txt"
+    outFile_path = os.path.join(outdir, 'Algorithm', mismatch_filename)
+    
+    with open(outFile_path, 'w') as outFile_mismatch:
+        outFile_mismatch.write('#CI\tStrain_data\tMismatch\n')
+
+    # Extract NR waveform components (physical units)
+    NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
+    NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
+
+    # Compute polarizations
+    F_plus = compute_F_plus(theta=ra, phi=dec, psi=psi)
+    F_cross = compute_F_cross(theta=ra, phi=dec, psi=psi)
+    NR_data = F_plus * NR_r + F_cross * NR_i
+
+    # Compute <NR|NR>
+    whiten_whiten_h_NR = sl.solve_toeplitz(acf, NR_data, check_finite=False)
+    h_NR_h_NR_sqrt = np.sqrt(abs(np.dot(NR_data, whiten_whiten_h_NR)))
+
+    # Load waveform template
+    if method == 'Nested-sampler':
+        models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
+        models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
+
+    for perc in [5, 50, 95]:
+            
+            # Extract waveform (geometric units)
+            wf_r = np.percentile(np.array(models_re_list), [perc], axis=0)[0]
+            wf_i = np.percentile(np.array(models_im_list), [perc], axis=0)[0]
+
+            # Convert to physical units
+            wf_r *= (C_md * M) / dL
+            wf_i *= (C_md * M) / dL
+            wf = F_plus * wf_r + F_cross * wf_i
+
+            # Compute scalar products with h_wf
+            whiten_whiten_h_wf = sl.solve_toeplitz(acf, wf, check_finite=False)
+            h_wf_h_wf_sqrt = np.sqrt(abs(np.dot(wf, whiten_whiten_h_wf)))
+            h_wf_h_NR = np.dot(wf, whiten_whiten_h_NR)
+
+            # Match/mismatch computations
+            TD_match = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
+            TD_mismatch = 1 - TD_match
+
+            print("TD mismatch of the total signal: ", TD_mismatch)
+
+            with open(outFile_path, 'a') as outFile_mismatch:
+                outFile_mismatch.write(f'{perc}\t{TD_mismatch}\n')
 
 def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size, k, check_TD_FD):
     """
@@ -1714,15 +1799,11 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size, outdir, directi
         os.makedirs(save_path, exist_ok=True)
 
         # Set x-axis limits for zoomed regions
-        x_min1, x_max1 = f_min / 2, (f_min + window_size)  # Zoom near f_min
+        x_min1, x_max1 = f_min * 0.9, (f_min + window_size)  # Zoom near f_min
         x_min2, x_max2 = (f_max - window_size), f_max  # Zoom near f_max
 
         # Create figure with two side-by-side subplots
         fig, axs = plt.subplots(1, 2, figsize=(14, 6))
-
-        # Initialize y-limits for both regions
-        y_min1, y_max1 = float("inf"), float("-inf")
-        y_min2, y_max2 = float("inf"), float("-inf")
 
         # ------------------ Plot PSD near f_min and f_max ------------------
         for i, (label, PSD_smoothed) in enumerate(psd_data.items()):
@@ -1730,17 +1811,16 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size, outdir, directi
             alpha = max(0.3, 1 - (i * 0.15))  # Decrease opacity for different curves
             
             # Identify indices for zoomed regions
-            idx_min1, idx_max1 = np.searchsorted(freq, [x_min1, x_max1])
-            idx_min2, idx_max2 = np.searchsorted(freq, [x_min2, x_max2])
+            idx_min1, idx_max1 = np.argmin(np.abs(freq - x_min1)), np.argmin(np.abs(freq - x_max1))
+            idx_min2, idx_max2 = np.argmin(np.abs(freq - x_min2)), np.argmin(np.abs(freq - x_max2))
 
-            # Update y-axis limits dynamically
-            if idx_max1 > idx_min1:
-                y_min1 = min(y_min1, np.min(PSD_smoothed[idx_min1:idx_max1]))
-                y_max1 = max(y_max1, np.max(PSD_smoothed[idx_min1:idx_max1]))
+            # y-axis limits dynamically
+            y_min1, y_max1 = PSD_smoothed[idx_min1], PSD_smoothed[idx_max1]
+            y_min2, y_max2 = PSD_smoothed[idx_min2], PSD_smoothed[idx_max2]
 
-            if idx_max2 > idx_min2:
-                y_min2 = min(y_min2, np.min(PSD_smoothed[idx_min2:idx_max2]))
-                y_max2 = max(y_max2, np.max(PSD_smoothed[idx_min2:idx_max2]))
+            # Re-order y-lims
+            y_min1, y_max1 = min(y_min1, y_max1), max(y_min1, y_max1)
+            y_min2, y_max2 = min(y_min2, y_max2), max(y_min2, y_max2)
 
             # Plot for both subplots with alpha variation
             axs[0].plot(freq, PSD_smoothed, label=label, linewidth=1.5, color=colbBlue, alpha=alpha)
@@ -1764,7 +1844,8 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size, outdir, directi
         #axs[1].set_xscale("log")
         axs[1].set_yscale("log")
         axs[1].set_xlim(x_min2 * 0.999, x_max2 *1.001)
-        axs[1].set_ylim(y_min2 * 0.9, y_max2 * 1.5)  # Add margin
+        #axs[1].set_xlim(4994, 4996)
+        axs[1].set_ylim(y_min2 * 0.99, y_max2 * 1.01)  # Add margin
         #axs[1].grid(True)
         #axs[1].legend(loc="upper right", fontsize=8)
 
@@ -1778,7 +1859,6 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size, outdir, directi
 
     except Exception as e:
         print(f"Failed to generate PSD plots near f_min and f_max ({direction}): {e}")
-
 
 def plot_acf_interpolated(t_array, t_trunc, ACF_smoothed, truncated_acf, outdir, window_size, k, saturation_DX, saturation_SX, direction):
 
@@ -1836,7 +1916,7 @@ def plot_mismatch_by_window(mismatch_data, outdir, direction, M, dL, N_fft):
                         plt.ylabel("Mismatch")
                         plt.legend()
                         plt.grid(True)
-                        filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_k={k}_saturationDX={saturation_DX:.2e}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_k={round(k,0)}_saturationDX={saturation_DX:.2e}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
                         plt.savefig(os.path.join(save_path, filename))
                         plt.close()
 
@@ -1871,7 +1951,7 @@ def plot_optimal_SNR_by_window(optimal_SNR_data, outdir, direction, M, dL, N_fft
                         plt.ylabel("Optimal SNR")
                         plt.legend()
                         plt.grid(True)
-                        filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_k={k}_saturationDX={saturation_DX:.2e}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_k={round(k,0)}_saturationDX={saturation_DX:.2e}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
                         plt.savefig(os.path.join(save_path, filename))
                         plt.close()
 
@@ -1947,6 +2027,52 @@ def plot_optimal_SNR_by_k(optimal_SNR_data, outdir, direction, M, dL, N_fft):
                         plt.savefig(os.path.join(save_path, filename))
                         plt.close()
 
+def plot_condition_number_by_k(condition_numbers, outdir, direction, M, dL, N_fft):
+    """
+    Plot the condition number of the ACF Toeplitz matrix by varying k, keeping window size, saturation_DX, and saturation_SX fixed.
+
+    Parameters:
+        condition_numbers (dict): Dictionary with keys as (window_size, k, saturation_DX, saturation_SX) and values as condition numbers.
+        outdir (str): Directory to save the plot.
+        direction (str): Direction of smoothing ("below", "above", or "both").
+        M (float): Mass parameter in solar masses.
+        dL (float): Luminosity distance in Mpc.
+        N_fft (list): List of N_FFT values to iterate over.
+    """
+
+    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
+    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    os.makedirs(save_path, exist_ok=True)
+
+    # Extract unique window sizes and saturation values
+    window_sizes = sorted(set(w for w, _, _, _ in condition_numbers.keys()))
+    saturation_DX_values = sorted(set(s for _, _, s, _ in condition_numbers.keys()))
+    saturation_SX_values = sorted(set(s for _, _, _, s in condition_numbers.keys()))
+
+    for N_FFT in N_fft:
+        for window_size in window_sizes:
+            for saturation_DX in saturation_DX_values:
+                for saturation_SX in saturation_SX_values:
+                    plt.figure(figsize=(10, 6))
+
+                    k_vals, cond_vals = [], []
+                    for (w_size, k_val, sat_DX, sat_SX), cond_number in condition_numbers.items():
+                        if w_size == window_size and sat_DX == saturation_DX and sat_SX == saturation_SX:
+                            k_vals.append(k_val)
+                            cond_vals.append(cond_number)
+
+                    if k_vals:  # Ensure there's data to plot
+                        plt.plot(k_vals, cond_vals, marker='o', linestyle='dotted')
+                        plt.xlabel("k (Smoothing Steepness)")
+                        plt.ylabel("Condition Number")
+                        plt.yscale("log")
+                        plt.grid(True)
+                        plt.title(f"Condition Number vs k (Window={round(window_size,1)}, DX={saturation_DX:.2e}, SX={saturation_SX:.2e})")
+
+                        filename = f"Condition_Number_M={M}M0_dL={dL}Mpc_window={round(window_size,1)}_saturationDX={saturation_DX:.2e}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        plt.savefig(os.path.join(save_path, filename))
+                        plt.close()
+
 def plot_mismatch_by_saturation_DX(mismatch_data, outdir, direction, M, dL, N_fft):
     """
     Plot mismatch for real and imaginary components by varying saturation_DX, keeping window size, k, and saturation_SX fixed.
@@ -1979,7 +2105,7 @@ def plot_mismatch_by_saturation_DX(mismatch_data, outdir, direction, M, dL, N_ff
                         plt.legend()
                         plt.grid(True)
                         plt.xscale("log")
-                        filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={k}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={round(k,0)}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
                         plt.savefig(os.path.join(save_path, filename))
                         plt.close()
 
@@ -2015,7 +2141,45 @@ def plot_optimal_SNR_by_saturation_DX(optimal_SNR_data, outdir, direction, M, dL
                         plt.legend()
                         plt.grid(True)
                         plt.xscale("log")
-                        filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={k}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={round(k,0)}_saturationSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        plt.savefig(os.path.join(save_path, filename))
+                        plt.close()
+
+def plot_condition_number_by_saturation_DX(condition_numbers, outdir, direction, M, dL, N_fft):
+    """
+    Plot the condition number of the ACF Toeplitz matrix by varying saturation_DX, keeping window size, k, and saturation_SX fixed.
+    """
+
+    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
+    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    os.makedirs(save_path, exist_ok=True)
+
+    window_sizes = sorted(set(w for w, _, _, _ in condition_numbers.keys()))
+    k_values = sorted(set(k for _, k, _, _ in condition_numbers.keys()))
+    saturation_SX_values = sorted(set(s for _, _, _, s in condition_numbers.keys()))
+
+    for N_FFT in N_fft:
+        for window_size in window_sizes:
+            for k in k_values:
+                for saturation_SX in saturation_SX_values:
+                    plt.figure(figsize=(10, 6))
+
+                    sat_DX_vals, cond_vals = [], []
+                    for (w_size, k_val, sat_DX, sat_SX), cond_number in condition_numbers.items():
+                        if w_size == window_size and k_val == k and sat_SX == saturation_SX:
+                            sat_DX_vals.append(sat_DX)
+                            cond_vals.append(cond_number)
+
+                    if sat_DX_vals:
+                        plt.plot(sat_DX_vals, cond_vals, marker='o', linestyle='dotted')
+                        plt.xlabel("Saturation DX [Hz^-1]")
+                        plt.ylabel("Condition Number")
+                        plt.xscale("log")
+                        plt.yscale("log")
+                        plt.grid(True)
+                        plt.title(f"Condition Number vs Saturation DX (Window={round(window_size,1)}, k={k:.1f})")
+
+                        filename = f"Condition_Number_M={M}M0_dL={dL}Mpc_window={round(window_size,1)}_k={k:.1f}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
                         plt.savefig(os.path.join(save_path, filename))
                         plt.close()
 
@@ -2051,7 +2215,7 @@ def plot_mismatch_by_saturation_SX(mismatch_data, outdir, direction, M, dL, N_ff
                         plt.legend()
                         plt.grid(True)
                         plt.xscale("log")
-                        filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={k}_saturationDX={saturation_DX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={round(k,0)}_saturationDX={saturation_DX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
                         plt.savefig(os.path.join(save_path, filename))
                         plt.close()
 
@@ -2087,7 +2251,45 @@ def plot_optimal_SNR_by_saturation_SX(optimal_SNR_data, outdir, direction, M, dL
                         plt.legend()
                         plt.grid(True)
                         plt.xscale("log")
-                        filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={k}_saturationDX={saturation_DX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_window={round(window_size,1)}_k={round(k,0)}_saturationDX={saturation_DX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
+                        plt.savefig(os.path.join(save_path, filename))
+                        plt.close()
+
+def plot_condition_number_by_saturation_SX(condition_numbers, outdir, direction, M, dL, N_fft):
+    """
+    Plot the condition number of the ACF Toeplitz matrix by varying saturation_SX, keeping window size, k, and saturation_DX fixed.
+    """
+
+    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
+    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    os.makedirs(save_path, exist_ok=True)
+
+    window_sizes = sorted(set(w for w, _, _, _ in condition_numbers.keys()))
+    k_values = sorted(set(k for _, k, _, _ in condition_numbers.keys()))
+    saturation_DX_values = sorted(set(s for _, _, s, _ in condition_numbers.keys()))
+
+    for N_FFT in N_fft:
+        for window_size in window_sizes:
+            for k in k_values:
+                for saturation_DX in saturation_DX_values:
+                    plt.figure(figsize=(10, 6))
+
+                    sat_SX_vals, cond_vals = [], []
+                    for (w_size, k_val, sat_DX, sat_SX), cond_number in condition_numbers.items():
+                        if w_size == window_size and k_val == k and sat_DX == saturation_DX:
+                            sat_SX_vals.append(sat_SX)
+                            cond_vals.append(cond_number)
+
+                    if sat_SX_vals:
+                        plt.plot(sat_SX_vals, cond_vals, marker='o', linestyle='dotted')
+                        plt.xlabel("Saturation SX [Hz^-1]")
+                        plt.ylabel("Condition Number")
+                        plt.xscale("log")
+                        plt.yscale("log")
+                        plt.grid(True)
+                        plt.title(f"Condition Number vs Saturation SX (Window={round(window_size,1)}, k={k:.1f})")
+
+                        filename = f"Condition_Number_M={M}M0_dL={dL}Mpc_window={round(window_size,1)}_k={k:.1f}_direction={direction}_NFFT_{round(N_FFT,0)}.png"
                         plt.savefig(os.path.join(save_path, filename))
                         plt.close()
 
@@ -2142,9 +2344,9 @@ def plot_condition_numbers(outdir, condition_numbers, thresholds=(1e3, 1e6)):
     plt.savefig(plot_file_path)
     print(f"Condition number plot saved to {plot_file_path}")
 
-def plot_all(mismatch_data, optimal_SNR_data, outdir, direction, M, dL, N_FFT):
+def plot_all(mismatch_data, optimal_SNR_data, condition_numbers, outdir, direction, M, dL, N_FFT):
     """
-    Plots mismatch and optimal SNR data if the corresponding x-axis variable has dim > 1.
+    Plots mismatch, optimal SNR, and condition number data if the corresponding x-axis variable has dim > 1.
     """
 
     # Define plotting functions with their corresponding x-axis variables
@@ -2161,17 +2363,25 @@ def plot_all(mismatch_data, optimal_SNR_data, outdir, direction, M, dL, N_FFT):
             "plot_optimal_SNR_by_saturation_DX": "saturation_DX",
             "plot_optimal_SNR_by_saturation_SX": "saturation_SX",
         },
+        "condition_numbers": {
+            "plot_condition_number_by_k": "k",
+            "plot_condition_number_by_saturation_DX": "saturation_DX",
+            "plot_condition_number_by_saturation_SX": "saturation_SX",
+        }
     }
 
-    # Debug: Stampiamo i valori unici di ogni variabile
-    #print("\n=== DEBUG: Checking data dimensions ===")
+    datasets = {
+        "mismatch": mismatch_data,
+        "optimal_SNR": optimal_SNR_data,
+        "condition_numbers": condition_numbers
+    }
+
     for category, functions in plot_functions.items():
-        data_dict = mismatch_data if category == "mismatch" else optimal_SNR_data
-        #print(f"\nCategory: {category}")
+        data_dict = datasets[category]
 
         for func_name, x_key in functions.items():
             extracted_values = set()
-            for key in data_dict.keys():  
+            for key in data_dict.keys():
                 param_mapping = {
                     "window": key[0],
                     "k": key[1],
@@ -2181,14 +2391,10 @@ def plot_all(mismatch_data, optimal_SNR_data, outdir, direction, M, dL, N_FFT):
                 if x_key in param_mapping:
                     extracted_values.add(param_mapping[x_key])
 
-            #print(f"  - {x_key}: {len(extracted_values)} unique values ({extracted_values})")
-
+            # Only call the function if there are multiple unique values for the x-axis variable
             if len(extracted_values) > 1:
                 plot_function = globals().get(func_name, None)
                 if plot_function:
-                    #print(f"  -> Plotting {func_name} for {category} using {x_key} as x-axis")
                     plot_function(data_dict, outdir, direction, M, dL, N_FFT)
                 else:
-                    print(f"  !! Warning: Function {func_name} not found in global scope.")
-
-    #print("\n=== DEBUG: Finished Checking ===\n")
+                    print(f"Warning: Function {func_name} not found in global scope.")

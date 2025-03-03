@@ -264,20 +264,20 @@ def extract_NR_params(NR_sim, M):
             - NR_r_cut (list or array)
 
     Returns:
-        tuple: (t_start_g, t_end_g, N_sim)
+        tuple: (t_start_g, t_end_g, t_NR_s, NR_length)
     """
     t_peak = NR_sim.t_peak
     t_NR_cut = NR_sim.t_NR_cut
     t_start_g, t_end_g = t_NR_cut[0] - t_peak, t_NR_cut[-1] - t_peak
-    N_sim = len(NR_sim.NR_r_cut)
+    NR_length = len(NR_sim.NR_r_cut)
     t_NR_s = (t_NR_cut - t_peak - t_start_g) * M * C_mt
 
-    print("t_start_g={0:.4f}M, t_end_g={1:.4f}M, N_sim={2:.0f}".format(t_start_g, t_end_g, N_sim))
+    print("t_start_g={0:.4f}M, t_end_g={1:.4f}M, N_sim={2:.0f}".format(t_start_g, t_end_g, NR_length))
 
     #print("t_NR_cut - t_peak - t_start_g (geometric units): ", t_NR_s/(M * C_mt))
     #print("t_NR_cut - t_peak (s): ", (t_NR_cut - t_peak) * M * C_mt)
 
-    return t_start_g, t_end_g, t_NR_s, N_sim
+    return t_start_g, t_end_g, t_NR_s, NR_length
 
 
 def extract_and_compute_psd_parameters(asd_path, psd):

@@ -229,16 +229,16 @@ def main():
     #===============================#
 
     # Initialize dictionary
-    psd_data, acf_data, mismatch_data, optimal_SNR_data = {}, {}, {}, {}
+    psd_data, acf_data, mismatch_data, optimal_SNR_data, condition_numbers = {}, {}, {}, {}, {}
 
     # Mass [M_{\odot}] and distance [Mpc]
-    M, dL = parameters['Mismatch']['M'], parameters['Mismatch']['dL']
+    M, dL, ra, dec, psi = parameters['Mismatch']['M'], parameters['Mismatch']['dL'], parameters['Mismatch']['ra'], parameters['Mismatch']['dec'], parameters['Mismatch']['psi']
     t_start_g_true = parameters['Inference']['t-start']
 
-    # Extract t-peak, t_start and t_end
+    # Extract estimated t-peak, t_start and t_end
     t_start_g, t_end_g, t_NR_s, NR_length = wf_utils.extract_NR_params(NR_sim, M)
 
-    # Compute start and end time in physical units
+    # Compute estimated start and end time in physical units
     t_start = t_start_g * C_mt * M
     t_end = t_end_g * C_mt * M
 
@@ -292,9 +292,6 @@ def main():
                     C1_flag=C1_choice
                 )
 
-                print("N_fft: ", N_fft)
-                print("len(ACF_smoothed): ", len(ACF_smoothed))
-
                 # Store smoothed PSD/ACF data in dictionaries
                 psd_data[f"window size={round(window_size,1)}Hz, k={round(k,0)}, {direction}, N_FFT={N_fft}"] = PSD_smoothed
                 acf_data[f"window size={round(window_size,1)}Hz, k={round(k,0)}, {direction}, N_FFT={N_fft}"] = ACF_smoothed
@@ -303,7 +300,13 @@ def main():
 
                 # Truncate ACF to ringdown analysis lenght
                 t_ACF = np.linspace(0, N_fft*dt, len(ACF_smoothed))
-                ACF_trunc = postprocess.truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s)
+                ACF_truncated_NR = postprocess.truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s)
+
+                # Compute the condition number
+                cond_number = wf_utils.compute_condition_number(ACF_truncated_NR)
+                
+                # Store in dictionary
+                condition_numbers[(window_size, k, saturation_DX, saturation_SX)] = cond_number
 
                 # Call compute_mismatch with the subsampled smoothed ACF
                 postprocess.compute_mismatch(
@@ -312,8 +315,21 @@ def main():
                     inference_model, 
                     parameters['I/O']['outdir'],
                     parameters['Inference']['method'], 
-                    ACF_trunc, N_fft,
+                    ACF_truncated_NR, N_fft,
                     M, dL,
+                    t_start_g_true,
+                    window_size, k
+                )
+
+                # Call compute_mismatch with the subsampled smoothed ACF (for fixed alpha, delta, psi)
+                postprocess.compute_mismatch_h(
+                    NR_sim, 
+                    results_object, 
+                    inference_model, 
+                    parameters['I/O']['outdir'],
+                    parameters['Inference']['method'], 
+                    ACF_truncated_NR, N_fft,
+                    M, dL, ra, dec, psi,
                     t_start_g_true,
                     window_size, k
                 )
@@ -336,7 +352,7 @@ def main():
 
                 # Plot ACF
                 postprocess.plot_acf_interpolated(t_ACF, t_NR_s, 
-                                                  ACF_smoothed, ACF_trunc, 
+                                                  ACF_smoothed, ACF_truncated_NR, 
                                                   parameters['I/O']['outdir'], 
                                                   window_size, k,
                                                   saturation_DX, saturation_SX,
@@ -349,7 +365,7 @@ def main():
                     inference_model, 
                     parameters['I/O']['outdir'],
                     parameters['Inference']['method'], 
-                    ACF_trunc,
+                    ACF_truncated_NR,
                     N_fft,
                     M, dL,
                     t_start_g, t_end_g,
@@ -379,8 +395,7 @@ def main():
 
     # Postprocess plots
     postprocess.plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size, parameters['I/O']['outdir'], direction)
-    #postprocess.plot_psd_and_acf(psd_data, acf_data, f_min, f_max, t_start, t_end, parameters['I/O']['outdir'], direction, window_size)
-    postprocess.plot_all(mismatch_data, optimal_SNR_data, parameters['I/O']['outdir'], direction, M, dL, N_FFT)
+    postprocess.plot_all(mismatch_data, optimal_SNR_data, condition_numbers, parameters['I/O']['outdir'], direction, M, dL, N_FFT)
 
     # Attempt to generate the global corner plot
     try:
