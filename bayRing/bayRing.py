@@ -187,13 +187,6 @@ def main():
 
     print_section('Post-processing')
 
-    """
-    #print info
-    print('results_object: ', results_object)
-    print('results_object len: ', len(results_object))
-    print('inference_model: ', inference_model)
-    """
-
     print('\n* Note: except for free damped sinusoids fits, quantities are quoted at the selected peak time.\n')
     postprocess.print_point_estimate(results_object, inference_model.access_names(), parameters['Inference']['method'])
     postprocess.l2norm_residual_vs_nr(results_object, inference_model, NR_sim, parameters['I/O']['outdir'])
@@ -251,20 +244,20 @@ def main():
     flags = parameters['Flags']
     check_TD_FD = False
     C1_choice = True
-    sanity_check_mm = False
+    mismatch_print_flag = flags['mismatch_print_flag']
 
     # Choose if iterate or not on N_FFT
     N_FFT = [N_points] if n_FFT_points == 1 else list(map(int, np.logspace(np.log10(NR_length), np.log10(N_points), n_FFT_points)))
 
-    """
-    # Define the directory path
-    smoothing_paths = ["Left_smoothing", "Right_smoothing", "Both_edges_smoothing"]
-    for smoothing_path in smoothing_paths:
-        algorithm_dir = os.path.join(parameters['I/O']['outdir'], "Algorithm", smoothing_path)
+    if flags['clear_directory'] == 1:
 
-        # Clear it before plotting
-        postprocess.clear_directory(algorithm_dir)
-    """    
+        # Define the directory path
+        smoothing_paths = ["Left_smoothing", "Right_smoothing", "Both_edges_smoothing"]
+        for smoothing_path in smoothing_paths:
+            algorithm_dir = os.path.join(parameters['I/O']['outdir'], "Algorithm", smoothing_path)
+
+            # Clear it before plotting
+            postprocess.clear_directory(algorithm_dir) 
 
     # Iterate over the number of FFT points
     for N_fft in N_FFT:
@@ -318,7 +311,8 @@ def main():
                     ACF_truncated_NR, N_fft,
                     M, dL,
                     t_start_g_true,
-                    window_size, k
+                    window_size, k,
+                    mismatch_print_flag
                 )
 
                 # Call compute_mismatch with the subsampled smoothed ACF (for fixed alpha, delta, psi)
@@ -395,6 +389,7 @@ def main():
 
     # Postprocess plots
     postprocess.plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size, parameters['I/O']['outdir'], direction)
+    postprocess.plot_psd_and_acf(psd_data, acf_data, f_min, f_max, parameters['I/O']['outdir'], direction)
     postprocess.plot_all(mismatch_data, optimal_SNR_data, condition_numbers, parameters['I/O']['outdir'], direction, M, dL, N_FFT)
 
     # Attempt to generate the global corner plot

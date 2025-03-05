@@ -217,7 +217,7 @@ class WaveformModel(cpnest.model.Model):
 
         c=2.99792458*10**8
         G_c=6.67259*10**(-11)
-        Msol=1.9885*(10**30) ;
+        Msol=1.9885*(10**30)
         gamma=Msol*G_c/c**3
 
         #self.t_start = 4.92e-6*self.t_start*(self.metadata['m1']+self.metadata['m2'])

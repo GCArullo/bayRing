@@ -157,14 +157,14 @@ def read_config(Config):
         'window'       : 0.8,
         'window_max'       : 10.0,
         'n_window'         : 1,
-        'steepness'    : 150,
-        'steepness_max'    : 200,
+        'steepness'    : 7.,
+        'steepness_max'    : 200.,
         'n_steepness'      : 1,
-        'saturation_DX'    : 1e-39,
-        'saturation_DX_max'    : 1e-32,
+        'saturation_DX'    : 1,
+        'saturation_DX_max'    : 5,
         'n_saturation_DX'      : 1,
-        'saturation_SX'    : 1e-44,
-        'saturation_SX_max'    : 1e-42,
+        'saturation_SX'    : 1,
+        'saturation_SX_max'    : 5,
         'n_saturation_SX'      : 1,
         'n_FFT_points'     : 1,
         },
@@ -175,7 +175,7 @@ def read_config(Config):
         'dL'               : 410,
         'ra'               : 1.375,
         'dec'              : -0.2108,
-        'psi'              : 2.659,
+        'psi'              : 2.659
         },
 
         'Flags': 
@@ -183,6 +183,8 @@ def read_config(Config):
         'check_TD_FD': False,
         'C1_choice': True,
         'sanity_check_mm': False,
+        'clear_directory': 1,
+        'mismatch_print_flag': 1
         }
 
     }

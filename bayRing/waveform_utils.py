@@ -436,16 +436,16 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
 
     # Apply smoothing for 'below', 'above', or 'below-and-above'
     if direction == 'below':
-        target_value_l = saturation_DX
+        target_value_l = saturation_DX*values[0]
         values = smoothing_function(frequencies, values, f_anchor_l, window_size, target_value_l, k, is_above=False)
 
     elif direction == 'above':
-        target_value_h = saturation_SX
+        target_value_h = saturation_SX*values[-1]
         values = smoothing_function(frequencies, values, f_anchor_h, window_size, target_value_h, k, is_above=True)
 
     elif direction == 'below-and-above':
-        target_value_l = saturation_DX
-        target_value_h = saturation_SX
+        target_value_l = saturation_DX*values[0]
+        target_value_h = saturation_SX*values[-1]
         # Left smoothing
         values = smoothing_function(frequencies, values, f_anchor_l, window_size, target_value_l, k, is_above=False)
         # Right smoothing
@@ -534,7 +534,7 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size, k
     # Extend PSD for f < f_min
     f_below_min = f[f < f_min]
     if len(f_below_min) > 0:
-        PSD_below_min = np.full_like(f_below_min, saturation_DX)
+        PSD_below_min = np.full_like(f_below_min, saturation_DX*smoothed_PSD[0])
         smoothed_PSD[:len(f_below_min)] = PSD_below_min
 
     #-----------------------------------------------------C^1 fixing------------------------------------------------------------#
