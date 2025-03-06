@@ -5,12 +5,16 @@ from scipy.optimize    import fmin, minimize as min
 from scipy.signal      import find_peaks
 import os
 
-#constants
+# Constants
 twopi = 2.*np.pi
 c=2.99792458*10**8 #m/s
-G=6.67259*1e-11
+G=6.67259*1e-11 #N*m^2/kg
 M_s=1.9885*10**30 #solar masses
-C_mt=(M_s*G)/c**3 #s, converts a mass expressed in solar masses into a time in seconds
+Mpc = 3.0857*1e22 #Mpc in meters
+
+# Conversions
+C_mt=(M_s*G)/(c**3) #s, converts a mass expressed in solar masses into a time in seconds
+C_md=(M_s*G)/(Mpc*c**2) #adimensional, converts a mass expressed in solar masses to a distance in Megaparsec
 
 def amp_phase_from_re_im(h_re, h_im):
 
@@ -200,7 +204,6 @@ def align_waveforms_at_peak(t_NR, NR_amp, NR_phi, t_res, NR_r_res, NR_i_res):
 
     return NR_r_res_interp_aligned_time_phase, NR_i_res_interp_aligned_time_phase
 
-
 def find_peak_time(t, A, ecc):
 
     """
@@ -272,20 +275,24 @@ def extract_NR_params(NR_sim, M):
     NR_length = len(NR_sim.NR_r_cut)
     t_NR_s = (t_NR_cut - t_peak - t_start_g) * M * C_mt
 
-    print("t_start_g={0:.4f}M, t_end_g={1:.4f}M, N_sim={2:.0f}".format(t_start_g, t_end_g, NR_length))
-
-    #print("t_NR_cut - t_peak - t_start_g (geometric units): ", t_NR_s/(M * C_mt))
-    #print("t_NR_cut - t_peak (s): ", (t_NR_cut - t_peak) * M * C_mt)
+    print("\nEstimated starting and end times and NR simulation lenght")
+    print("t_start={0:.1f}M, t_end={1:.1f}M, NR_length={2:.0f}\n".format(t_start_g, t_end_g, NR_length))
 
     return t_start_g, t_end_g, t_NR_s, NR_length
 
+def extract_GW_parameters(parameters):
+    """Extract GW parameters for mismatch computation."""
+    return (
+        parameters['Mismatch']['M'], parameters['Mismatch']['dL'],
+        parameters['Mismatch']['ra'], parameters['Mismatch']['dec'], parameters['Mismatch']['psi']
+    )
 
-def extract_and_compute_psd_parameters(asd_path, psd):
+def extract_and_compute_psd_parameters(asd_path, psd_dict):
     """
     Load the PSD file, extract key frequency parameters, and compute window properties.
     
     Parameters:
-        asd_path (str): Path to the ASD (Amplitude Spectral Density) file.
+        asd_path (str): Path to the ASD file.
         f_sample (float): Sampling frequency in Hz.
         psd (dict): Dictionary containing window properties.
     
@@ -306,24 +313,25 @@ def extract_and_compute_psd_parameters(asd_path, psd):
         # Load the frequency data from the ASD file
         freq_file, _ = np.loadtxt(asd_path, unpack=True)
         
-        # Extract required parameters
+        # Extract PSD parameters
         f_min, f_max = np.min(freq_file), np.max(freq_file)
         f_sample = 2 * f_max
         dt = 1 / f_sample
         df = np.min(np.diff(freq_file))
         N_points = int(f_sample / df)
-        n_iterations = psd['n_FFT_points']
+        n_FFT_points = psd_dict['n_FFT_points']
         
         # Print extracted values
-        print(f"f_min={f_min:.3f} Hz, f_max={f_max:.3f} Hz, dt={dt:.6f} s, df={df:.4f} Hz, N_points={N_points}, n_iterations={n_iterations}")
+        print("\nASD file parameters")
+        print(f"f_min={f_min:.0f}Hz, f_max={f_max:.0f}Hz, dt={dt:.6f}s, df={df:.4f}Hz, N_points={N_points}\n")
         
         # Compute window properties
-        window_sizes = np.linspace(psd['window'], psd['window_max'], psd['n_window']).tolist()
-        steepness_values = np.logspace(np.log10(psd['steepness']), np.log10(psd['steepness_max']), psd['n_steepness']).tolist()
-        saturation_DX_values = np.logspace(np.log10(psd['saturation_DX']), np.log10(psd['saturation_DX_max']), psd['n_saturation_DX']).tolist()
-        saturation_SX_values = np.logspace(np.log10(psd['saturation_SX']), np.log10(psd['saturation_SX_max']), psd['n_saturation_SX']).tolist()
+        window_sizes = np.linspace(psd_dict['window'], psd_dict['window_max'], psd_dict['n_window']).tolist()
+        steepness_values = np.logspace(np.log10(psd_dict['steepness']), np.log10(psd_dict['steepness_max']), psd_dict['n_steepness']).tolist()
+        saturation_DX_values = np.logspace(np.log10(psd_dict['saturation_DX']), np.log10(psd_dict['saturation_DX_max']), psd_dict['n_saturation_DX']).tolist()
+        saturation_SX_values = np.logspace(np.log10(psd_dict['saturation_SX']), np.log10(psd_dict['saturation_SX_max']), psd_dict['n_saturation_SX']).tolist()
         
-        return f_min, f_max, dt, df, N_points, n_iterations, window_sizes, steepness_values, saturation_DX_values, saturation_SX_values
+        return f_min, f_max, dt, df, N_points, n_FFT_points, window_sizes, steepness_values, saturation_DX_values, saturation_SX_values
     
     except Exception as e:
         print(f"Error processing PSD file {asd_path}: {e}")

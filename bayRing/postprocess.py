@@ -10,12 +10,12 @@ from pycbc.types.frequencyseries import FrequencySeries
 from pycbc.filter import sigma, overlap as compute_FD_overlap, overlap_cplx as compute_FD_overlap_cplx, match as compute_FD_match, matched_filter_core, matched_filter
 from scipy.interpolate import interp1d
 
-#units and costants
+# Costants
 twopi = 2.*np.pi
 c=2.99792458*1e8 #m/s
-G=6.67259*1e-11
+G=6.67259*1e-11 #N*m^2/kg
 M_s=1.9885*1e30 #solar masses
-Mpc = 3.0857*1e22 #Megaparsec in meters
+Mpc = 3.0857*1e22 #Mpc in meters
 
 #color palette
 colbBlue   = "#4477AA"
@@ -26,7 +26,7 @@ colbCyan   = "#66CCEE"
 colbPurple = "#AA3377"
 colbGray   = "#BBBBBB"
 
-#conversions
+# Conversions
 C_mt=(M_s*G)/(c**3) #s, converts a mass expressed in solar masses into a time in seconds
 C_md=(M_s*G)/(Mpc*c**2) #adimensional, converts a mass expressed in solar masses to a distance in Megaparsec
 
@@ -779,7 +779,7 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
 
 def compute_mismatch_check_FD(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size, k, check_TD_FD, sanity_check_mm):
     """
-    Compute the mismatch of the model with respect to NR simulations.
+    OLD VERSION. Compute the mismatch of the model with respect to NR simulations.
     """
 
     # File paths for saving results
@@ -847,10 +847,11 @@ def compute_mismatch_check_FD(NR_sim, results, inference_model, outdir, method, 
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
                 continue
 
-def compute_mismatch(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g_true, window_size, k, mismatch_print_flag):
+def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g_true, window_size, k, mismatch_print_flag):
     """
     Compute the mismatch of the model with respect to NR simulations.
     """
+    print("\nProcessing mismatch computation for plus and cross polarizations.\n")
 
     # File paths for saving results
     mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}.txt"
@@ -915,11 +916,11 @@ def compute_mismatch(NR_sim, results, inference_model, outdir, method, acf, N_FF
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
                 continue
 
-def compute_mismatch_h(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, ra, dec, psi, t_start_g_true, window_size, k):
+def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, ra, dec, psi, t_start_g_true, window_size, k):
     """
     Compute the mismatch of the model with respect to NR simulations.
     """
-
+    print("\nProcessing mismatch computation for the total signal.\n")
     # File paths for saving results
     mismatch_filename = f"Mismatch_h_tot_M_{M}_dL_{dL}_alpha_{ra}_delta_{dec}_psi_{psi}_t_s_{round(t_start_g_true,1)}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}.txt"
     outFile_path = os.path.join(outdir, 'Algorithm', mismatch_filename)
@@ -974,6 +975,7 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
     """
     Compute the optimal SNR of the model waveform.
     """
+    print("\nProcessing optimal SNR computation for plus and cross polarizations.\n")
 
     # File paths for saving results
     optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}.txt"
@@ -990,7 +992,7 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
     NR_dict = {'real': NR_r, 'imaginary': NR_i}
 
     for NR_quant, NR_data in NR_dict.items():
-        print(f"\nProcessing NR component: {NR_quant}")
+        #print(f"\nProcessing NR component: {NR_quant}")
 
         for perc in [5, 50, 95]:
             try:
@@ -1770,7 +1772,7 @@ def plot_psd_and_acf(psd_data, acf_data, f_min, f_max, outdir, direction):
         path = os.path.join(save_path, filename)
         plt.savefig(path)
         plt.close(fig)
-        print(f"\nSaved PSD/ACF plots to {path}.\n")
+        #print(f"\nSaved PSD/ACF plots to {path}.\n")
 
     except Exception as e:
         print(f"Failed to generate smoothed PSD and ACF plots ({direction}): {e}")
@@ -1841,24 +1843,20 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size, outdir, directi
         axs[0].set_yscale("log")
         axs[0].set_xlim(x_min1 * 0.99, x_max1 * 1.01)
         axs[0].set_ylim(y_min1 * 0.9, y_max1 * 1.5)
-        #axs[0].grid(True)
-        #axs[0].legend(loc="upper right", fontsize=8)
+        axs[0].grid(True)
 
         # Adjust subplot 2 (f_max)
         axs[1].set_xlabel("Frequency [Hz]")
         axs[1].set_ylabel("PSD [Hz^-1]")
         axs[1].set_title(f"Smoothed PSD near f_max ({direction.capitalize()})")
-        #axs[1].set_xscale("log")
         axs[1].set_yscale("log")
-        #axs[1].set_xlim(x_min2 * 0.99, x_max2 *1.01)
-        axs[1].set_xlim(4980, 4996)
+        axs[1].set_xlim(x_min2 * 0.99, x_max2 *1.01)
         axs[1].set_ylim(y_min2 * 0.1, y_max2 * 1.1)
-        #axs[1].grid(True)
-        #axs[1].legend(loc="upper right", fontsize=8)
+        axs[1].grid(True)
 
         # Adjust layout and save the plot
         plt.tight_layout()
-        filename = "PSD_Near_fmin_fmax.png"
+        filename = "PSD_Near_fmin_fmax.pdf"
         path = os.path.join(save_path, filename)
         plt.savefig(path)
         plt.close(fig)
@@ -2419,7 +2417,7 @@ def plot_condition_numbers(outdir, condition_numbers, thresholds=(1e3, 1e6)):
     plt.savefig(plot_file_path)
     print(f"Condition number plot saved to {plot_file_path}")
 
-def plot_all(mismatch_data, optimal_SNR_data, condition_numbers, outdir, direction, M, dL, N_FFT):
+def plot_mismatch_optimal_SNR_condition_number_window_parameters(mismatch_data, optimal_SNR_data, condition_numbers, outdir, direction, M, dL, N_FFT):
     """
     Plots mismatch, optimal SNR, and condition number data if the corresponding x-axis variable has dim > 1.
     """

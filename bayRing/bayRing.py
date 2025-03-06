@@ -17,16 +17,23 @@ import bayRing.inference          as inference
 import bayRing.template_waveforms as template_waveforms
 import bayRing.waveform_utils     as wf_utils
 
+import pyRing
 from pyRing.utils import print_section
+
+print("\n\n\n\n\nUsing ", pyRing.__file__, "\n\n\n\n\n")
 
 import scipy.linalg as sl
 
-#constants
+# Constants
 twopi = 2.*np.pi
-c=2.99792458*10**8 #m/s
-G=6.67259*1e-11
-M_s=1.9885*10**30 #solar masses
-C_mt=(M_s*G)/c**3 #s, converts a mass expressed in solar masses into a time in seconds
+c=2.99792458*1e8 #m/s
+G=6.67259*1e-11 #N*m^2/kg
+M_s=1.9885*1e30 #solar masses
+Mpc = 3.0857*1e22 #Mpc in meters
+
+# Conversions
+C_mt=(M_s*G)/(c**3) #s, converts a mass expressed in solar masses into a time in seconds
+C_md=(M_s*G)/(Mpc*c**2) #adimensional, converts a mass expressed in solar masses to a distance in Megaparsec
 
 if __name__=='__main__':
     main()
@@ -224,21 +231,21 @@ def main():
     # Initialize dictionary
     psd_data, acf_data, mismatch_data, optimal_SNR_data, condition_numbers = {}, {}, {}, {}, {}
 
-    # Mass [M_{\odot}] and distance [Mpc]
-    M, dL, ra, dec, psi = parameters['Mismatch']['M'], parameters['Mismatch']['dL'], parameters['Mismatch']['ra'], parameters['Mismatch']['dec'], parameters['Mismatch']['psi']
+    # Assign GW parameters
+    M, dL, ra, dec, psi = wf_utils.extract_GW_parameters(parameters)
     t_start_g_true = parameters['Inference']['t-start']
 
     # Extract estimated t-peak, t_start and t_end
     t_start_g, t_end_g, t_NR_s, NR_length = wf_utils.extract_NR_params(NR_sim, M)
 
-    # Compute estimated start and end time in physical units
+    # Convert estimated start and end time in seconds
     t_start = t_start_g * C_mt * M
     t_end = t_end_g * C_mt * M
 
     # Loading PSD parameters
-    psd_d = parameters['PSD-settings']
-    asd_path, direction = psd_d['asd-path'], psd_d['direction']
-    f_min, f_max, dt, _, N_points, n_FFT_points, window_sizes, steepness_values, saturation_DX_values, saturation_SX_values = wf_utils.extract_and_compute_psd_parameters(asd_path, psd_d)
+    psd_dict = parameters['PSD-settings']
+    asd_path, direction = psd_dict['asd-path'], psd_dict['direction']
+    f_min, f_max, dt, _, N_points, n_FFT_points, window_sizes, steepness_values, saturation_DX_values, saturation_SX_values = wf_utils.extract_and_compute_psd_parameters(asd_path, psd_dict)
 
     # Flags (to improve)
     flags = parameters['Flags']
@@ -295,14 +302,11 @@ def main():
                 t_ACF = np.linspace(0, N_fft*dt, len(ACF_smoothed))
                 ACF_truncated_NR = postprocess.truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s)
 
-                # Compute the condition number
-                cond_number = wf_utils.compute_condition_number(ACF_truncated_NR)
-                
                 # Store in dictionary
-                condition_numbers[(window_size, k, saturation_DX, saturation_SX)] = cond_number
+                condition_numbers[(window_size, k, saturation_DX, saturation_SX)] = wf_utils.compute_condition_number(ACF_truncated_NR)
 
                 # Call compute_mismatch with the subsampled smoothed ACF
-                postprocess.compute_mismatch(
+                postprocess.compute_mismatch_hplus_hcross(
                     NR_sim, 
                     results_object, 
                     inference_model, 
@@ -316,7 +320,7 @@ def main():
                 )
 
                 # Call compute_mismatch with the subsampled smoothed ACF (for fixed alpha, delta, psi)
-                postprocess.compute_mismatch_h(
+                postprocess.compute_mismatch_htot(
                     NR_sim, 
                     results_object, 
                     inference_model, 
@@ -345,12 +349,7 @@ def main():
                 #-------------------------------------------------- optimal SNR computation -------------------------------------------------------#
 
                 # Plot ACF
-                postprocess.plot_acf_interpolated(t_ACF, t_NR_s, 
-                                                  ACF_smoothed, ACF_truncated_NR, 
-                                                  parameters['I/O']['outdir'], 
-                                                  window_size, k,
-                                                  saturation_DX, saturation_SX,
-                                                  direction)
+                postprocess.plot_acf_interpolated(t_ACF, t_NR_s, ACF_smoothed, ACF_truncated_NR, parameters['I/O']['outdir'], window_size, k, saturation_DX, saturation_SX, direction)
 
                 # Call compute_mismatch with the subsampled smoothed ACF
                 postprocess.compute_optimal_SNR(
@@ -390,7 +389,7 @@ def main():
     # Postprocess plots
     postprocess.plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size, parameters['I/O']['outdir'], direction)
     postprocess.plot_psd_and_acf(psd_data, acf_data, f_min, f_max, parameters['I/O']['outdir'], direction)
-    postprocess.plot_all(mismatch_data, optimal_SNR_data, condition_numbers, parameters['I/O']['outdir'], direction, M, dL, N_FFT)
+    postprocess.plot_mismatch_optimal_SNR_condition_number_window_parameters(mismatch_data, optimal_SNR_data, condition_numbers, parameters['I/O']['outdir'], direction, M, dL, N_FFT)
 
     # Attempt to generate the global corner plot
     try:

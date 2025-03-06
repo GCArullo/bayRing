@@ -184,7 +184,7 @@ def read_config(Config):
         'C1_choice': True,
         'sanity_check_mm': False,
         'clear_directory': 1,
-        'mismatch_print_flag': 1
+        'mismatch_print_flag': 0
         }
 
     }

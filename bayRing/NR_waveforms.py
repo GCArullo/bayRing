@@ -9,6 +9,11 @@ except: pass
 import bayRing.QNM_utils      as QNM_utils
 import bayRing.utils          as utils
 import bayRing.waveform_utils as waveform_utils
+
+import pyRing
+
+#print("\n\n\n\n\nUsing ", pyRing.__file__, "\n\n\n\n\n")
+
 import pyRing.utils           as pyRing_utils
 import pyRing.waveform        as wf
 
