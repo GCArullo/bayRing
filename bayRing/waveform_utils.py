@@ -322,20 +322,21 @@ def extract_and_compute_psd_parameters(asd_path, psd_dict):
         n_FFT_points = psd_dict['n_FFT_points']
         
         # Print extracted values
-        print("\nASD file parameters")
+        print("\nExtracted ASD file parameters")
         print(f"f_min={f_min:.0f}Hz, f_max={f_max:.0f}Hz, dt={dt:.6f}s, df={df:.4f}Hz, N_points={N_points}\n")
         
         # Compute window properties
-        window_sizes = np.linspace(psd_dict['window'], psd_dict['window_max'], psd_dict['n_window']).tolist()
+        window_sizes_DX = np.linspace(psd_dict['window_DX'], psd_dict['window_DX_max'], psd_dict['n_window_DX']).tolist()
+        window_sizes_SX = np.linspace(psd_dict['window_SX'], psd_dict['window_SX_max'], psd_dict['n_window_SX']).tolist()
         steepness_values = np.logspace(np.log10(psd_dict['steepness']), np.log10(psd_dict['steepness_max']), psd_dict['n_steepness']).tolist()
         saturation_DX_values = np.logspace(np.log10(psd_dict['saturation_DX']), np.log10(psd_dict['saturation_DX_max']), psd_dict['n_saturation_DX']).tolist()
         saturation_SX_values = np.logspace(np.log10(psd_dict['saturation_SX']), np.log10(psd_dict['saturation_SX_max']), psd_dict['n_saturation_SX']).tolist()
         
-        return f_min, f_max, dt, df, N_points, n_FFT_points, window_sizes, steepness_values, saturation_DX_values, saturation_SX_values
+        return f_min, f_max, dt, df, N_points, n_FFT_points, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values
     
     except Exception as e:
         print(f"Error processing PSD file {asd_path}: {e}")
-        return None, None, None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None, None, None, None
 
 def acf_from_asd(asd_filepath, f_min, f_max, N_points):
 
@@ -389,7 +390,7 @@ def acf_from_asd(asd_filepath, f_min, f_max, N_points):
 
     return ACF
 
-def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, saturation_SX, k, window_size, direction):
+def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, saturation_SX, k, window_size_DX, window_size_SX, direction):
     """
     Apply smoothing saturation to specified frequency ranges.
 
@@ -400,7 +401,8 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
         f_anchor_h (float): High anchor frequency for smoothing (for 'above' or 'below-and-above').
         saturation (float): Saturation value for the target smoothing.
         k (float): Smoothing steepness parameter (controls the exponential decay).
-        window_size (float): Smoothing window size around anchor frequencies.
+        window_size_DX (float): Smoothing window size around low anchor frequencies.
+        window_size_SX (float): Smoothing window size around high anchor frequencies.
         direction (str): Direction of smoothing ('below', 'above', or 'below-and-above').
 
     Returns:
@@ -408,10 +410,10 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
     """
 
     # Return early if window_size is 0 to avoid unnecessary computations
-    if window_size == 0:
+    if window_size_DX == 0:
         return values
 
-    def smoothing_function(frequencies, values, f_anchor, window_size, target_value, k, is_above):
+    def smoothing_function(frequencies, values, f_anchor, window_size, target_value, k, indices, is_above):
         """
         Function to apply smoothing to a specified frequency range (left or right).
 
@@ -429,12 +431,10 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
         """
         if is_above:
             smooth_range = frequencies[(frequencies >= f_anchor - window_size) & (frequencies <= f_anchor)]
-            indices = np.where((frequencies >= f_anchor - window_size) & (frequencies <= f_anchor))
             smoothing_factor = 1 - np.exp(-(smooth_range - (f_anchor - window_size)) * k)
             s_norm = 1 - np.exp(- (window_size) * k)
         else:
             smooth_range = frequencies[(frequencies >= f_anchor) & (frequencies <= f_anchor + window_size)]
-            indices = np.where((frequencies >= f_anchor) & (frequencies <= f_anchor + window_size))
             smoothing_factor = 1 - np.exp((smooth_range - (f_anchor + window_size)) * k)
             s_norm = 1 - np.exp(- (window_size) * k)
 
@@ -444,20 +444,37 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
 
     # Apply smoothing for 'below', 'above', or 'below-and-above'
     if direction == 'below':
-        target_value_l = saturation_DX*values[0]
-        values = smoothing_function(frequencies, values, f_anchor_l, window_size, target_value_l, k, is_above=False)
+
+        # Select only the indices in the low-frequency range
+        indices_below = np.where((frequencies >= f_anchor_l) & (frequencies <= f_anchor_l + window_size_DX))
+
+        # We acceed to the last element (when we have f = f_anchor_l + window_size)
+        target_value_l = saturation_DX*max(values[indices_below])
+        values = smoothing_function(frequencies, values, f_anchor_l, window_size_DX, target_value_l, k, indices_below, is_above=False)
 
     elif direction == 'above':
-        target_value_h = saturation_SX*values[-1]
-        values = smoothing_function(frequencies, values, f_anchor_h, window_size, target_value_h, k, is_above=True)
+
+        # Select only the indices in the high-frequency range
+        indices_above = np.where((frequencies >= f_anchor_h - window_size_SX) & (frequencies <= f_anchor_h))
+
+        # We acceed to the first element (when we have f = f_anchor_l - window_size)
+        target_value_h = saturation_SX*max(values[indices_above])
+        values = smoothing_function(frequencies, values, f_anchor_h, window_size_SX, target_value_h, k, indices_above, is_above=True)
 
     elif direction == 'below-and-above':
-        target_value_l = saturation_DX*values[0]
-        target_value_h = saturation_SX*values[-1]
-        # Left smoothing
-        values = smoothing_function(frequencies, values, f_anchor_l, window_size, target_value_l, k, is_above=False)
-        # Right smoothing
-        values = smoothing_function(frequencies, values, f_anchor_h, window_size, target_value_h, k, is_above=True)
+
+        # Define indices for both below and above
+        indices_below = np.where((frequencies >= f_anchor_l) & (frequencies <= f_anchor_l + window_size_DX))
+        indices_above = np.where((frequencies >= f_anchor_h - window_size_SX) & (frequencies <= f_anchor_h))
+        
+        # Define targets
+        target_value_l = saturation_DX*max(values[indices_below])
+        target_value_h = saturation_SX*max(values[indices_above])
+
+        # Apply left smoothing
+        values = smoothing_function(frequencies, values, f_anchor_l, window_size_DX, target_value_l, k, indices_below, is_above=False)
+        # Apply right smoothing
+        values = smoothing_function(frequencies, values, f_anchor_h, window_size_SX, target_value_h, k, indices_above, is_above=True)
 
     else:
         raise ValueError("Invalid direction. Choose between 'below', 'above', or 'below-and-above'.")
@@ -501,7 +518,7 @@ def apply_C1(frequencies, values, f_start, window_size):
 
     return values
 
-def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size, k, saturation_DX, saturation_SX, direction, C1_flag):
+def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, direction, C1_flag):
     """
     Compute the ACF from the ASD with smoothing applied.
 
@@ -537,7 +554,7 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size, k
 
     # Apply smoothing
     smoothed_PSD = PSD_band.copy()
-    smoothed_PSD = apply_smoothing(f, smoothed_PSD, f_min, f_max, saturation_DX, saturation_SX, k, window_size, direction)
+    smoothed_PSD = apply_smoothing(f, smoothed_PSD, f_min, f_max, saturation_DX, saturation_SX, k, window_size_DX, window_size_SX, direction)
 
     # Extend PSD for f < f_min
     f_below_min = f[f < f_min]
@@ -552,24 +569,24 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size, k
         if direction=='below':
 
             # Apply the C1 fixing near f_min + window_low
-            f_transition_start = f_min + window_size
-            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start, window_size)
+            f_transition_start = f_min + window_size_DX
+            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start, window_size_DX)
 
         elif direction=='above':
 
             # Apply the C1 fixing near f_max - window_low
-            f_transition_start = f_max - window_size
-            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start, window_size)
+            f_transition_start = f_max - window_size_SX
+            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start, window_size_SX)
 
         elif direction=='below-and-above':
 
             # Apply the C1 fixing near f_min + window_low
-            f_transition_start = f_min + window_size
-            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start, window_size)
+            f_transition_start = f_min + window_size_DX
+            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start, window_size_DX)
 
             # Apply the C1 fixing near f_max - window_low
-            f_transition_start = f_max - window_size
-            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start, window_size)
+            f_transition_start = f_max - window_size_SX
+            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start, window_size_SX)
 
     # ACF for smoothed PSD
     ACF_smoothed = 0.5 * np.real(np.fft.irfft(smoothed_PSD * df)) * N_points

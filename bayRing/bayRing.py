@@ -245,12 +245,12 @@ def main():
     # Loading PSD parameters
     psd_dict = parameters['PSD-settings']
     asd_path, direction = psd_dict['asd-path'], psd_dict['direction']
-    f_min, f_max, dt, _, N_points, n_FFT_points, window_sizes, steepness_values, saturation_DX_values, saturation_SX_values = wf_utils.extract_and_compute_psd_parameters(asd_path, psd_dict)
+    f_min, f_max, dt, _, N_points, n_FFT_points, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values = wf_utils.extract_and_compute_psd_parameters(asd_path, psd_dict)
 
     # Flags (to improve)
     flags = parameters['Flags']
     check_TD_FD = False
-    C1_choice = True
+    C1_choice = flags['C1_flag']
     mismatch_print_flag = flags['mismatch_print_flag']
 
     # Choose if iterate or not on N_FFT
@@ -270,11 +270,12 @@ def main():
     for N_fft in N_FFT:
 
         # Iterate over the smoothing parameters and compute ACF
-        for window_size, k, saturation_DX, saturation_SX in [(w, s, tdx, tsx) for w in window_sizes for s in steepness_values for tdx in saturation_DX_values for tsx in saturation_SX_values]:
+        for window_size_DX, window_size_SX, k, saturation_DX, saturation_SX in [(wdx, wsx, s, tdx, tsx) for wdx in window_sizes_DX for wsx in window_sizes_SX for s in steepness_values for tdx in saturation_DX_values for tsx in saturation_SX_values]:
                 
             # Consistency check on starting time, end time and f_min 
-            if (t_end-t_start)>1/(f_min+window_size) and direction!='above':
-                print("Please provide (t_end-t_start)<1/(f_min+window_size).")
+            if (t_end-t_start)>1/(f_min+window_size_DX) and direction!='above':
+                print("Please provide (t_end-t_start)<1/(f_min+window_size_DX).")
+                print("Forbidden frequency:",f_min+window_size_DX)
                 exit()
 
             try:
@@ -284,7 +285,8 @@ def main():
                     asd_path,
                     f_min, f_max,
                     N_fft,
-                    window_size=window_size,
+                    window_size_DX=window_size_DX,
+                    window_size_SX=window_size_SX,
                     k=k,
                     saturation_DX=saturation_DX,
                     saturation_SX=saturation_SX,
@@ -293,8 +295,8 @@ def main():
                 )
 
                 # Store smoothed PSD/ACF data in dictionaries
-                psd_data[f"window size={round(window_size,1)}Hz, k={round(k,0)}, {direction}, N_FFT={N_fft}"] = PSD_smoothed
-                acf_data[f"window size={round(window_size,1)}Hz, k={round(k,0)}, {direction}, N_FFT={N_fft}"] = ACF_smoothed
+                psd_data[f"wDX={round(window_size_DX,1)}Hz, wSX={round(window_size_SX,1)}Hz, k={round(k,0)}, {direction}, N_FFT={N_fft}"] = PSD_smoothed
+                acf_data[f"wDX={round(window_size_DX,1)}Hz, wSX={round(window_size_SX,1)}Hz, k={round(k,0)}, {direction}, N_FFT={N_fft}"] = ACF_smoothed
 
                 #-------------------------------------------------- Mismatch computation -------------------------------------------------------#
 
@@ -303,7 +305,7 @@ def main():
                 ACF_truncated_NR = postprocess.truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s)
 
                 # Store in dictionary
-                condition_numbers[(window_size, k, saturation_DX, saturation_SX)] = wf_utils.compute_condition_number(ACF_truncated_NR)
+                condition_numbers[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = wf_utils.compute_condition_number(ACF_truncated_NR)
 
                 # Call compute_mismatch with the subsampled smoothed ACF
                 postprocess.compute_mismatch_hplus_hcross(
@@ -315,7 +317,7 @@ def main():
                     ACF_truncated_NR, N_fft,
                     M, dL,
                     t_start_g_true,
-                    window_size, k,
+                    window_size_DX, window_size_SX, k,
                     mismatch_print_flag
                 )
 
@@ -329,27 +331,27 @@ def main():
                     ACF_truncated_NR, N_fft,
                     M, dL, ra, dec, psi,
                     t_start_g_true,
-                    window_size, k
+                    window_size_DX, window_size_SX, k
                 )
 
                 # Read mismatch results from file
-                mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_fft}.txt"
+                mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_fft}.txt"
                 mismatch_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', mismatch_filename)
 
                 with open(mismatch_file, 'r') as f:
                     lines = f.readlines()[1:]  # Skip the header
 
                 # Store mismatch results in mismatch_data (consider only real and imaginary for simplicity)
-                mismatch_data[(window_size, k, saturation_DX, saturation_SX)] = {'real': {}, 'imaginary': {}}
+                mismatch_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = {'real': {}, 'imaginary': {}}
                 for line in lines:
                     perc, component, mismatch = line.strip().split('\t')
                     perc = int(perc)
-                    mismatch_data[(window_size, k, saturation_DX, saturation_SX)][component][perc] = float(mismatch)
+                    mismatch_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)][component][perc] = float(mismatch)
 
                 #-------------------------------------------------- optimal SNR computation -------------------------------------------------------#
 
                 # Plot ACF
-                postprocess.plot_acf_interpolated(t_ACF, t_NR_s, ACF_smoothed, ACF_truncated_NR, parameters['I/O']['outdir'], window_size, k, saturation_DX, saturation_SX, direction)
+                postprocess.plot_acf_interpolated(t_ACF, t_NR_s, ACF_smoothed, ACF_truncated_NR, parameters['I/O']['outdir'], window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, direction)
 
                 # Call compute_mismatch with the subsampled smoothed ACF
                 postprocess.compute_optimal_SNR(
@@ -364,30 +366,30 @@ def main():
                     t_start_g, t_end_g,
                     f_min, f_max,
                     asd_path,
-                    window_size, k,
+                    window_size_DX, window_size_SX, k,
                     check_TD_FD
                 )
 
                 # Read optimal SNR results from file
-                optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_fft}.txt"
+                optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_fft}.txt"
                 optimal_SNR_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', optimal_SNR_filename)
                 with open(optimal_SNR_file, 'r') as f:
                     lines = f.readlines()[1:]  # Skip the header
 
                 # Store mismatch results in optimal_SNR_data (consider only real and imaginary for simplicity)
-                optimal_SNR_data[(window_size, k, saturation_DX, saturation_SX)] = {'real': {}, 'imaginary': {}}
+                optimal_SNR_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = {'real': {}, 'imaginary': {}}
                 for line in lines:
                     perc, component, optimal_SNR = line.strip().split('\t')
                     perc = int(perc)
-                    optimal_SNR_data[(window_size, k, saturation_DX, saturation_SX)][component][perc] = float(optimal_SNR)
+                    optimal_SNR_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)][component][perc] = float(optimal_SNR)
 
             except Exception as e:
-                print(f"Optimal SNR computation failed for window_size={window_size}, k={k}: {e}")
+                print(f"Optimal SNR computation failed for window_sizes=({window_size_DX, window_size_SX})Hz, k={k}, saturations={(saturation_DX, saturation_SX)}: {e}")
 
     #----------------------------------------------------------------------------------- Postprocessing --------------------------------------------------------------------------------------------------------------------------#
 
     # Postprocess plots
-    postprocess.plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size, parameters['I/O']['outdir'], direction)
+    postprocess.plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_SX, parameters['I/O']['outdir'], direction)
     postprocess.plot_psd_and_acf(psd_data, acf_data, f_min, f_max, parameters['I/O']['outdir'], direction)
     postprocess.plot_mismatch_optimal_SNR_condition_number_window_parameters(mismatch_data, optimal_SNR_data, condition_numbers, parameters['I/O']['outdir'], direction, M, dL, N_FFT)
 

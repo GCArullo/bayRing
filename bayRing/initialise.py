@@ -154,9 +154,12 @@ def read_config(Config):
         {
         'asd-path'         : '',
         'direction'        : 'below',
-        'window'       : 0.8,
-        'window_max'       : 10.0,
-        'n_window'         : 1,
+        'window_DX'       : 0.8,
+        'window_DX_max'       : 10.0,
+        'window_SX'       : 0.8,
+        'window_SX_max'       : 10.0,
+        'n_window_DX'         : 1,
+        'n_window_SX'         : 1,
         'steepness'    : 7.,
         'steepness_max'    : 200.,
         'n_steepness'      : 1,
@@ -181,7 +184,7 @@ def read_config(Config):
         'Flags': 
         {
         'check_TD_FD': False,
-        'C1_choice': True,
+        'C1_flag': 1,
         'sanity_check_mm': False,
         'clear_directory': 1,
         'mismatch_print_flag': 0
