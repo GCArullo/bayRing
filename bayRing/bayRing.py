@@ -245,16 +245,16 @@ def main():
     # Loading PSD parameters
     psd_dict = parameters['PSD-settings']
     asd_path, direction = psd_dict['asd-path'], psd_dict['direction']
-    f_min, f_max, dt, _, N_points, n_FFT_points, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values = wf_utils.extract_and_compute_psd_parameters(asd_path, psd_dict)
+    f_min, f_max, dt, _, N_points, n_FFT_points, n_iterations_C1, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values = wf_utils.extract_and_compute_psd_parameters(asd_path, psd_dict)
 
     # Flags (to improve)
     flags = parameters['Flags']
     check_TD_FD = False
-    C1_choice = flags['C1_flag']
+    C1_flag = flags['C1_flag']
     mismatch_print_flag = flags['mismatch_print_flag']
 
     # Choose if iterate or not on N_FFT
-    N_FFT = [N_points] if n_FFT_points == 1 else list(map(int, np.logspace(np.log10(NR_length), np.log10(N_points), n_FFT_points)))
+    N_FFT = [N_points] if n_FFT_points == 1 else list(map(int, np.logspace(np.log10(NR_length), np.log10(2*N_points), n_FFT_points)))
 
     if flags['clear_directory'] == 1:
 
@@ -291,7 +291,8 @@ def main():
                     saturation_DX=saturation_DX,
                     saturation_SX=saturation_SX,
                     direction=direction,
-                    C1_flag=C1_choice
+                    C1_flag=C1_flag,
+                    n_iterations_C1=n_iterations_C1
                 )
 
                 # Store smoothed PSD/ACF data in dictionaries
@@ -306,6 +307,9 @@ def main():
 
                 # Store in dictionary
                 condition_numbers[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = wf_utils.compute_condition_number(ACF_truncated_NR)
+
+                # Print window parameters
+                print(f"\nSelected window parameters: w_DX={window_size_DX}Hz, w_SX={window_size_SX}Hz, k={k}, saturation_DX={saturation_DX}, saturation_SX={saturation_SX}, N_FFT={N_fft}\n")
 
                 # Call compute_mismatch with the subsampled smoothed ACF
                 postprocess.compute_mismatch_hplus_hcross(

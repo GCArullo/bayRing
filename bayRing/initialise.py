@@ -170,6 +170,7 @@ def read_config(Config):
         'saturation_SX_max'    : 5,
         'n_saturation_SX'      : 1,
         'n_FFT_points'     : 1,
+        'n_iterations_C1'  : 1
         },
 
         'Mismatch':
