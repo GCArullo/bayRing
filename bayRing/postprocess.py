@@ -491,7 +491,9 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     ax2.set_xlim(-10, tM_end)
     ax4.set_xlim(ax2.get_xlim())
 
-    # Plot NR data
+    ################
+    # Plot NR data #
+    ################
 
     if not(tail_flag):
         ax1.plot(t_NR - t_peak, NR_r,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
@@ -505,9 +507,10 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
         ax3.set_ylabel(r'$\mathrm{Im[%s]}$'%(label_data), fontsize=fontsize_labels)
         ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
 
-    ax2.semilogy(t_NR - t_peak, NR_amp*np.e**((t_NR- t_peak)/tau_rd_fundamental), label=r'$\mathrm{NR}$',                            c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
-    ax2.axvline(tM_start,                                                                  c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
-    if(not(tail_flag)): ax2.axvline(0.0,                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
+    if not(tail_flag): ax2.semilogy(t_NR - t_peak, NR_amp*np.e**((t_NR - t_peak)/tau_rd_fundamental), label=r'$\mathrm{NR}$', c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
+    else             : ax2.semilogy(t_NR - t_peak, NR_amp                                          , label=r'$\mathrm{NR}$', c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
+    ax2.axvline(tM_start,                                                                                                    c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
+    if(not(tail_flag)): ax2.axvline(0.0,                                                                                     c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
     if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): ax2.set_ylim([1e-1*amp_peak, 10*amp_peak])
     elif(  tail_flag  and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): ax2.set_ylim([2*1e-4, 2*np.max(NR_amp)])
     ax2.set_xlabel(r'$\mathrm{t - t_{peak} \, [M}]$', fontsize=fontsize_labels)
@@ -537,9 +540,12 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     else:
         ax4.set_ylim([-0.08, 0.28])
 
+    ################################
+    # Plot waveform reconstruction #
+    ################################
+
     if not(nest_model==None):
 
-        # Plot waveform reconstruction
         if(method=='Nested-sampler'):
             models_re_list = [np.real(np.array(nest_model.model(p))) for p in results]
             models_im_list = [np.imag(np.array(nest_model.model(p))) for p in results]
@@ -560,14 +566,18 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
                 if not(tail_flag):
                     ax1.plot(t_cut - t_peak, wf_r,                                               c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
                     ax3.plot(t_cut - t_peak, wf_i,                                               c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
-                ax2.semilogy(t_cut - t_peak, wf_amp, label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
-                ax4.plot(    t_cut - t_peak, wf_f,                                               c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
+                    ax2.semilogy(t_cut - t_peak, wf_amp*np.e**((t_cut - t_peak)/tau_rd_fundamental), label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
+                else:
+                    ax2.semilogy(t_cut - t_peak, wf_amp                                         , label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
+                ax4.plot(    t_cut - t_peak, wf_f,                                                c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
             else:
                 if not(tail_flag):
-                    ax1.plot(t_cut - t_peak, wf_r,                                               c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
-                    ax3.plot(t_cut - t_peak, wf_i,                                               c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
-                ax2.semilogy(t_cut - t_peak, wf_amp,                                             c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
-                ax4.plot(    t_cut - t_peak, wf_f,                                               c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
+                    ax1.plot(t_cut - t_peak, wf_r,                                                c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
+                    ax3.plot(t_cut - t_peak, wf_i,                                                c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
+                    ax2.semilogy(t_cut - t_peak, wf_amp*np.e**((t_cut - t_peak)/tau_rd_fundamental), c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
+                else:
+                    ax2.semilogy(t_cut - t_peak, wf_amp                                         , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
+                ax4.plot(    t_cut - t_peak, wf_f,                                                c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
 
 
         if(tail_flag):
