@@ -144,8 +144,9 @@ class Waveform_rit(object):
 
     def __init__(self, NR_data_path='', csv_path='', ID='', ell=2, m=2, resolution_level=100):
 
-        self.waveform_path    = os.path.join(NR_data_path, 'Data')
+        self.base             = NR_data_path
         self.metadata_path    = os.path.join(NR_data_path, 'Metadata')
+        self.waveform_path    = os.path.join(NR_data_path, 'Data')
         self.psi4_path        = os.path.join(NR_data_path, 'Data/Psi4')
         self.csv_path         = csv_path 
         self.ID               = ID 
@@ -171,12 +172,11 @@ class Waveform_rit(object):
         ID_str = str(self.ID)
 
         possible_name_formats_list = [
-                                        os.path.join(self.metadata_path, f'RIT_eBBH_{ID_str}-n{self.resolution_level}-ecc_Metadata.txt'    ),
-                                        os.path.join(self.metadata_path, f'RIT:eBBH:{ID_str}-n{self.resolution_level}-ecc_Metadata.txt'    ),
+                                        os.path.join(self.base, f'RIT_eBBH_{ID_str}-n{self.resolution_level}-ecc_Metadata.txt'    ),
+                                        os.path.join(self.base, f'RIT:eBBH:{ID_str}-n{self.resolution_level}-ecc_Metadata.txt'    ),
                                      ]
-        idx_names = [                   os.path.join(self.metadata_path, f'RIT:eBBH:{ID_str}-n{self.resolution_level}-id{idx}_Metadata.txt') for idx in range(0, 4)]
         
-        possible_name_formats_list = possible_name_formats_list + idx_names
+        possible_name_formats_list = possible_name_formats_list
         for name_format in possible_name_formats_list:
             try:
                 f  = self.set_metadata_RIT(name_format)
@@ -197,20 +197,26 @@ class Waveform_rit(object):
             self.metadata[key] = val
 
         try:
-            additional_data = pd.read_csv(self.csv_path)
-            
-            self.metadata[  f'A_peak_{self.ell}{self.m}'] = float(additional_data.loc[additional_data.ID==self.ID,     f'A_peak{self.ell}{self.m}'])
-            self.metadata[f'omg_peak_{self.ell}{self.m}'] = float(additional_data.loc[additional_data.ID==self.ID, f'omega_peak{self.ell}{self.m}'])
-            self.metadata[                        'Emrg'] = float(additional_data.loc[additional_data.ID==self.ID,                     f'Heff_til'])
-            self.metadata[                        'Jmrg'] = float(additional_data.loc[additional_data.ID==self.ID,                     f'Jmrg_til'])
-            self.metadata[                        'bmrg'] = float(additional_data.loc[additional_data.ID==self.ID,               f'b_massless_EOB'])
-            
+            additional_data = pd.read_csv(self.csv_path)     
+            self.metadata[f'A_peak_{self.ell}{self.m}']      = additional_data.loc[additional_data['ID'] == int(self.ID), f'A_peak{self.ell}{self.m}'].values[0]
+            self.metadata[f'omg_peak_{self.ell}{self.m}']    = additional_data.loc[additional_data['ID'] == int(self.ID), f'omega_peak{self.ell}{self.m}'].values[0]
+            try:
+                self.metadata['A_nr_error']                  = additional_data.loc[additional_data['ID'] == int(self.ID), f'A_nr_error'].values[0]
+            except:
+                print("No NR error found in the csv file. Setting it to 1e-3.")
+                self.metadata['A_nr_error'] = 1e-3
+            self.metadata[f'A_peak{self.ell}{self.m}dotdot'] = additional_data.loc[additional_data['ID'] == int(self.ID), f'A_peak{self.ell}{self.m}dotdot'].values[0]
+            self.metadata['Emrg']                            = additional_data.loc[additional_data['ID'] == int(self.ID), f'Heff_til'].values[0]
+            self.metadata['Jmrg']                            = additional_data.loc[additional_data['ID'] == int(self.ID), f'Jmrg_til'].values[0]
+            self.metadata['bmrg']                            = additional_data.loc[additional_data['ID'] == int(self.ID), f'b_massless_EOB'].values[0]
         except:
-            self.metadata[  f'A_peak_{self.ell}{self.m}'] = 0.0
-            self.metadata[f'omg_peak_{self.ell}{self.m}'] = 0.0
-            self.metadata[                       f'Emrg'] = 0.0
-            self.metadata[                       f'Jmrg'] = 0.0
-            self.metadata[                       f'bmrg'] = 0.0
+            self.metadata[  f'A_peak_{self.ell}{self.m}']   = 0.0
+            self.metadata[f'omg_peak_{self.ell}{self.m}']   = 0.0
+            self.metadata['A_nr_error']                     = 1e-3
+            self.metadata['A_peak{self.ell}{self.m}dotdot'] = 0.0
+            self.metadata[                       f'Emrg']   = 0.0
+            self.metadata[                       f'Jmrg']   = 0.0
+            self.metadata[                       f'bmrg']   = 0.0
 
         return self.metadata
 
@@ -403,19 +409,21 @@ def read_NR_metadata(NR_sim, NR_catalog):
 
         M = 1.0
         metadata = {
-                    'q'          : NR_sim.q,
-                    'chi1'       : NR_sim.chi1,
-                    'chi2'       : NR_sim.chi2,
-                    'm1'         : pyRing_utils.m1_from_m_q(M, NR_sim.q),
-                    'm2'         : pyRing_utils.m2_from_m_q(M, NR_sim.q),
-                    'ecc'        : NR_sim.ecc,
-                    'Mf'         : NR_sim.Mf,
-                    'af'         : NR_sim.af,
-                    'A_peak_22'  : NR_sim.A_peak_22,
-                    'omg_peak_22': NR_sim.omg_peak_22,
-                    'bmrg'       : NR_sim.bmrg,
-                    'Emrg'       : NR_sim.Emrg,
-                    'Jmrg'       : NR_sim.Jmrg,
+                    'q'             : NR_sim.q,
+                    'chi1'          : NR_sim.chi1,
+                    'chi2'          : NR_sim.chi2,
+                    'm1'            : pyRing_utils.m1_from_m_q(M, NR_sim.q),
+                    'm2'            : pyRing_utils.m2_from_m_q(M, NR_sim.q),
+                    'ecc'           : NR_sim.ecc,
+                    'Mf'            : NR_sim.Mf,
+                    'af'            : NR_sim.af,
+                    'A_peak_22'     : NR_sim.A_peak_22,
+                    'omg_peak_22'   : NR_sim.omg_peak_22,
+                    'A_nr_error'    : NR_sim.A_nr_error,
+                    'A_peak22dotdot': NR_sim.A_peak22dotdot,
+                    'bmrg'          : NR_sim.bmrg,
+                    'Emrg'          : NR_sim.Emrg,
+                    'Jmrg'          : NR_sim.Jmrg,
                 }
 
     elif(NR_catalog=='C2EFT'):
@@ -506,7 +514,7 @@ class NR_simulation():
         If True, the NR simulation is downloaded from the NR catalog. Default: False.
 
     NR_error : str, optional
-        Error of the NR simulation. Available options: 'align-with-mismatch-res-only', 'align-with-mismatch-res-and-extrap', 'align-with-mismatch-res-and-extrap-and-pert', 'constant-X' (with X=error value). Default: 'align-with-mismatch-res-only'.
+        Error of the NR simulation. Available options: 'align-with-mismatch-res-only', 'align-with-mismatch-res-and-extrap', 'align-with-mismatch-res-and-extrap-and-pert', 'constant-X' (with X=error value), 'late-time-const-error'. Default: 'align-with-mismatch-res-only'.
 
     tM_start : float, optional
         Initial time of the fit. Default: 30.0.
@@ -736,7 +744,7 @@ class NR_simulation():
         
             print('\n\n\nFIXME: figure out extrapolation order and resolution level for RIT\n\n\n')
 
-            self.q, self.chi1, self.chi2, self.ecc, self.Mf, self.af, self.A_peak_22, self.omg_peak_22, self.bmrg, self.Emrg, self.Jmrg = self.read_RIT_metadata()
+            self.q, self.chi1, self.chi2, self.ecc, self.Mf, self.af, self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot, self.bmrg, self.Emrg, self.Jmrg = self.read_RIT_metadata()
 
             # Build NR waveform and time axis.
             self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_RIT()
@@ -829,8 +837,14 @@ class NR_simulation():
                 self.NR_err_cmplx = np.sqrt(NR_r_err_extr**2 + NR_r_err_res**2) + 1j * np.sqrt(NR_i_err_extr**2 + NR_i_err_res**2)
             
         elif(self.NR_catalog=='RIT'):
-            error_value       = float(NR_error.split('-')[-1])
-            self.NR_err_cmplx = self.generate_constant_error(error_value)   
+            
+            if('constant' in NR_error):
+                error_value                = float(NR_error.split('-')[-1])
+                self.NR_err_cmplx          = self.generate_constant_error(error_value)
+
+            elif(NR_error == 'late-time-const-error'):
+                error_value                = self.A_nr_error
+                self.NR_err_cmplx          = self.generate_constant_error(error_value)
 
         elif(self.NR_catalog=='C2EFT'):
 
@@ -962,10 +976,11 @@ class NR_simulation():
                         self.NR_i[i] += np.imag(self.NR_err_cmplx.data[i])
 
         # Start from zero.
-        if(self.t_NR[0] < 0 and self.waveform_type=='strain'): self.t_NR = self.t_NR - self.t_NR[0]
+        #if(self.t_NR[0] < 0 and self.waveform_type=='strain'): self.t_NR = self.t_NR - self.t_NR[0]
         
         # Locate the merger time (which does not coincide with the peak in the eccentric case).
         self.t_peak = waveform_utils.find_peak_time(self.t_NR, self.NR_amp, self.ecc)
+        if(self.t_NR[0] < 0 and self.waveform_type=='strain'): self.t_NR = self.t_NR - self.t_peak
 
         # For convenience, for second order perturbations, allow the option to build the time axis from the secondary peak.
         if(self.NR_catalog=='Teukolsky' and self.pert_order=='lin'): 
@@ -1338,13 +1353,15 @@ class NR_simulation():
         chif        = float(data['final-chi'])
 
         # FIXME: Generalise to multiple modes with dictionaries.
-        A_peak_22   = float(data['A_peak_22'])
-        omg_peak_22 = float(data['omg_peak_22'])
-        bmrg        = float(data['bmrg'])
-        Emrg        = float(data['Emrg'])
-        Jmrg        = float(data['Jmrg'])
+        A_peak_22       = float(data['peak-ampl-22'])
+        omg_peak_22     = float(data['peak-omega-22'])
+        A_nr_error      = float(data['A_nr_error'])
+        A_peak22dotdot  = float(data['A_peak22dotdot'])
+        bmrg            = float(data['bmrg'])
+        Emrg            = float(data['Emrg'])
+        Jmrg            = float(data['Jmrg'])
 
-        return q, chi1z, chi2z, ecc, Mf, chif, A_peak_22, omg_peak_22, bmrg, Emrg, Jmrg
+        return q, chi1z, chi2z, ecc, Mf, chif, A_peak_22, omg_peak_22, A_nr_error, A_peak22dotdot, bmrg, Emrg, Jmrg
 
     def read_waveform_lm_from_RIT(self):
 
