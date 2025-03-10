@@ -184,9 +184,7 @@ def read_config(Config):
 
         'Flags': 
         {
-        'check_TD_FD': False,
         'C1_flag': 1,
-        'sanity_check_mm': False,
         'clear_directory': 1,
         'mismatch_print_flag': 0
         }
@@ -406,19 +404,58 @@ A dot is present at the end of each description line and is not to be intended a
         Prior default bounds can be changed by adding 'param-min=value' or 'param-max=value' to this section, where `param` is the name of the parameter under consideration.
 
         User-controlled starting values for the minimization can be set by adding`'param-start=value` to the [Priors] section, where `param` is the name of the parameter under consideration. User-defined starting values overrun the `seeding` option for that parameter.
-
-
+        
     ******************************************************
     * Parameters to be passed to the [PSD-settings] section. *
     ******************************************************  
-        asd-path         Path to the ASD file, used to evaluate the mismatch at the end of the run. Default: ''.
-        direction        Where to apply the smoothing in the PSD before doing the FFT.             Default: below.
+        asd-path            Path to the ASD file. Default: ''.
+        direction           Where to apply the smoothing in the PSD before doing the FFT. If below, it applies to low frequencies, if above to high frequencies, if below-and-above on both. Default: below.
+        n_FFT_points        Number of iterations for values of the points that are used to compute the PSD. Default: 1.
+        n_iterations_C1     Number of iteriations for the C1 algorithm. Default: 1.
+        window_DX           Minimum window size for smoothing on the right side. Default: 0.8.
+        window_DX_max       Maximum window size for smoothing on the right side. Default: 10.
+        n_window_DX         Number of steps for the right-side windowing. Default: 1.
+        window_SX           Minimum window size for smoothing on the left side. Default: 0.8.
+        window_SX_max       Maximum window size for smoothing on the left side. Default: 10.
+        n_window_SX         Number of steps for the left-side windowing. Default: 1.
+        steepness           Minimum steepness parameter for smoothing. Default: 7.
+        steepness_max       Maximum steepness parameter for smoothing. Default: 200.
+        n_steepness         Number of steps in the steepness parameter range. Default: 1.
+        saturation_DX       Minimum saturation value for the right-side windowing. Default: 1.0.
+        saturation_DX_max   Maximum saturation value for the right-side windowing. Default: 5.0.
+        n_saturation_DX     Number of steps for right-side saturation values. Default: 1.
+        saturation_SX       Minimum saturation value for the left-side windowing. Default: 1.0.
+        saturation_SX_max   Maximum saturation value for the left-side windowing. Default: 5.0.
+        n_saturation_SX     Number of steps for left-side saturation values. Default: 1.
+
+    *************************************************
+    * Parameters to be passed in the Flags section. *
+    *************************************************
+
+        C1_flag              Enables or disables C1 fixing on the PSD after smoothing application.
+                             - 1: Enable C1 iterations.
+                             - 0: Disable C1 iterations.
+                             Default: 1.
+
+        clear_directory      Controls whether the output directory for the smoothing section is cleared before the run.
+                             - 1: Clear the directory before execution.
+                             - 0: Keep existing files.
+                             Default: 1.
+
+        mismatch_print_flag  Determines whether to print mismatch information.
+                             - 1: Print mismatch values.
+                             - 0: Do not print mismatch values.
+                             Default: 0.
+    
 
     ******************************************************
     * Parameters to be passed to the [Mismatch] section. *
     ******************************************************
-        M                The mass of the remnant (in solar masses).                                 Default: 10.
-        dL               The luminosity distance of the source with respect to the observer.        Default: 400.
+        M                The mass of the remnant (in solar masses).                                 Default: 60.
+        dL               The luminosity distance of the source with respect to the observer.        Default: 410.
+        ra               Right ascension (in radiants).                                             Default: 1.375.
+        dec              Declination (in radiants).                                                 Default: -0.2108.
+        psi              Polarization angle (in radiants).                                          Default: 2.659.
         
 """
                                                      
