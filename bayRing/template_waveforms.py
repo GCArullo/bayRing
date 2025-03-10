@@ -213,17 +213,6 @@ class WaveformModel(cpnest.model.Model):
         if(  self.TEOB_template=='qc'): ecc_par = 0
         elif(self.TEOB_template=='nc'): ecc_par = 1
 
-        #print("\n\nmerger phases: ", merger_phases, "\n\n")
-
-        c=2.99792458*10**8
-        G_c=6.67259*10**(-11)
-        Msol=1.9885*(10**30)
-        gamma=Msol*G_c/c**3
-
-        #self.t_start = 4.92e-6*self.t_start*(self.metadata['m1']+self.metadata['m2'])
-
-        #self.t_start = self.t_start / self.metadata['Mf']
-
         TGR_parameters = {}
         ringdown_model = wf.TEOBPM(self.t_start,
                                    self.metadata['m1']          ,

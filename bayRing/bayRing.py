@@ -228,7 +228,7 @@ def main():
     # Mismatch computation section. #
     #===============================#
 
-    # Initialize dictionary
+    # Initialize dictionaries
     psd_data, acf_data, mismatch_data, optimal_SNR_data, condition_numbers = {}, {}, {}, {}, {}
 
     # Assign GW parameters
@@ -239,15 +239,12 @@ def main():
     t_start_g, t_end_g, t_NR_s, NR_length = wf_utils.extract_NR_params(NR_sim, M)
 
     # Convert estimated start and end time in seconds
-    t_start = t_start_g * C_mt * M
-    t_end = t_end_g * C_mt * M
+    t_start, t_end = t_start_g * C_mt * M, t_end_g * C_mt * M
 
     # Loading PSD parameters
-    psd_dict = parameters['PSD-settings']
-    asd_path, direction = psd_dict['asd-path'], psd_dict['direction']
-    f_min, f_max, dt, _, N_points, n_FFT_points, n_iterations_C1, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values = wf_utils.extract_and_compute_psd_parameters(asd_path, psd_dict)
+    f_min, f_max, dt, _, N_points, n_FFT_points, asd_path, n_iterations_C1, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values, direction = wf_utils.extract_and_compute_psd_parameters(parameters['PSD-settings'])
 
-    # Flags (to improve)
+    # Flags -> to clean TD_FD subsection
     flags = parameters['Flags']
     check_TD_FD = False
     C1_flag = flags['C1_flag']
@@ -256,6 +253,7 @@ def main():
     # Choose if iterate or not on N_FFT
     N_FFT = [N_points] if n_FFT_points == 1 else list(map(int, np.logspace(np.log10(NR_length), np.log10(2*N_points), n_FFT_points)))
 
+    # Choose if cleaning directories or not
     if flags['clear_directory'] == 1:
 
         # Define the directory path
@@ -263,7 +261,6 @@ def main():
         for smoothing_path in smoothing_paths:
             algorithm_dir = os.path.join(parameters['I/O']['outdir'], "Algorithm", smoothing_path)
 
-            # Clear it before plotting
             postprocess.clear_directory(algorithm_dir) 
 
     # Iterate over the number of FFT points
@@ -274,13 +271,17 @@ def main():
                 
             # Consistency check on starting time, end time and f_min 
             if (t_end-t_start)>1/(f_min+window_size_DX) and direction!='above':
-                print("Please provide (t_end-t_start)<1/(f_min+window_size_DX).")
+                print("Please provide (t_end-t_start) < 1/(f_min+window_size_DX).")
                 print("Forbidden frequency:",f_min+window_size_DX)
                 exit()
 
             try:
 
-                # Compute PSD and ACF with smoothing
+                # Print window parameters
+                print(f"\nSelected window parameters: w_DX={window_size_DX}Hz, w_SX={window_size_SX}Hz, k={k}, saturation_DX={saturation_DX}, saturation_SX={saturation_SX}, N_FFT={N_fft}\n")
+
+
+                # Compute PSD and ACF with smoothing at PSD edges
                 PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_with_smoothing(
                     asd_path,
                     f_min, f_max,
@@ -305,13 +306,10 @@ def main():
                 t_ACF = np.linspace(0, N_fft*dt, len(ACF_smoothed))
                 ACF_truncated_NR = postprocess.truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s)
 
-                # Store in dictionary
+                # Store condition number values in dictionary
                 condition_numbers[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = wf_utils.compute_condition_number(ACF_truncated_NR)
 
-                # Print window parameters
-                print(f"\nSelected window parameters: w_DX={window_size_DX}Hz, w_SX={window_size_SX}Hz, k={k}, saturation_DX={saturation_DX}, saturation_SX={saturation_SX}, N_FFT={N_fft}\n")
-
-                # Call compute_mismatch with the subsampled smoothed ACF
+                # Compute mismatch for hplus, hcross
                 postprocess.compute_mismatch_hplus_hcross(
                     NR_sim, 
                     results_object, 
@@ -325,7 +323,7 @@ def main():
                     mismatch_print_flag
                 )
 
-                # Call compute_mismatch with the subsampled smoothed ACF (for fixed alpha, delta, psi)
+                # Compute mismatch for htot
                 postprocess.compute_mismatch_htot(
                     NR_sim, 
                     results_object, 
@@ -345,7 +343,7 @@ def main():
                 with open(mismatch_file, 'r') as f:
                     lines = f.readlines()[1:]  # Skip the header
 
-                # Store mismatch results in mismatch_data (consider only real and imaginary for simplicity)
+                # Store mismatch results in a dictionry
                 mismatch_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = {'real': {}, 'imaginary': {}}
                 for line in lines:
                     perc, component, mismatch = line.strip().split('\t')
@@ -380,7 +378,7 @@ def main():
                 with open(optimal_SNR_file, 'r') as f:
                     lines = f.readlines()[1:]  # Skip the header
 
-                # Store mismatch results in optimal_SNR_data (consider only real and imaginary for simplicity)
+                # Store mismatch results in a dictionary
                 optimal_SNR_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = {'real': {}, 'imaginary': {}}
                 for line in lines:
                     perc, component, optimal_SNR = line.strip().split('\t')

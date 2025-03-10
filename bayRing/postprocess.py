@@ -577,7 +577,7 @@ def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_N
 def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf, M, dL, t_start_g, t_end_g, window_size, k):
 
     """
-    Performs sanity checks for mismatch computation.
+    TO IMPROVE. Performs sanity checks for mismatch computation.
 
     Parameters
     ----------
@@ -905,7 +905,7 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
                     print(f"<h|h>**0.5={h_wf_h_wf_sqrt:.1f}")
                     print(f"<h|NR>={h_wf_h_NR:.1f}")
 
-                # Match/mismatch computations
+                # Match and mismatch computations
                 TD_match = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
                 TD_mismatch = 1 - TD_match
 
@@ -1854,6 +1854,8 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_
         axs[1].set_ylim(y_min2 * 0.02, y_max2 * 1.1)
         #axs[1].set_ylim(1e-46, 1e-41)
         axs[1].grid(True)
+
+        # TO IMPROVE: fix the limits of the axes.
 
         # Adjust layout and save the plot
         plt.tight_layout()

@@ -265,6 +265,7 @@ def extract_NR_params(NR_sim, M):
             - t_peak
             - t_NR_cut (list or array)
             - NR_r_cut (list or array)
+        M: mass of the remnant in Solar masses.
 
     Returns:
         tuple: (t_start_g, t_end_g, t_NR_s, NR_length)
@@ -273,6 +274,8 @@ def extract_NR_params(NR_sim, M):
     t_NR_cut = NR_sim.t_NR_cut
     t_start_g, t_end_g = t_NR_cut[0] - t_peak, t_NR_cut[-1] - t_peak
     NR_length = len(NR_sim.NR_r_cut)
+
+    # Time axis in seconds, shifted with respect to the starting time
     t_NR_s = (t_NR_cut - t_peak - t_start_g) * M * C_mt
 
     print("\nEstimated starting and end times and NR simulation lenght")
@@ -287,45 +290,64 @@ def extract_GW_parameters(parameters):
         parameters['Mismatch']['ra'], parameters['Mismatch']['dec'], parameters['Mismatch']['psi']
     )
 
-def extract_and_compute_psd_parameters(asd_path, psd_dict):
+def extract_and_compute_psd_parameters(psd_dict):
     """
     Load the PSD file, extract key frequency parameters, and compute window properties.
     
     Parameters:
-        asd_path (str): Path to the ASD file.
-        f_sample (float): Sampling frequency in Hz.
-        psd (dict): Dictionary containing window properties.
+        psd_dict (dict): Dictionary containing window properties of the PSD.
     
     Returns:
-        tuple: (f_min, f_max, dt, df, N_psd, n_iterations, window_sizes, steepness_values, saturation_DX_values, saturation_SX_values)
+        tuple containing:
             - f_min (float): Minimum frequency in Hz.
             - f_max (float): Maximum frequency in Hz.
             - dt (float): Time resolution (1 / 2*f_max).
             - df (float): Frequency resolution (minimum difference between consecutive frequencies).
             - N_points (int): Number of PSD points (f_sample / df).
-            - n_iterations (int): Number of FFT iterations from psd dictionary.
-            - window_sizes (list): Smoothed window sizes.
+            - n_FFT_points (int): Number of FFT iterations from psd dictionary.
+            - asd_path (string): Path to the ASD.            
+            - n_iterations_C1 (int): Number of C1 iterations.
+            - window_sizes_DX (list): Smoothed window sizes.
+            - window_sizes_SX (list): Smoothed window sizes.
             - steepness_values (list): Logarithmic values for steepness.
             - saturation_DX_values (list): Logarithmic values for saturation_DX.
             - saturation_SX_values (list): Logarithmic values for saturation_SX.
+            - direction (string): Defines where to apply the smoothing of the PSD.
     """
     try:
         # Load the frequency data from the ASD file
-        freq_file, _ = np.loadtxt(asd_path, unpack=True)
-        
+        asd_path = psd_dict['asd-path']
+        direction = psd_dict['direction']
+
+        if asd_path is None:
+            raise ValueError("ASD path is missing in psd_dict.")
+
+        try:
+            freq_file, _ = np.loadtxt(asd_path, unpack=True)
+        except Exception as e:
+            raise ValueError(f"Error loading ASD file {asd_path}: {e}")
+
         # Extract PSD parameters
         f_min, f_max = np.min(freq_file), np.max(freq_file)
         f_sample = 2 * f_max
         dt = 1 / f_sample
         df = np.min(np.diff(freq_file))
+
+        if df <= 0:
+            raise ValueError("Invalid frequency resolution calculated (df <= 0).")
+
         N_points = int(f_sample / df)
         n_FFT_points = psd_dict['n_FFT_points']
         n_iterations_C1 = psd_dict['n_iterations_C1']
-        
+
+        # Validate n_FFT_points
+        if n_FFT_points < 1:
+            raise ValueError("n_FFT_points must be >= 1.")
+
         # Print extracted values
         print("\nExtracted ASD file parameters")
         print(f"f_min={f_min:.0f}Hz, f_max={f_max:.0f}Hz, dt={dt:.6f}s, df={df:.4f}Hz, N_points={N_points}\n")
-        
+
         # Compute window properties
         window_sizes_DX = np.linspace(psd_dict['window_DX'], psd_dict['window_DX_max'], psd_dict['n_window_DX']).tolist()
         window_sizes_SX = np.linspace(psd_dict['window_SX'], psd_dict['window_SX_max'], psd_dict['n_window_SX']).tolist()
@@ -333,11 +355,11 @@ def extract_and_compute_psd_parameters(asd_path, psd_dict):
         saturation_DX_values = np.logspace(np.log10(psd_dict['saturation_DX']), np.log10(psd_dict['saturation_DX_max']), psd_dict['n_saturation_DX']).tolist()
         saturation_SX_values = np.logspace(np.log10(psd_dict['saturation_SX']), np.log10(psd_dict['saturation_SX_max']), psd_dict['n_saturation_SX']).tolist()
         
-        return f_min, f_max, dt, df, N_points, n_FFT_points, n_iterations_C1, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values
+        return f_min, f_max, dt, df, N_points, n_FFT_points, asd_path, n_iterations_C1, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values, direction
     
     except Exception as e:
-        print(f"Error processing PSD file {asd_path}: {e}")
-        return None, None, None, None, None, None, None, None, None, None, None
+        print(f"Error processing PSD data: {e}")
+        return None
 
 def acf_from_asd(asd_filepath, f_min, f_max, N_points):
 
@@ -410,13 +432,9 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
         np.ndarray: Smoothed values. If `window_size` is 0, returns the original values.
     """
 
-    # Return early if window_size is 0 to avoid unnecessary computations
-    if window_size_DX == 0:
-        return values
-
     def smoothing_function(frequencies, values, f_anchor, window_size, target_value, k, indices, is_above):
         """
-        Function to apply smoothing to a specified frequency range (left or right).
+        Function to apply smoothing to a specified frequency range.
 
         Parameters:
             frequencies (np.ndarray): Frequency array.
@@ -433,11 +451,13 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
         if is_above:
             smooth_range = frequencies[(frequencies >= f_anchor - window_size) & (frequencies <= f_anchor)]
             smoothing_factor = 1 - np.exp(-(smooth_range - (f_anchor - window_size)) * k)
-            s_norm = 1 - np.exp(- (window_size) * k)
+
         else:
             smooth_range = frequencies[(frequencies >= f_anchor) & (frequencies <= f_anchor + window_size)]
             smoothing_factor = 1 - np.exp((smooth_range - (f_anchor + window_size)) * k)
-            s_norm = 1 - np.exp(- (window_size) * k)
+
+        # Normalizing factor, fo that at f=f_min, or f=f_max, the PSD tends to the target value.   
+        s_norm = 1 - np.exp(- (window_size) * k)
 
         # Apply the smoothing formula
         values[indices] = values[indices] * (1 - smoothing_factor) + target_value * smoothing_factor / s_norm
@@ -458,7 +478,7 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
         # Select only the indices in the high-frequency range
         indices_above = np.where((frequencies >= f_anchor_h - window_size_SX) & (frequencies <= f_anchor_h))
 
-        # We acceed to the first element (when we have f = f_anchor_l - window_size)
+        # We acceed to the first element (when we have f = f_anchor_h - window_size)
         target_value_h = saturation_SX*max(values[indices_above])
         values = smoothing_function(frequencies, values, f_anchor_h, window_size_SX, target_value_h, k, indices_above, is_above=True)
 
@@ -484,13 +504,14 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
 
 def apply_C1(frequencies, values, f_start, window_size, n_iterations_C1):
     """
-    Applies moving average in order to transform the acf to C1.
+    Applies moving average between 3 points in order to C1 the PSD.
 
     Parameters:
     - frequencies: Array of frequency values.
     - values: Array of corresponding PSD values.
     - f_start: Start of the range where the transition begins.
-    - output_file: Path to save the output data.
+    - window_size: Size of the window.
+    - n_iterations_C1: How many times the C1 algorithm should be applied.
 
     Returns:
     - Modified values after applying the transition.
@@ -526,11 +547,13 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size_DX
         asd_path (str): Path to the ASD file.
         f_min (float): Minimum frequency.
         f_max (float): Maximum frequency.
-        N_points (int): Number of frequency points.
-        window_size (float): Smoothing window size.
+        N_points (int): Number of FFT frequency points.
+        window_size_DX (float): Smoothing window size at low frequencies.
+        window_size_SX (float): Smoothing window size at high frequencies.
         k (float): Smoothing steepness parameter.
-        saturation (float): Saturation value for smoothing target.
-        direction (str): 'below' for smoothing near f_min, 'above' for smoothing near f_max.
+        saturation_DX (float): Saturation value for smoothing target at low frequencies.
+        saturation_SX (float): Saturation value for smoothing target at high frequencies.
+        direction (str): 'below' for smoothing near f_min, 'above' for smoothing near f_max, 'below-and-above' for both.
 
     Returns:
         np.ndarray: Smoothed PSD and ACF.
@@ -540,7 +563,7 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size_DX
     freq_file, asd_file = np.loadtxt(asd_path, unpack=True)
     psd_file = asd_file ** 2
 
-    # Sampling settings
+    # Frequency settings
     s_rate = 2 * f_max
     dt = 1. / s_rate
     df = s_rate / N_points
@@ -556,13 +579,13 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size_DX
     smoothed_PSD = PSD_band.copy()
     smoothed_PSD = apply_smoothing(f, smoothed_PSD, f_min, f_max, saturation_DX, saturation_SX, k, window_size_DX, window_size_SX, direction)
 
-    # Extend PSD for f < f_min
+    # Extend PSD for 0 < f < f_min
     f_below_min = f[f < f_min]
     if len(f_below_min) > 0:
         PSD_below_min = np.full_like(f_below_min, saturation_DX*smoothed_PSD[0])
         smoothed_PSD[:len(f_below_min)] = PSD_below_min
 
-    #-----------------------------------------------------C^1 fixing------------------------------------------------------------#
+    #-----------------------------------------------------C1 fixing------------------------------------------------------------#
 
     if C1_flag==True:
         
