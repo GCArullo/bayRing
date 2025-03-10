@@ -1,4 +1,0 @@
-# L2 norm of residual is 
-0.08060332496615714 
-# L2 norm of NR error is 
-0.011296676228188161 

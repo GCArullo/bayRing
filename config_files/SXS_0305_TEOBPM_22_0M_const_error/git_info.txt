@@ -1,5 +1,0 @@
-pyRing
-branch: mismatch\n	 commit: 765f069715ddb856364dc130fa5e1e570bb127d5
-Author:  
-
-Git diff:

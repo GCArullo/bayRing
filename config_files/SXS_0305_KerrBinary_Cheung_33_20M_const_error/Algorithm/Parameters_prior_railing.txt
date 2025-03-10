@@ -1,2 +1,0 @@
-# phi_low	phi_up	
-0 0
