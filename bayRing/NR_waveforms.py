@@ -210,8 +210,8 @@ class Waveform_rit(object):
             self.metadata['Jmrg']                            = additional_data.loc[additional_data['ID'] == int(self.ID), f'Jmrg_til'].values[0]
             self.metadata['bmrg']                            = additional_data.loc[additional_data['ID'] == int(self.ID), f'b_massless_EOB'].values[0]
         except:
-            self.metadata[  f'A_peak_{self.ell}{self.m}']   = 0.0
-            self.metadata[f'omg_peak_{self.ell}{self.m}']   = 0.0
+            self.metadata[  f'A_peak_{self.ell}{self.m}']   = self.metadata[f'peak-ampl-l{self.ell}-m{self.m}']
+            self.metadata[f'omg_peak_{self.ell}{self.m}']   = self.metadata[f'peak-omega-l{self.ell}-m{self.m}']
             self.metadata['A_nr_error']                     = 1e-3
             self.metadata['A_peak{self.ell}{self.m}dotdot'] = 0.0
             self.metadata[                       f'Emrg']   = 0.0
@@ -976,11 +976,10 @@ class NR_simulation():
                         self.NR_i[i] += np.imag(self.NR_err_cmplx.data[i])
 
         # Start from zero.
-        #if(self.t_NR[0] < 0 and self.waveform_type=='strain'): self.t_NR = self.t_NR - self.t_NR[0]
+        if(self.t_NR[0] < 0 and self.waveform_type=='strain'): self.t_NR = self.t_NR - self.t_NR[0]
         
         # Locate the merger time (which does not coincide with the peak in the eccentric case).
         self.t_peak = waveform_utils.find_peak_time(self.t_NR, self.NR_amp, self.ecc)
-        if(self.t_NR[0] < 0 and self.waveform_type=='strain'): self.t_NR = self.t_NR - self.t_peak
 
         # For convenience, for second order perturbations, allow the option to build the time axis from the secondary peak.
         if(self.NR_catalog=='Teukolsky' and self.pert_order=='lin'): 
@@ -1353,8 +1352,8 @@ class NR_simulation():
         chif        = float(data['final-chi'])
 
         # FIXME: Generalise to multiple modes with dictionaries.
-        A_peak_22       = float(data['peak-ampl-22'])
-        omg_peak_22     = float(data['peak-omega-22'])
+        A_peak_22       = float(data['A_peak_22'])
+        omg_peak_22     = float(data['omg_peak_22'])
         A_nr_error      = float(data['A_nr_error'])
         A_peak22dotdot  = float(data['A_peak22dotdot'])
         bmrg            = float(data['bmrg'])
