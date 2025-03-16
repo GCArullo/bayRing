@@ -214,7 +214,7 @@ class WaveformModel(cpnest.model.Model):
         elif(self.TEOB_template=='nc'): ecc_par = 1
 
         TGR_parameters = {}
-        ringdown_model = wf.TEOBPM(self.t_start,
+        ringdown_model = wf.TEOBPM(self.t_start                 ,
                                    self.metadata['m1']          ,
                                    self.metadata['m2']          ,
                                    self.metadata['chi1']        ,
@@ -222,13 +222,12 @@ class WaveformModel(cpnest.model.Model):
                                    merger_phases                ,
                                    1.0                          , # distance     , dummy with geom=1
                                    0.0                          , # inclination  , dummy with geom=1
-                                   0                            , # orbital phase, dummy with geom=1
+                                   0.0                          , # orbital phase, dummy with geom=1
                                    modes                        ,
                                    TGR_parameters               ,
                                    geom          = 1            ,
                                    ecc_par       = ecc_par      ,
                                    NR_fit_coeffs = NR_fit_coeffs)
-
 
         return ringdown_model
 

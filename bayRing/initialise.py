@@ -133,60 +133,62 @@ def read_config(Config):
         'Inference':
         {
         'method'           : 'Nested-sampler',
-        'likelihood'       : 'gaussian',
-        'sampler'          : 'cpnest',
-        'nlive'            : 256,
-        'maxmcmc'          : 256,
-        'seed'             : 1234,
-        'nnest'            : 1,
-        'nensemble'        : 1,
+        'likelihood'       : 'gaussian'      ,
+        'sampler'          : 'cpnest'        ,
+        'nlive'            : 256             ,
+        'maxmcmc'          : 256             ,
+        'seed'             : 1234            ,
+        'nnest'            : 1               ,
+        'nensemble'        : 1               ,
 
-        't-start'          : 20.0,
+        't-start'          : 20.0 ,
         't-end'            : 140.0,
-        'dt-scd'           : 0.0,
+        'dt-scd'           : 0.0  ,
         
         'min-method'       : 'lm',
-        'min-iter-min'     : 1,
+        'min-iter-min'     : 1   ,
         'min-iter-max'     : 1000,
         },
 
-        'PSD-settings':
+        'Mismatch-PSD-settings':
         {
-        'asd-path'         : '',
-        'direction'        : 'below',
-        'window_DX'       : 0.8,
-        'window_DX_max'       : 10.0,
-        'window_SX'       : 0.8,
-        'window_SX_max'       : 10.0,
-        'n_window_DX'         : 1,
-        'n_window_SX'         : 1,
-        'steepness'    : 7.,
-        'steepness_max'    : 200.,
-        'n_steepness'      : 1,
-        'saturation_DX'    : 1,
-        'saturation_DX_max'    : 5,
-        'n_saturation_DX'      : 1,
-        'saturation_SX'    : 1,
-        'saturation_SX_max'    : 5,
-        'n_saturation_SX'      : 1,
-        'n_FFT_points'     : 1,
-        'n_iterations_C1'  : 1
+        'asd-path'              : ''     ,
+        'direction'             : 'below',
+        'window_DX'             : 0.8    ,
+        'window_DX_max'         : 10.0   ,
+        'window_SX'             : 0.8    ,
+        'window_SX_max'         : 10.0   ,
+        'n_window_DX'           : 1      ,
+        'n_window_SX'           : 1      ,
+        'steepness'             : 7.     ,
+        'steepness_max'         : 200.   ,
+        'n_steepness'           : 1      ,
+        'saturation_DX'         : 1      ,
+        'saturation_DX_max'     : 5      ,
+        'n_saturation_DX'       : 1      ,
+        'saturation_SX'         : 1      ,
+        'saturation_SX_max'     : 5      ,
+        'n_saturation_SX'       : 1      ,
+        'n_FFT_points'          : 1      ,
+        'n_iterations_C1'       : 1      
         },
 
-        'Mismatch':
+        'Mismatch-GW-parameters':
         {
-        'M'                : 60,
-        'dL'               : 410,
-        'ra'               : 1.375,
-        'dec'              : -0.2108,
-        'psi'              : 2.659
+        'M'                    : 60     ,
+        'dL'                   : 410    ,
+        'ra'                   : 1.375  ,
+        'dec'                  : -0.2108,
+        'psi'                  : 2.659
         },
 
         'Flags': 
         {
-        'C1_flag': 1,
-        'clear_directory': 1,
-        'mismatch_print_flag': 0
+        'C1_flag'                      : 1,
+        'clear_directory'              : 1,
+        'compare_TD_FD'                : 0,
+        'mismatch_print_flag'          : 0,
+        'mismatch_section_plot_flag'   : 0,
         }
 
     }
@@ -406,7 +408,7 @@ A dot is present at the end of each description line and is not to be intended a
         User-controlled starting values for the minimization can be set by adding`'param-start=value` to the [Priors] section, where `param` is the name of the parameter under consideration. User-defined starting values overrun the `seeding` option for that parameter.
         
     ******************************************************
-    * Parameters to be passed to the [PSD-settings] section. *
+    * Parameters to be passed to the [Mismatch-PSD-settings] section. *
     ******************************************************  
         asd-path            Path to the ASD file. Default: ''.
         direction           Where to apply the smoothing in the PSD before doing the FFT. If below, it applies to low frequencies, if above to high frequencies, if below-and-above on both. Default: below.
@@ -449,7 +451,7 @@ A dot is present at the end of each description line and is not to be intended a
     
 
     ******************************************************
-    * Parameters to be passed to the [Mismatch] section. *
+    * Parameters to be passed to the [Mismatch-GW-parameters] section. *
     ******************************************************
         M                The mass of the remnant (in solar masses).                                 Default: 60.
         dL               The luminosity distance of the source with respect to the observer.        Default: 410.

@@ -1,23 +1,22 @@
-import corner, os, numpy as np, matplotlib.pyplot as plt, h5py, scipy.linalg as sl, seaborn as sns, shutil
-import bayRing.utils          as utils
-import bayRing.waveform_utils as waveform_utils
-from pycbc.psd import from_txt
-import numba
-from scipy.interpolate import interp1d
-from pycbc.types.timeseries import TimeSeries
-from pycbc.psd import aLIGOZeroDetHighPower
+# Standard python packages
+import corner, os, numpy as np, matplotlib.pyplot as plt, scipy.linalg as sl, seaborn as sns, shutil, numba
+from scipy.interpolate           import interp1d
+
+# Package internal imports
+import bayRing.utils             as utils
+import bayRing.waveform_utils    as waveform_utils
+from pycbc.psd                   import from_txt
+from pycbc.types.timeseries      import TimeSeries
+from pycbc.psd                   import aLIGOZeroDetHighPower
 from pycbc.types.frequencyseries import FrequencySeries
-from pycbc.filter import sigma, overlap as compute_FD_overlap, overlap_cplx as compute_FD_overlap_cplx, match as compute_FD_match, matched_filter_core, matched_filter
-from scipy.interpolate import interp1d
+from pycbc.filter                import sigma, overlap as compute_FD_overlap, overlap_cplx as compute_FD_overlap_cplx, match as compute_FD_match, matched_filter_core, matched_filter
+import h5py, lal
+from lal.antenna                 import AntennaResponse
 
 # Costants
 twopi = 2.*np.pi
-c=2.99792458*1e8 #m/s
-G=6.67259*1e-11 #N*m^2/kg
-M_s=1.9885*1e30 #solar masses
-Mpc = 3.0857*1e22 #Mpc in meters
 
-#color palette
+# Color palette
 colbBlue   = "#4477AA"
 colbRed    = "#EE6677"
 colbGreen  = "#228833"
@@ -27,8 +26,8 @@ colbPurple = "#AA3377"
 colbGray   = "#BBBBBB"
 
 # Conversions
-C_mt=(M_s*G)/(c**3) #s, converts a mass expressed in solar masses into a time in seconds
-C_md=(M_s*G)/(Mpc*c**2) #adimensional, converts a mass expressed in solar masses to a distance in Megaparsec
+C_mt=(lal.MSUN_SI * lal.G_SI) / (lal.C_SI**3) #s, converts a mass expressed in solar masses into a time in seconds
+C_md=(lal.MSUN_SI * lal.G_SI)/(1e6*lal.PC_SI*lal.C_SI**2) #adimensional, converts a mass expressed in solar masses to a distance in Megaparsec
 
 def read_results_object_from_previous_inference(parameters):
 
@@ -396,52 +395,19 @@ def compare_with_GR_QNMs(results_object, qnm_cached, NR_sim, outdir):
 def compute_FD_optimal_SNR(asd_file, h, n, f_min, f_max):
 
         # Ensure PSD matches the waveform's `delta_f`
-        delta_f=2*f_max/n
-        psd = from_txt(
-            filename=asd_file,
-            length=n,
-            delta_f=delta_f,
-            low_freq_cutoff=f_min,
-            is_asd_file=True
+        delta_f = 2*f_max/n
+        psd     = from_txt(
+            filename        = asd_file,
+            length          = n,
+            delta_f         = delta_f,
+            low_freq_cutoff = f_min,
+            is_asd_file     = True
         )
 
         h_tilde = h.to_frequencyseries(delta_f=delta_f)
-
         fd_snr = sigma(h_tilde, psd=psd, low_frequency_cutoff=f_min)
 
         return fd_snr
-
-def compute_F_plus(theta, phi, psi):
-    """
-    Computes F_plus(θ, φ, ψ) based on the given equation.
-
-    Parameters:
-    theta (float): The θ angle in radians.
-    phi (float): The φ angle in radians.
-    psi (float): The ψ angle in radians.
-
-    Returns:
-    float: The value of F_plus.
-    """
-    term1 = 0.5 * (1 + np.cos(theta)**2) * np.cos(2 * phi) * np.cos(2 * psi)
-    term2 = -np.cos(theta) * np.sin(2 * phi) * np.sin(2 * psi)
-    return term1 + term2
-
-def compute_F_cross(theta, phi, psi):
-    """
-    Computes F_cross(θ, φ, ψ) based on the given equation.
-
-    Parameters:
-    theta (float): The θ angle in radians.
-    phi (float): The φ angle in radians.
-    psi (float): The ψ angle in radians.
-
-    Returns:
-    float: The value of F_cross.
-    """
-    term1 = 0.5 * (1 + np.cos(theta)**2) * np.cos(2 * phi) * np.sin(2 * psi)
-    term2 = np.cos(theta) * np.sin(2 * phi) * np.cos(2 * psi)
-    return term1 + term2
 
 @numba.njit
 def fast_interpolation(x, xp, fp):
@@ -453,14 +419,14 @@ def interpolate_waveform(t_start_g, t_end_g, M, wf_lNR, acf):
     Interpolates the waveform to match the length of the autocovariance function (ACF).
     
     Parameters:
-    - t_start_g : float : Start time in geometrical units.
-    - t_end_g : float : End time in geometrical units.
-    - M : float : Mass of the system.
-    - wf_lNR : array : The original NR waveform data.
-    - acf : array : The autocovariance function (defines new length).
+    - t_start_g (float) : Start time in geometrical units.
+    - t_end_g   (float) : End time in geometrical units.
+    - M (float)         : Mass of the system.
+    - wf_lNR (array)    : The original NR waveform data.
+    - acf (array)       : The autocovariance function (defines new length).
 
     Returns:
-    - wf_int : array : Interpolated waveform with the same length as `acf`.
+    - wf_int (array) Interpolated waveform with the same length as `acf`.
     """
     # Compute start and end time in physical units
     t_start = t_start_g * C_mt * M
@@ -470,15 +436,12 @@ def interpolate_waveform(t_start_g, t_end_g, M, wf_lNR, acf):
     t_array = np.linspace(t_start, t_end, len(wf_lNR))  # Original waveform time
     t_int = np.linspace(t_start, t_end, len(acf))       # Target interpolation time
 
-    #print(t_array)
-    #print(t_int)
-
     # Use Numba-optimized interpolation
     wf_int = fast_interpolation(t_int, t_array, wf_lNR)
 
     return wf_int
 
-def convert_asd_to_pycbc_psd(asd_file, f_min, f_max, delta_f):
+def convert_asd_to_pycbc_psd(asd_file, delta_f):
     """
     Load an ASD file, compute the PSD, and convert it to a PyCBC FrequencySeries.
 
@@ -531,7 +494,7 @@ def clear_directory(directory_path):
     else:
         os.makedirs(directory_path, exist_ok=True)
 
-def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s):
+def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s, print_truncation_info):
     """
     Truncate and interpolate the Autocorrelation Function (ACF) based on time constraints.
 
@@ -564,20 +527,20 @@ def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_N
     interpolator = interp1d(t_ACF_truncated, ACF_truncated, kind='linear', fill_value="extrapolate")
     ACF_trunc = interpolator(t_NR_s)
 
-    """
-    print("Truncation info:")
-    print("ACF time array expr. in [s] (full): ", t_ACF)
-    print("ACF time array expr. in [s] (first half, associated to positive frequencies): ", t_ACF_half)
-    print("Truncated ACF time array expr. in [s] : ", t_ACF_truncated)
-    print("Truncated waveform time array expr. in geometrical units : ", t_NR_s/(M*C_mt))
-    """
+    if print_truncation_info:
 
+        print("Truncation info:")
+        print("ACF time array expr. in [s] (full): ", t_ACF)
+        print("ACF time array expr. in [s] (first half, associated to positive frequencies): ", t_ACF_half)
+        print("Truncated ACF time array expr. in [s] : ", t_ACF_truncated)
+        print("Truncated waveform time array expr. in geometrical units : ", t_NR_s/(M*C_mt))
+    
     return ACF_trunc
 
-def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf, M, dL, t_start_g, t_end_g, window_size, k):
+def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf, M, dL, t_start_g, t_end_g, window_size_DX, window_size_SX, k):
 
     """
-    TO IMPROVE. Performs sanity checks for mismatch computation.
+    Performs sanity checks for mismatch computation.
 
     Parameters
     ----------
@@ -661,25 +624,21 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
     # Generate plot for real components (No Whitening)
     plt.figure(figsize=(10, 6))
     plt.plot(t_trunc, NR_r, label='NR_r', color='blue', linewidth=1.5)
-    plt.plot(t_trunc, wf_r_quantiles[5], label='5% CI', linestyle='--', color='green')
-    plt.plot(t_trunc, wf_r_quantiles[50], label='50% CI', linestyle='-', color='orange')
-    plt.plot(t_trunc, wf_r_quantiles[95], label='95% CI', linestyle='--', color='red')
+    plt.plot(t_trunc, wf_r_quantiles[50], label='50% CI', linestyle='-', color=colbRed)
     plt.title('Real Component Comparison (No Whitening)')
     plt.xlabel('Time [s]')
     plt.ylabel('Amplitude')
     plt.legend()
     plt.grid()
     plt.tight_layout()
-    filename = f"Real_Component_No_Whitening_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.png"
+    filename = f"Real_Component_No_Whitening_M_{M}_dL_{dL}_M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}.pdf"
     plt.savefig(os.path.join(sanity_checks_dir, filename))
     plt.close()
 
     # Generate plot for imaginary components (No Whitening)
     plt.figure(figsize=(10, 6))
-    plt.plot(t_trunc, NR_i, label='NR_i', color='blue', linewidth=1.5)
-    plt.plot(t_trunc, wf_i_quantiles[5], label='5% CI', linestyle='--', color='green')
-    plt.plot(t_trunc, wf_i_quantiles[50], label='50% CI', linestyle='-', color='orange')
-    plt.plot(t_trunc, wf_i_quantiles[95], label='95% CI', linestyle='--', color='red')
+    plt.plot(t_trunc, NR_i, label='NR_i', color=colbBlue, linewidth=1.5)
+    plt.plot(t_trunc, wf_i_quantiles[50], label='50% CI', linestyle='-', color=colbRed)
     plt.title('Imaginary Component Comparison (No Whitening)')
     plt.xlabel('Time [s]')
     plt.ylabel('Amplitude')
@@ -687,16 +646,14 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
     plt.legend()
     plt.grid()
     plt.tight_layout()
-    filename = f"Imaginary_Component_No_Whitening_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.png"
+    filename = f"Imaginary_Component_No_Whitening_M_{M}_dL_{dL}_M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}.pdf"
     plt.savefig(os.path.join(sanity_checks_dir, filename))
     plt.close()
 
     # Generate plot for real components (Whitening with solve_toeplitz)
     plt.figure(figsize=(10, 6))
-    plt.plot(t_trunc, whiten_NR_r, label='NR_r (whitened)', color='blue', linewidth=1.5)
-    plt.plot(t_trunc, wf_r_whitened[5], label='5% CI (whitened)', linestyle='--', color='green')
-    plt.plot(t_trunc, wf_r_whitened[50], label='50% CI (whitened)', linestyle='-', color='orange')
-    plt.plot(t_trunc, wf_r_whitened[95], label='95% CI (whitened)', linestyle='--', color='red')
+    plt.plot(t_trunc, whiten_NR_r, label='NR_r (whitened)', color=colbBlue, linewidth=1.5)
+    plt.plot(t_trunc, wf_r_whitened[50], label='50% CI (whitened)', linestyle='-', color=colbRed)
     plt.title('Real Component Comparison (Whitened with solve_toeplitz)')
     plt.xlabel('Time [s]')
     plt.ylabel('Amplitude (Whitened)')
@@ -704,16 +661,14 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
     plt.legend()
     plt.grid()
     plt.tight_layout()
-    filename = f"Real_Component_Whitened_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.png"
+    filename = f"Real_Component_Whitened_M_{M}_dL_{dL}_M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}.pdf"
     plt.savefig(os.path.join(sanity_checks_dir, filename))
     plt.close()
 
     # Generate plot for imaginary components (Whitening with solve_toeplitz)
     plt.figure(figsize=(10, 6))
-    plt.plot(t_trunc, whiten_NR_i, label='NR_i (whitened)', color='blue', linewidth=1.5)
-    plt.plot(t_trunc, wf_i_whitened[5], label='5% CI (whitened)', linestyle='--', color='green')
-    plt.plot(t_trunc, wf_i_whitened[50], label='50% CI (whitened)', linestyle='-', color='orange')
-    plt.plot(t_trunc, wf_i_whitened[95], label='95% CI (whitened)', linestyle='--', color='red')
+    plt.plot(t_trunc, whiten_NR_i, label='NR_i (whitened)', color=colbBlue, linewidth=1.5)
+    plt.plot(t_trunc, wf_i_whitened[50], label='50% CI (whitened)', linestyle='-', color=colbRed)
     plt.title('Imaginary Component Comparison (Whitened with solve_toeplitz)')
     plt.xlabel('Time [s]')
     plt.ylabel('Amplitude (Whitened)')
@@ -721,16 +676,14 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
     plt.legend()
     plt.grid()
     plt.tight_layout()
-    filename = f"Imaginary_Component_Whitened_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.png"
+    filename = f"Imaginary_Component_Whitened_M_{M}_dL_{dL}_M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}.pdf"
     plt.savefig(os.path.join(sanity_checks_dir, filename))
     plt.close()
 
     # Generate plot for real components (Toeplitz Whitening)
     plt.figure(figsize=(10, 6))
-    plt.plot(t_trunc, toeplitz_whitened_NR_r, label='NR_r (Toeplitz whitened)', color='blue', linewidth=1.5)
-    plt.plot(t_trunc, wf_r_toeplitz_whitened[5], label='5% CI (Toeplitz whitened)', linestyle='--', color='green')
-    plt.plot(t_trunc, wf_r_toeplitz_whitened[50], label='50% CI (Toeplitz whitened)', linestyle='-', color='orange')
-    plt.plot(t_trunc, wf_r_toeplitz_whitened[95], label='95% CI (Toeplitz whitened)', linestyle='--', color='red')
+    plt.plot(t_trunc, toeplitz_whitened_NR_r, label='NR_r (Toeplitz whitened)', color=colbBlue, linewidth=1.5)
+    plt.plot(t_trunc, wf_r_toeplitz_whitened[50], label='50% CI (Toeplitz whitened)', linestyle='-', color=colbRed)
     plt.title('Real Component Comparison (Toeplitz Whitening)')
     plt.xlabel('Time [s]')
     plt.ylabel('Amplitude (Toeplitz Whitened)')
@@ -738,46 +691,27 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
     plt.legend()
     plt.grid()
     plt.tight_layout()
-    filename = f"Real_Component_Toeplitz_Whitening_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.png"
+    filename = f"Real_Component_Toeplitz_Whitening_M_{M}_dL_{dL}_M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}.pdf"
     plt.savefig(os.path.join(sanity_checks_dir, filename))
     plt.close()
 
     # Generate plot for imaginary components (Toeplitz Whitening)
     plt.figure(figsize=(10, 6))
-    plt.plot(t_trunc, toeplitz_whitened_NR_i, label='NR_i (Toeplitz whitened)', color='blue', linewidth=1.5)
-    plt.plot(t_trunc, wf_i_toeplitz_whitened[5], label='5% CI (Toeplitz whitened)', linestyle='--', color='green')
-    plt.plot(t_trunc, wf_i_toeplitz_whitened[50], label='50% CI (Toeplitz whitened)', linestyle='-', color='orange')
-    plt.plot(t_trunc, wf_i_toeplitz_whitened[95], label='95% CI (Toeplitz whitened)', linestyle='--', color='red')
+    plt.plot(t_trunc, toeplitz_whitened_NR_i, label='NR_i (Toeplitz whitened)', color=colbBlue, linewidth=1.5)
+    plt.plot(t_trunc, wf_i_toeplitz_whitened[50], label='50% CI (Toeplitz whitened)', linestyle='-', color=colbRed)
     plt.title('Imaginary Component Comparison (Toeplitz Whitening)')
     plt.xlabel('Time [s]')
     plt.ylabel('Amplitude (Toeplitz Whitened)')
-    #plt.xlim(1.1285,1.13)
     plt.legend()
     plt.grid()
     plt.tight_layout()
-    filename = f"Imaginary_Component_Toeplitz_Whitening_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.png"
-    plt.savefig(os.path.join(sanity_checks_dir, filename))
-    plt.close()
-
-    # Plot ACF as a function of time
-    plt.figure(figsize=(10, 6))
-    plt.plot(t_trunc, acf, label='ACF', color='blue', linewidth=1.5)
-    plt.title('Autocorrelation Function')
-    plt.xlabel('Time [s]')
-    plt.ylabel('ACF')
-    #plt.xlim(1.1285, 1.13)
-    idx_start = np.searchsorted(t_trunc, 1.1285, side="left")
-    idx_end = np.searchsorted(t_trunc, 1.1295, side="right")
-    #plt.ylim(acf[idx_start:idx_end].min() * 0.9, acf[idx_start:idx_end].max() * 1.1)
-    plt.grid()
-    plt.tight_layout()
-    filename = f"ACF_Plot_M_{M}_dL_{dL}_t_s_{t_start_g}M_w_{round(window_size,1)}_k_{round(k,1)}.png"
+    filename = f"Imaginary_Component_Toeplitz_Whitening_M_{M}_dL_{dL}_M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}.pdf"
     plt.savefig(os.path.join(sanity_checks_dir, filename))
     plt.close()
 
     print("Plots saved to:", os.path.join(outdir, 'Algorithm'))
 
-def compute_mismatch_check_FD(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size, k, check_TD_FD, sanity_check_mm):
+def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size, k, compare_TD_FD, sanity_check_mm):
     """
     OLD VERSION. Compute the mismatch of the model with respect to NR simulations.
     """
@@ -832,7 +766,7 @@ def compute_mismatch_check_FD(NR_sim, results, inference_model, outdir, method, 
                 with open(outFile_path, 'a') as outFile_mismatch:
                     outFile_mismatch.write(f'{perc}\t{NR_quant}\t{TD_mismatch}\n')
 
-                if check_TD_FD:
+                if compare_TD_FD:
                     psd = convert_asd_to_pycbc_psd(asd_file, f_min, f_max, delta_f=2*f_max/len(acf))
                     h_TS = TimeSeries(wf_int, delta_t=1/(2*f_max))
                     NR_TS = TimeSeries(NR_int, delta_t=1/(2*f_max))
@@ -847,7 +781,7 @@ def compute_mismatch_check_FD(NR_sim, results, inference_model, outdir, method, 
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
                 continue
 
-def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g_true, window_size_DX, window_size_SX, k, mismatch_print_flag):
+def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g_true, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, mismatch_print_flag, compare_TD_FD):
     """
     Compute the mismatch of the model with respect to NR simulations.
     """
@@ -901,16 +835,39 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
                 h_wf_h_wf_sqrt = np.sqrt(abs(np.dot(wf_quant[NR_quant], whiten_whiten_h_wf)))
                 h_wf_h_NR = np.dot(wf_quant[NR_quant], whiten_whiten_h_NR)
 
-                if mismatch_print_flag==1:
-                    print(f"<h|h>**0.5={h_wf_h_wf_sqrt:.1f}")
-                    print(f"<h|NR>={h_wf_h_NR:.1f}")
-
                 # Match and mismatch computations
                 TD_match = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
                 TD_mismatch = 1 - TD_match
 
+                if mismatch_print_flag==1:
+                    print(f"<h|h>**0.5={h_wf_h_wf_sqrt:.1f}")
+                    print(f"<h|NR>={h_wf_h_NR:.1f}")
+                    print(f"Time domain mismatch={TD_mismatch}")
+
                 with open(outFile_path, 'a') as outFile_mismatch:
                     outFile_mismatch.write(f'{perc}\t{NR_quant}\t{TD_mismatch}\n')
+
+                if compare_TD_FD:
+
+                    mismatch_filename_fd = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}.txt"
+                    outFile_path_fd = os.path.join(outdir, 'Algorithm', mismatch_filename_fd)
+
+                    with open(outFile_path_fd, 'w') as outFile_mismatch_fd:
+                        outFile_mismatch_fd.write('#CI\tStrain_data\tFD_Mismatch\n')
+
+                    psd = convert_asd_to_pycbc_psd(asd_file, f_min, f_max, delta_f=2*f_max/len(acf))
+                    h_TS = TimeSeries(wf_quant[NR_quant], delta_t=1/(2*f_max))
+                    NR_TS = TimeSeries(NR_data, delta_t=1/(2*f_max))
+
+                    FD_match_m = float(compute_FD_match(h_TS, NR_TS, psd=psd, low_frequency_cutoff=f_min, high_frequency_cutoff=f_max)[0])
+                    FD_mismatch = 1 - FD_match_m
+
+                    if mismatch_print_flag==1:
+                        print(f"Time domain mismatch={TD_mismatch}")
+                        print(f"Frequency domain mismatch={TD_mismatch}")
+
+                    with open(outFile_path_fd, 'a') as outFile_mismatch_fd:
+                        outFile_mismatch_fd.write(f'{perc}\t{NR_quant}\t{FD_mismatch}\n')
 
             except Exception as e:
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
@@ -933,8 +890,8 @@ def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf,
     NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
 
     # Compute polarizations
-    F_plus = compute_F_plus(theta=ra, phi=dec, psi=psi)
-    F_cross = compute_F_cross(theta=ra, phi=dec, psi=psi)
+    resp = AntennaResponse('H1', ra=ra, dec=dec, psi=psi, tensor=True, times=1126259462.43)
+    F_plus, F_cross = resp.plus, resp.cross
     NR_data = F_plus * NR_r + F_cross * NR_i
 
     # Compute <NR|NR>
@@ -966,12 +923,10 @@ def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf,
             TD_match = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
             TD_mismatch = 1 - TD_match
 
-            #print("TD mismatch of the total signal: ", TD_mismatch)
-
             with open(outFile_path, 'a') as outFile_mismatch:
                 outFile_mismatch.write(f'{perc}\t{TD_mismatch}\n')
 
-def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, check_TD_FD):
+def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, compare_TD_FD):
     """
     Compute the optimal SNR of the model waveform.
     """
@@ -992,7 +947,6 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
     NR_dict = {'real': NR_r, 'imaginary': NR_i}
 
     for NR_quant, NR_data in NR_dict.items():
-        #print(f"\nProcessing NR component: {NR_quant}")
 
         for perc in [5, 50, 95]:
             try:
@@ -1008,12 +962,10 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
                 with open(outFile_path, 'a') as outFile_SNR:
                     outFile_SNR.write(f'{perc}\t{NR_quant}\t{optimal_SNR_TD}\n')
 
-                if check_TD_FD:
+                if compare_TD_FD:
                     h_TS = TimeSeries(wf_int, delta_t=1/(2*f_max))
                     optimal_SNR_FD = compute_FD_optimal_SNR(asd_file, h_TS, len(acf), f_min, f_max)
 
-
-                    print(len(acf))
                     print("Optimal TD SNR: ", optimal_SNR_TD)
                     print("Optimal FD SNR: ", optimal_SNR_FD)
 
@@ -1066,8 +1018,6 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     #take NR elements
     NR_r, NR_i, NR_r_err, NR_i_err, NR_amp, NR_f, t_NR, t_peak                                                = NR_sim.NR_r, NR_sim.NR_i, np.real(NR_sim.NR_err_cmplx), np.imag(NR_sim.NR_err_cmplx), NR_sim.NR_amp, NR_sim.NR_freq, NR_sim.t_NR, NR_sim.t_peak
     t_cut, tM_start, tM_end, NR_r_cut, NR_i_cut, NR_r_err_cut, NR_i_err_cut, NR_amp_cut, NR_phi_cut, NR_f_cut = NR_sim.t_NR_cut, NR_sim.tM_start, NR_sim.tM_end, NR_sim.NR_r_cut, NR_sim.NR_i_cut, np.real(NR_sim.NR_cpx_err_cut), np.imag(NR_sim.NR_cpx_err_cut), NR_sim.NR_amp_cut, NR_sim.NR_phi_cut, NR_sim.NR_freq_cut
-
-    #print("\n\nUsed t_start (M): ", tM_start)
 
     wf_data_type = NR_sim.waveform_type
 
@@ -1694,11 +1644,10 @@ def plot_multiple_psd(psd_data, f_min, f_max, outdir, direction, window):
         path = os.path.join(save_path, filename)
         plt.savefig(path)
         plt.close()
-        #print(f"Saved smoothed PSD plot ({direction}) to {path}")
     except Exception as e:
         print(f"Failed to generate smoothed PSD plot ({direction}): {e}")
 
-def plot_psd_and_acf(psd_data, acf_data, f_min, f_max, outdir, direction):
+def plot_psd_and_acf(psd_data, acf_data, asd_filepath, f_min, f_max, outdir, direction):
     """
     Plot multiple smoothed PSD and ACF curves in a single figure with two subplots.
 
@@ -1717,9 +1666,10 @@ def plot_psd_and_acf(psd_data, acf_data, f_min, f_max, outdir, direction):
         None
     """
     try:
-        # Colors for PSD and ACF
-        colbBlue = "#4477AA"  # Base color for PSD
-        colbRed = "#EE6677"   # Base color for ACF
+
+        # Load ASD file and convert it to PSD
+        freq_file, asd_file = np.loadtxt(asd_filepath, unpack=True)
+        psd_file            = asd_file**2 
 
         # Determine subfolder based on smoothing direction
         subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
@@ -1732,10 +1682,11 @@ def plot_psd_and_acf(psd_data, acf_data, f_min, f_max, outdir, direction):
         fig, axs = plt.subplots(2, 1, figsize=(12, 12))
 
         # ------------------ Plot PSD ------------------ #
+        axs[0].plot(freq_file, psd_file, label="No window application", linewidth=1.2, linestyle='--', color="black")
         for i, (label, PSD_smoothed) in enumerate(psd_data.items()):
             freq = np.linspace(0, f_max, len(PSD_smoothed))
             alpha = max(0.3, 1 - (i * 0.15))  # Decrease opacity for different curves
-            axs[0].plot(freq, PSD_smoothed, label=label, linestyle="dotted", linewidth=2, color=colbBlue, alpha=alpha)
+            axs[0].plot(freq, PSD_smoothed, label=label, linewidth=2, color=colbBlue, alpha=alpha)
 
         axs[0].set_xlabel("Frequency [Hz]")
         axs[0].set_ylabel("PSD [Hz^-1]")
@@ -1743,9 +1694,6 @@ def plot_psd_and_acf(psd_data, acf_data, f_min, f_max, outdir, direction):
         axs[0].set_xscale("log")
         axs[0].set_yscale("log")
         axs[0].grid(True)
-
-        # Center the legend inside the plot
-        #axs[0].legend(loc="upper left")
 
         # ------------------ Plot ACF ------------------
         # Duration time
@@ -1756,7 +1704,7 @@ def plot_psd_and_acf(psd_data, acf_data, f_min, f_max, outdir, direction):
             T = N_FFT*dt
             t_array = np.linspace(0, T, N_FFT)
             alpha = max(0.3, 1 - (i * 0.15))  # Decrease opacity for different curves
-            axs[1].plot(t_array, ACF_smoothed, label=label, linestyle="dotted", linewidth=2, color=colbRed, alpha=alpha)
+            axs[1].plot(t_array, ACF_smoothed, label=label, linewidth=2, color=colbBlue, alpha=alpha)
 
         axs[1].set_xlabel("Time [s]")
         axs[1].set_ylabel("ACF")
@@ -1764,7 +1712,7 @@ def plot_psd_and_acf(psd_data, acf_data, f_min, f_max, outdir, direction):
         axs[1].grid(True)
 
         # Center the legend inside the plot
-        axs[1].legend(loc="center", bbox_to_anchor=(0.5, 0.5))
+        axs[1].legend(loc="upper center")
 
         # Adjust layout and save the plot
         plt.tight_layout()
@@ -1772,7 +1720,6 @@ def plot_psd_and_acf(psd_data, acf_data, f_min, f_max, outdir, direction):
         path = os.path.join(save_path, filename)
         plt.savefig(path)
         plt.close(fig)
-        #print(f"\nSaved PSD/ACF plots to {path}.\n")
 
     except Exception as e:
         print(f"Failed to generate smoothed PSD and ACF plots ({direction}): {e}")
@@ -1889,7 +1836,6 @@ def plot_acf_interpolated(t_array, t_trunc, ACF_smoothed, truncated_acf, outdir,
     # Save the plot
     filename = f"Truncated_ACF_wDX={round(window_size_DX,1)}Hz_wSX={round(window_size_SX,1)}Hz_k={round(k,3)}_sat_DX={round(saturation_DX,0)}_sat_SX={round(saturation_SX,0)}.pdf"
     path = os.path.join(save_path, filename)
-    #print(path)
     plt.savefig(path)
     plt.close()
 
@@ -2031,7 +1977,7 @@ def plot_condition_number_by_window_DX(condition_numbers, outdir, direction, M, 
         plt.xlabel("wDX [Hz]", fontsize=26)
         plt.ylabel("Condition Number", fontsize=26)
         plt.xscale("log")
-        #plt.yscale('log')
+        plt.yscale('log')
         plt.xticks(fontsize=22)
         plt.yticks(fontsize=22)
         plt.grid(True)
@@ -2057,7 +2003,7 @@ def plot_condition_number_by_window_SX(condition_numbers, outdir, direction, M, 
         plt.xlabel("wSX [Hz]", fontsize=26)
         plt.ylabel("Condition Number", fontsize=26)
         plt.xscale("log")
-        #plt.yscale('log')
+        plt.yscale('log')
         plt.xticks(fontsize=22)
         plt.yticks(fontsize=22)
         plt.grid(True)

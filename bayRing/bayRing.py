@@ -16,24 +16,15 @@ import bayRing.QNM_utils          as QNM_utils
 import bayRing.inference          as inference
 import bayRing.template_waveforms as template_waveforms
 import bayRing.waveform_utils     as wf_utils
-
-import pyRing
 from pyRing.utils import print_section
-
-print("\n\n\n\n\nUsing ", pyRing.__file__, "\n\n\n\n\n")
-
-import scipy.linalg as sl
+import lal
 
 # Constants
 twopi = 2.*np.pi
-c=2.99792458*1e8 #m/s
-G=6.67259*1e-11 #N*m^2/kg
-M_s=1.9885*1e30 #solar masses
-Mpc = 3.0857*1e22 #Mpc in meters
 
 # Conversions
-C_mt=(M_s*G)/(c**3) #s, converts a mass expressed in solar masses into a time in seconds
-C_md=(M_s*G)/(Mpc*c**2) #adimensional, converts a mass expressed in solar masses to a distance in Megaparsec
+C_mt=(lal.MSUN_SI * lal.G_SI) / (lal.C_SI**3) #s, converts a mass expressed in solar masses into a time in seconds
+C_md=(lal.MSUN_SI * lal.G_SI)/(1e6*lal.PC_SI*lal.C_SI**2) #adimensional, converts a mass expressed in solar masses to a distance in Megaparsec
 
 if __name__=='__main__':
     main()
@@ -241,20 +232,17 @@ def main():
     # Convert estimated start and end time in seconds
     t_start, t_end = t_start_g * C_mt * M, t_end_g * C_mt * M
 
-    # Loading PSD parameters
-    f_min, f_max, dt, _, N_points, n_FFT_points, asd_path, n_iterations_C1, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values, direction = wf_utils.extract_and_compute_psd_parameters(parameters['PSD-settings'])
+    # Load PSD parameters
+    f_min, f_max, dt, _, N_points, n_FFT_points, asd_path, n_iterations_C1, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values, direction = wf_utils.extract_and_compute_psd_parameters(parameters['Mismatch-PSD-settings'])
 
-    # Flags -> to clean TD_FD subsection
-    flags = parameters['Flags']
-    check_TD_FD = False
-    C1_flag = flags['C1_flag']
-    mismatch_print_flag = flags['mismatch_print_flag']
+    # Load flags
+    compare_TD_FD, clear_directory, C1_flag, mismatch_print_flag, mismatch_section_plot_flag = wf_utils.extract_flags(parameters['Flags'])
 
     # Choose if iterate or not on N_FFT
     N_FFT = [N_points] if n_FFT_points == 1 else list(map(int, np.logspace(np.log10(NR_length), np.log10(2*N_points), n_FFT_points)))
 
     # Choose if cleaning directories or not
-    if flags['clear_directory'] == 1:
+    if clear_directory == 1:
 
         # Define the directory path
         smoothing_paths = ["Left_smoothing", "Right_smoothing", "Both_edges_smoothing"]
@@ -278,7 +266,7 @@ def main():
             try:
 
                 # Print window parameters
-                print(f"\nSelected window parameters: w_DX={window_size_DX}Hz, w_SX={window_size_SX}Hz, k={k}, saturation_DX={saturation_DX}, saturation_SX={saturation_SX}, N_FFT={N_fft}\n")
+                print(f"\n\nSelected window parameters: w_DX={round(window_size_DX,1)}Hz, w_SX={round(window_size_SX,1)}Hz, k={round(k,1)}, saturation_DX={round(saturation_DX,1)}, saturation_SX={round(saturation_SX,1)}, N_FFT={N_fft}\n")
 
 
                 # Compute PSD and ACF with smoothing at PSD edges
@@ -297,14 +285,14 @@ def main():
                 )
 
                 # Store smoothed PSD/ACF data in dictionaries
-                psd_data[f"wDX={round(window_size_DX,1)}Hz, wSX={round(window_size_SX,1)}Hz, k={round(k,0)}, {direction}, N_FFT={N_fft}"] = PSD_smoothed
-                acf_data[f"wDX={round(window_size_DX,1)}Hz, wSX={round(window_size_SX,1)}Hz, k={round(k,0)}, {direction}, N_FFT={N_fft}"] = ACF_smoothed
+                psd_data[f"wDX={round(window_size_DX,1)}Hz, wSX={round(window_size_SX,1)}Hz, k={round(k,0)}, satDX={round(saturation_DX,1)}, satSX={round(saturation_SX,1)}, N_FFT={N_fft}"] = PSD_smoothed
+                acf_data[f"wDX={round(window_size_DX,1)}Hz, wSX={round(window_size_SX,1)}Hz, k={round(k,0)}, satDX={round(saturation_DX,1)}, satSX={round(saturation_SX,1)}, N_FFT={N_fft}"] = ACF_smoothed
 
                 #-------------------------------------------------- Mismatch computation -------------------------------------------------------#
 
                 # Truncate ACF to ringdown analysis lenght
                 t_ACF = np.linspace(0, N_fft*dt, len(ACF_smoothed))
-                ACF_truncated_NR = postprocess.truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s)
+                ACF_truncated_NR = postprocess.truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s, mismatch_print_flag)
 
                 # Store condition number values in dictionary
                 condition_numbers[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = wf_utils.compute_condition_number(ACF_truncated_NR)
@@ -319,8 +307,11 @@ def main():
                     ACF_truncated_NR, N_fft,
                     M, dL,
                     t_start_g_true,
+                    f_min, f_max,
+                    asd_path,
                     window_size_DX, window_size_SX, k,
-                    mismatch_print_flag
+                    mismatch_print_flag,
+                    compare_TD_FD
                 )
 
                 # Compute mismatch for htot
@@ -335,6 +326,8 @@ def main():
                     t_start_g_true,
                     window_size_DX, window_size_SX, k
                 )
+
+                # Plot mismatch sanity checks
 
                 # Read mismatch results from file
                 mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_fft}.txt"
@@ -369,8 +362,17 @@ def main():
                     f_min, f_max,
                     asd_path,
                     window_size_DX, window_size_SX, k,
-                    check_TD_FD
+                    compare_TD_FD
                 )
+
+                if mismatch_section_plot_flag==1:
+                    postprocess.mismatch_sanity_checks(NR_sim, 
+                                                       results_object, 
+                                                       inference_model, 
+                                                       parameters['I/O']['outdir'],
+                                                       parameters['Inference']['method'],  
+                                                       ACF_truncated_NR,
+                                                       M, dL, t_start_g, t_end_g, window_size_DX, window_size_SX, k)
 
                 # Read optimal SNR results from file
                 optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_fft}.txt"
@@ -390,10 +392,11 @@ def main():
 
     #----------------------------------------------------------------------------------- Postprocessing --------------------------------------------------------------------------------------------------------------------------#
 
-    # Postprocess plots
-    postprocess.plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_SX, parameters['I/O']['outdir'], direction)
-    postprocess.plot_psd_and_acf(psd_data, acf_data, f_min, f_max, parameters['I/O']['outdir'], direction)
-    postprocess.plot_mismatch_optimal_SNR_condition_number_window_parameters(mismatch_data, optimal_SNR_data, condition_numbers, parameters['I/O']['outdir'], direction, M, dL, N_FFT)
+    if mismatch_section_plot_flag==1:
+
+        # Postprocess plots
+        postprocess.plot_psd_and_acf(psd_data, acf_data, asd_path, f_min, f_max, parameters['I/O']['outdir'], direction)
+        postprocess.plot_mismatch_optimal_SNR_condition_number_window_parameters(mismatch_data, optimal_SNR_data, condition_numbers, parameters['I/O']['outdir'], direction, M, dL, N_FFT)
 
     # Attempt to generate the global corner plot
     try:

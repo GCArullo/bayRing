@@ -283,11 +283,25 @@ def extract_NR_params(NR_sim, M):
 
     return t_start_g, t_end_g, t_NR_s, NR_length
 
+def extract_flags(flags):
+    """
+    Extracts specific flags from the given flags dictionary.
+    
+    :param flags: Dictionary containing flag values.
+    :return: Tuple containing compare_TD_FD, C1_flag, mismatch_print_flag, and mismatch_section_plot_flag.
+    """
+    compare_TD_FD = flags['compare_TD_FD']
+    clear_directory = flags['clear_directory']
+    C1_flag, mismatch_print_flag = flags['C1_flag'], flags['mismatch_print_flag']
+    mismatch_section_plot_flag = flags['mismatch_section_plot_flag']
+    
+    return compare_TD_FD, clear_directory, C1_flag, mismatch_print_flag, mismatch_section_plot_flag
+
 def extract_GW_parameters(parameters):
     """Extract GW parameters for mismatch computation."""
     return (
-        parameters['Mismatch']['M'], parameters['Mismatch']['dL'],
-        parameters['Mismatch']['ra'], parameters['Mismatch']['dec'], parameters['Mismatch']['psi']
+        parameters['Mismatch-GW-parameters']['M'], parameters['Mismatch-GW-parameters']['dL'],
+        parameters['Mismatch-GW-parameters']['ra'], parameters['Mismatch-GW-parameters']['dec'], parameters['Mismatch-GW-parameters']['psi']
     )
 
 def extract_and_compute_psd_parameters(psd_dict):
