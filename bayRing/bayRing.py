@@ -314,19 +314,6 @@ def main():
                     compare_TD_FD
                 )
 
-                # Compute mismatch for htot
-                postprocess.compute_mismatch_htot(
-                    NR_sim, 
-                    results_object, 
-                    inference_model, 
-                    parameters['I/O']['outdir'],
-                    parameters['Inference']['method'], 
-                    ACF_truncated_NR, N_fft,
-                    M, dL, ra, dec, psi,
-                    t_start_g_true,
-                    window_size_DX, window_size_SX, k
-                )
-
                 # Plot mismatch sanity checks
 
                 # Read mismatch results from file

@@ -497,9 +497,7 @@ def acf_from_asd(asd_filepath, f_min, f_max, N_points):
 
     return ACF
 
-def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h,
-                    saturation_DX, saturation_SX, k,
-                    window_size_DX, window_size_SX, direction):
+def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, saturation_SX, k, window_size_DX, window_size_SX, direction):
     """
     Apply smoothing saturation to specified frequency ranges.
 
@@ -508,81 +506,85 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h,
         values (np.ndarray): Array of corresponding values (e.g., PSD values).
         f_anchor_l (float): Low anchor frequency for smoothing (for 'below' or 'below-and-above').
         f_anchor_h (float): High anchor frequency for smoothing (for 'above' or 'below-and-above').
-        saturation_DX (float): Saturation factor for the low-frequency region.
-        saturation_SX (float): Saturation factor for the high-frequency region.
-        k (float): Smoothing steepness parameter.
+        saturation (float): Saturation value for the target smoothing.
+        k (float): Smoothing steepness parameter (controls the exponential decay).
         window_size_DX (float): Smoothing window size around low anchor frequencies.
         window_size_SX (float): Smoothing window size around high anchor frequencies.
         direction (str): Direction of smoothing ('below', 'above', or 'below-and-above').
 
     Returns:
-        np.ndarray: Smoothed values.
+        np.ndarray: Smoothed values. If `window_size` is 0, returns the original values.
     """
 
-    def smoothing_function(frequencies, values, f_anchor, window_size,
-                           target_value, k, indices, is_above):
+    def smoothing_function(frequencies, values, f_anchor, window_size, target_value, k, indices, is_above):
         """
-        Internal function to apply smoothing to a frequency range.
+        Function to apply smoothing to a specified frequency range.
+
+        Parameters:
+            frequencies (np.ndarray): Frequency array.
+            values (np.ndarray): Corresponding values array.
+            f_anchor (float): Anchor frequency.
+            window_size (float): Smoothing window size.
+            target_value (float): Target value for the smoothed region.
+            k (float): Smoothing steepness parameter.
+            is_above (bool): If True, applies smoothing from above; otherwise, from below.
+
+        Returns:
+            np.ndarray: Smoothed values for the selected range.
         """
         if is_above:
             smooth_range = frequencies[(frequencies >= f_anchor - window_size) & (frequencies <= f_anchor)]
             smoothing_factor = 1 - np.exp(-(smooth_range - (f_anchor - window_size)) * k)
+
         else:
             smooth_range = frequencies[(frequencies >= f_anchor) & (frequencies <= f_anchor + window_size)]
             smoothing_factor = 1 - np.exp((smooth_range - (f_anchor + window_size)) * k)
 
-        s_norm = 1 - np.exp(-window_size * k)
+        # Normalizing factor, fo that at f=f_min, or f=f_max, the PSD tends to the target value.   
+        s_norm = 1 - np.exp(- (window_size) * k)
 
+        # Apply the smoothing formula
         values[indices] = values[indices] * (1 - smoothing_factor) + target_value * smoothing_factor / s_norm
         return values
 
+    # Apply smoothing for 'below', 'above', or 'below-and-above'
     if direction == 'below':
+
+        # Select only the indices in the low-frequency range
         indices_below = np.where((frequencies >= f_anchor_l) & (frequencies <= f_anchor_l + window_size_DX))
-        
-        # Find target value at f_anchor_l + window_size_DX
-        f_target_l = f_anchor_l# + window_size_DX
-        idx_target_l = np.argmin(np.abs(frequencies - f_target_l))
-        target_value_l = saturation_DX * max(values[indices_below])
-        
-        values = smoothing_function(frequencies, values, f_anchor_l, window_size_DX,
-                                    target_value_l, k, indices_below, is_above=False)
+
+        # We acceed to the last element (when we have f = f_anchor_l + window_size)
+        target_value_l = saturation_DX*max(values[indices_below])
+        values = smoothing_function(frequencies, values, f_anchor_l, window_size_DX, target_value_l, k, indices_below, is_above=False)
 
     elif direction == 'above':
-        indices_above = np.where((frequencies >= f_anchor_h - window_size_SX) & (frequencies <= f_anchor_h))
-        
-        # Find target value at f_anchor_h - window_size_SX
-        f_target_h = f_anchor_h# - window_size_SX
-        idx_target_h = np.argmin(np.abs(frequencies - f_target_h))
-        target_value_h = saturation_SX * max(values[indices_above])
 
-        values = smoothing_function(frequencies, values, f_anchor_h, window_size_SX,
-                                    target_value_h, k, indices_above, is_above=True)
+        # Select only the indices in the high-frequency range
+        indices_above = np.where((frequencies >= f_anchor_h - window_size_SX) & (frequencies <= f_anchor_h))
+
+        # We acceed to the first element (when we have f = f_anchor_h - window_size)
+        target_value_h = saturation_SX*max(values[indices_above])
+        values = smoothing_function(frequencies, values, f_anchor_h, window_size_SX, target_value_h, k, indices_above, is_above=True)
 
     elif direction == 'below-and-above':
+
+        # Define indices for both below and above
         indices_below = np.where((frequencies >= f_anchor_l) & (frequencies <= f_anchor_l + window_size_DX))
         indices_above = np.where((frequencies >= f_anchor_h - window_size_SX) & (frequencies <= f_anchor_h))
+        
+        # Define targets
+        target_value_l = saturation_DX*max(values[indices_below])
+        target_value_h = saturation_SX*max(values[indices_above])
 
-        # Find target for below
-        f_target_l = f_anchor_l# + window_size_DX
-        idx_target_l = np.argmin(np.abs(frequencies - f_target_l))
-        target_value_l = saturation_DX * max(values[indices_below])
-
-        # Find target for above
-        f_target_h = f_anchor_h# - window_size_SX
-        idx_target_h = np.argmin(np.abs(frequencies - f_target_h))
-        target_value_h = saturation_SX * max(values[indices_above])
-
-        # Apply both sides
-        values = smoothing_function(frequencies, values, f_anchor_l, window_size_DX,
-                                    target_value_l, k, indices_below, is_above=False)
-        values = smoothing_function(frequencies, values, f_anchor_h, window_size_SX,
-                                    target_value_h, k, indices_above, is_above=True)
+        # Apply left smoothing
+        values = smoothing_function(frequencies, values, f_anchor_l, window_size_DX, target_value_l, k, indices_below, is_above=False)
+        # Apply right smoothing
+        values = smoothing_function(frequencies, values, f_anchor_h, window_size_SX, target_value_h, k, indices_above, is_above=True)
 
     else:
         raise ValueError("Invalid direction. Choose between 'below', 'above', or 'below-and-above'.")
 
     return values
-
 
 def apply_C1(frequencies, values, f_start, window_size, n_iterations_C1):
     """
@@ -608,7 +610,7 @@ def apply_C1(frequencies, values, f_start, window_size, n_iterations_C1):
     # Initialize the transition array
     transition = values[indices]
 
-    for n in range(0, n_iterations_C1, 1):
+    for n in range(0,n_iterations_C1,1):
 
         # Apply mild concavity by averaging three consecutive elements
         len_indices=indices[0][:-2]
@@ -664,20 +666,7 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size_DX
     # Extend PSD for 0 < f < f_min
     f_below_min = f[f < f_min]
     if len(f_below_min) > 0:
-        
-        # Compute the frequency at which to extract the target value
-        f_target_l = f_min
-
-        # Find index of the closest frequency to f_target_l
-        idx_target_l = np.argmin(np.abs(f - f_target_l))
-
-        # Compute the target value for extension using saturation_DX
-        target_value_l = smoothed_PSD[idx_target_l]
-
-        # Create constant PSD below f_min
-        PSD_below_min = np.full_like(f_below_min, target_value_l)
-
-        # Replace the initial values of smoothed_PSD
+        PSD_below_min = np.full_like(f_below_min, saturation_DX*smoothed_PSD[0])
         smoothed_PSD[:len(f_below_min)] = PSD_below_min
 
     #-----------------------------------------------------C1 fixing------------------------------------------------------------#
