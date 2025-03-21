@@ -483,7 +483,7 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h,
         indices_below = np.where((frequencies >= f_anchor_l) & (frequencies <= f_anchor_l + window_size_DX))
         
         # Find target value at f_anchor_l + window_size_DX
-        f_target_l = f_anchor_l + window_size_DX
+        f_target_l = f_anchor_l# + window_size_DX
         idx_target_l = np.argmin(np.abs(frequencies - f_target_l))
         target_value_l = saturation_DX * values[idx_target_l]
         
@@ -494,7 +494,7 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h,
         indices_above = np.where((frequencies >= f_anchor_h - window_size_SX) & (frequencies <= f_anchor_h))
         
         # Find target value at f_anchor_h - window_size_SX
-        f_target_h = f_anchor_h - window_size_SX
+        f_target_h = f_anchor_h# - window_size_SX
         idx_target_h = np.argmin(np.abs(frequencies - f_target_h))
         target_value_h = saturation_SX * values[idx_target_h]
 
@@ -506,12 +506,12 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h,
         indices_above = np.where((frequencies >= f_anchor_h - window_size_SX) & (frequencies <= f_anchor_h))
 
         # Find target for below
-        f_target_l = f_anchor_l + window_size_DX
+        f_target_l = f_anchor_l# + window_size_DX
         idx_target_l = np.argmin(np.abs(frequencies - f_target_l))
         target_value_l = saturation_DX * values[idx_target_l]
 
         # Find target for above
-        f_target_h = f_anchor_h - window_size_SX
+        f_target_h = f_anchor_h# - window_size_SX
         idx_target_h = np.argmin(np.abs(frequencies - f_target_h))
         target_value_h = saturation_SX * values[idx_target_h]
 
