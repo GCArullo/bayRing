@@ -345,9 +345,11 @@ def main():
 
                 #-------------------------------------------------- optimal SNR computation -------------------------------------------------------#
 
-                # Plot ACF
-                postprocess.plot_acf_interpolated(t_ACF, t_NR_s, ACF_smoothed, ACF_truncated_NR, parameters['I/O']['outdir'], window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, direction)
+                if mismatch_section_plot_flag==1:
 
+                    # Plot truncated ACF
+                    postprocess.plot_acf_interpolated(t_ACF, t_NR_s, ACF_smoothed, ACF_truncated_NR, parameters['I/O']['outdir'], window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, direction)
+                
                 # Call compute_mismatch with the subsampled smoothed ACF
                 postprocess.compute_optimal_SNR(
                     NR_sim, 

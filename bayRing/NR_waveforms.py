@@ -547,8 +547,8 @@ class NR_simulation():
                  tM_end         = 150.0                         , 
                  t_delay_scd    = 0.0                           , 
                  t_peak_22      = 0.0                           ,
-                 t_min_mismatch = 2692.7480095302817            , 
-                 t_max_mismatch = 3792.7480095302817            ):
+                 t_min_mismatch = 2692.7480095302817            , #-#
+                 t_max_mismatch = 3792.7480095302817            ):#-#
 
         ####################
         # Input parameters #
@@ -599,7 +599,7 @@ class NR_simulation():
                 self.download      = download
                 self.fake_error_NR = NR_error
 
-                self.t_NR, self.NR_err_cmplx_SXS, self.t_start = self.extract_data_NR(t_min_mismatch, t_max_mismatch)
+                self.t_NR, self.NR_err_cmplx_SXS, self.t_start = self.extract_data_NR(t_min_mismatch, t_max_mismatch)#-#
 
             else:
 
@@ -708,7 +708,6 @@ class NR_simulation():
             self.q, self.chi1, self.chi2, self.tilt1, self.tilt2, self.ecc, self.Mf, self.af = self.read_SXS_metadata()
 
             # Build NR waveform and time axis.
-
             if(self.res_level==-1):
                 for res_level_x in [6,5,4,3,2,1]:
                     try: 
@@ -803,11 +802,11 @@ class NR_simulation():
                 # Align the waveforms minimising the mismatch over a [t_min, t_max] interval.
                 if('align-with-mismatch' in NR_error):
                     
-                    # Resolution error.
+                    # Resolution error. #-#
                     NR_r_res    , NR_i_res       = waveform_utils.align_waveforms_with_mismatch(self.t_NR, self.NR_amp, self.NR_phi,  t_res,  NR_r_res,  NR_i_res, t_min_mismatch, t_max_mismatch)
                     NR_r_err_res, NR_i_err_res   = np.abs(self.NR_r-NR_r_res), np.abs(self.NR_i-NR_i_res)
 
-                    # Extrapolation error.  Align different extrapolation orders only if requested.
+                    # Extrapolation error.  Align different extrapolation orders only if requested. #-#
                     if(NR_error=='align-with-mismatch-all'): 
                         NR_r_extr, NR_i_extr     = waveform_utils.align_waveforms_with_mismatch(self.t_NR, self.NR_amp, self.NR_phi, t_extr, NR_r_extr, NR_i_extr, t_min_mismatch, t_max_mismatch)
                     NR_r_err_extr, NR_i_err_extr = np.abs(self.NR_r-NR_r_extr), np.abs(self.NR_i-NR_i_extr)
@@ -998,7 +997,6 @@ class NR_simulation():
     def extract_data_NR(self, t_min_mismatch, t_max_mismatch):
 
         # Build NR time axis.
-
         if(self.res_level==-1):
             for res_level_x in [6,5,4,3,2,1]:
                 try: 
@@ -1013,7 +1011,6 @@ class NR_simulation():
         NR_amp, NR_phi               = waveform_utils.amp_phase_from_re_im(NR_r, NR_i)
 
         # Build NR error array.
-
         if(self.fake_error_NR=='from-SXS-NR'):
             t_res,  NR_r_res,  NR_i_res  = self.read_waveform_lm_from_SXS(self.extrap_order,   self.res_level-1)
             t_extr, NR_r_extr, NR_i_extr = self.read_waveform_lm_from_SXS(self.extrap_order+1, self.res_level)
@@ -1026,7 +1023,8 @@ class NR_simulation():
             NR_err_cmplx = np.sqrt(NR_r_err_extr**2 + NR_r_err_res**2) + 1j * np.sqrt(NR_i_err_extr**2 + NR_i_err_res**2)
         else:
             NR_err_cmplx = None
-        
+
+        # Construct positive t_NR and compute t_peak
         if(t_NR[0] < 0):
             t_NR = t_NR - t_NR[0]
         t_peak   = t_NR[np.argmax(NR_amp)]
