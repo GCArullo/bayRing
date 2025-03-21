@@ -128,8 +128,6 @@ def align_waveforms_with_mismatch_original(t_NR, NR_amp, NR_phi, t_2, NR_r_2, NR
 
     """
 
-    print(f"* Mismatch window: t_min = {t_min_mismatch:.3f}, t_max = {t_max_mismatch:.3f} (based on t_peak = {t_peak:.3f})")
-
     NR_amp_interp, NR_phi_interp     = interp1d(t_NR, NR_amp, fill_value=0.0, bounds_error=False), interp1d(t_NR, NR_phi, fill_value=0.0, bounds_error=False)
 
     # Amplitude and phase decomposition for NR simulation with different resolutions/extrapolation orders.
