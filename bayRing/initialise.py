@@ -100,8 +100,8 @@ def read_config(Config):
         'l-NR'             : 2,
         'm'                : 2,
         'error'            : 'align-with-mismatch-res-only',
-        'error-t-min'      : 2692.7480095302817, # SXS-0305 specific
-        'error-t-max'      : 3792.7480095302817, # SXS-0305 specific
+        'error-t-min'      : 4e-3,
+        'error-t-max'      : 3e-1,
         'add-const'        : '0.0,0.0',
         'properties-file'  : '',
         't-peak-22'        : 0.0,
@@ -163,11 +163,11 @@ def read_config(Config):
         'steepness'             : 7.     ,
         'steepness_max'         : 200.   ,
         'n_steepness'           : 1      ,
-        'saturation_DX'         : 1      ,
-        'saturation_DX_max'     : 5      ,
+        'saturation_DX'         : 1.      ,
+        'saturation_DX_max'     : 5.      ,
         'n_saturation_DX'       : 1      ,
-        'saturation_SX'         : 1      ,
-        'saturation_SX_max'     : 5      ,
+        'saturation_SX'         : 1.      ,
+        'saturation_SX_max'     : 5.      ,
         'n_saturation_SX'       : 1      ,
         'n_FFT_points'          : 1      ,
         'n_iterations_C1'       : 1      
@@ -303,8 +303,8 @@ A dot is present at the end of each description line and is not to be intended a
                          for `Teukolsky`: ['constant-X', 'resolution'] where X is the constant value selected by the user, \
                          for `RIT`: ['constant-X']. For 'fake_NR': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
                          deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-res-only'.
-        error-t-min      Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option.     Default: 2692.7480095302817, SXS-0305 specific.
-        error-t-max      Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option.     Default: 3792.7480095302817, SXS-0305 specific.
+        error-t-min      Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time.     Default: 4e-3.
+        error-t-max      Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time.     Default: 3e-1.
         add-const        Parameter of the complex constant to be added to the fit template. Required to account for spurious \
                          effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.
         properties-file  Path to the file containing additional properties of the NR simulation in `.csv` format. \
@@ -407,9 +407,9 @@ A dot is present at the end of each description line and is not to be intended a
 
         User-controlled starting values for the minimization can be set by adding`'param-start=value` to the [Priors] section, where `param` is the name of the parameter under consideration. User-defined starting values overrun the `seeding` option for that parameter.
         
-    ******************************************************
+    *******************************************************************
     * Parameters to be passed to the [Mismatch-PSD-settings] section. *
-    ******************************************************  
+    *******************************************************************  
         asd-path            Path to the ASD file. Default: ''.
         direction           Where to apply the smoothing in the PSD before doing the FFT. If below, it applies to low frequencies, if above to high frequencies, if below-and-above on both. Default: below.
         n_FFT_points        Number of iterations for values of the points that are used to compute the PSD. Default: 1.
@@ -444,10 +444,22 @@ A dot is present at the end of each description line and is not to be intended a
                              - 0: Keep existing files.
                              Default: 1.
 
-        mismatch_print_flag  Determines whether to print mismatch information.
+        mismatch_print_flag  Determines whether to print mismatch information (e.g. the scalar products involved in the mismatch).
                              - 1: Print mismatch values.
                              - 0: Do not print mismatch values.
                              Default: 0.
+
+        mismatch_section_plot_flag  
+                             Determines whether to plot sanity check plots regarding the mismatch section (for instance, the windowed PSD vs the original one).
+                             - 1: Generate and save mismatch section plots.
+                             - 0: Do not generate plots.
+                             Default: 0.
+
+        compare_TD_FD        Enables comparison between Time Domain (TD) and Frequency Domain (FD) mismatches.
+                             - 1: Compute and compare both TD and FD mismatches.
+                             - 0: Skip comparison.
+                             Default: 0.
+
     
 
     ******************************************************
