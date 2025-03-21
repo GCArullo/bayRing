@@ -90,6 +90,65 @@ def mismatch_waveforms(deltaT_deltaPhi, time, amp1, amp2, phase1, phase2, t1, t2
     num = np.real(np.sum(amp1(t_masked)*amp2(t_masked-deltaT)*np.exp(-1j*(phase1(t_masked) - phase2(t_masked-deltaT) - deltaPhi))))
     return 1.-num/np.sqrt(norm1*norm2)
 
+def align_waveforms_with_mismatch_original(t_NR, NR_amp, NR_phi, t_2, NR_r_2, NR_i_2, t_min_mismatch, t_max_mismatch):
+
+    """
+
+    Align two waveforms using the mismatch between them.
+
+    Parameters
+    ----------
+
+    t_NR : array
+        Time array for the first NR waveform.
+    NR_amp : array
+        Amplitude of the first NR waveform.
+    NR_phi : array
+        Phase of the first NR waveform.
+    t_2 : array
+        Time array for the second NR waveform.
+    NR_r_2 : array
+        Real part of the second NR waveform.
+    NR_i_2 : array
+        Imaginary part of the second NR waveform.
+    t_min_mismatch : float
+        Initial time for the mismatch computation.
+    t_max_mismatch : float
+        Final time for the mismatch computation.
+
+    Returns
+    -------
+
+    rough_deltaPhi_estimate_2 : float
+        Rough estimate of the phase shift between the two waveforms.
+    deltaT_estimate_2 : float
+        Rough estimate of the time shift between the two waveforms.
+    mismatch : float
+        Mismatch between the two waveforms.
+
+    """
+
+    print(f"* Mismatch window: t_min = {t_min_mismatch:.3f}, t_max = {t_max_mismatch:.3f} (based on t_peak = {t_peak:.3f})")
+
+    NR_amp_interp, NR_phi_interp     = interp1d(t_NR, NR_amp, fill_value=0.0, bounds_error=False), interp1d(t_NR, NR_phi, fill_value=0.0, bounds_error=False)
+
+    # Amplitude and phase decomposition for NR simulation with different resolutions/extrapolation orders.
+    NR_amp_2, NR_phi_2               = amp_phase_from_re_im(NR_r_2, NR_i_2)
+    NR_amp_2_interp, NR_phi_2_interp = interp1d(t_2, NR_amp_2, fill_value=0.0, bounds_error=False), interp1d(t_2, NR_phi_2, fill_value=0.0, bounds_error=False)
+    
+    # Initial guess (used in the minimisation algorithm) of dephasing between different resolutions/extrapolation orders. Will use 0 for deltaT
+    rough_deltaPhi_estimate_2        = NR_phi_interp(t_min_mismatch) - NR_phi_2_interp(t_min_mismatch)
+    # Get deltaT and deltaPhi for alignment by minimising the mismatch.
+    # THE DOCUMENTATION OF THIS FUNCTION SUCKS SO BADLY. To get the actual value of the mismatch, need to add: `full_output=True, disp=False)[1]` at the end of the line.
+    deltaT_2, deltaPhi_2             = fmin(mismatch_waveforms, np.array([0.,rough_deltaPhi_estimate_2]), args=(t_NR, NR_amp_interp, NR_amp_2_interp, NR_phi_interp, NR_phi_2_interp, t_min_mismatch, t_max_mismatch), ftol=1e-15)
+    
+    # Align the waveforms.
+    NR_cmplx_2_aligned               = NR_amp_2_interp(t_NR-deltaT_2) * np.exp(1j*(NR_phi_2_interp(t_NR-deltaT_2) + deltaPhi_2))
+    NR_r_2_aligned, NR_i_2_aligned   = np.real(NR_cmplx_2_aligned), -np.imag(NR_cmplx_2_aligned)
+
+    return NR_r_2_aligned, NR_i_2_aligned
+
+
 def align_waveforms_with_mismatch(t_NR, NR_amp, NR_phi, t_2, NR_r_2, NR_i_2, t_min_mismatch, t_max_mismatch):
 
     """
