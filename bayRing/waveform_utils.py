@@ -189,8 +189,8 @@ def align_waveforms_with_mismatch(t_NR, NR_amp, NR_phi, t_2, NR_r_2, NR_i_2, t_m
     t_peak = t_NR[np.argmax(NR_amp)]
 
     # Convert mismatch time fractions into actual times
-    t_max_mismatch = t_peak * (1 - t_max_mismatch)
-    t_min_mismatch = t_peak * (1 - t_min_mismatch)
+    #t_max_mismatch = t_peak * (1 - t_max_mismatch)
+    #t_min_mismatch = t_peak * (1 - t_min_mismatch)
 
     print(f"* Mismatch window: t_min = {t_min_mismatch:.3f}, t_max = {t_max_mismatch:.3f} (based on t_peak = {t_peak:.3f})")
 
