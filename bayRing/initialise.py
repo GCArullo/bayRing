@@ -410,7 +410,7 @@ A dot is present at the end of each description line and is not to be intended a
     *******************************************************************
     * Parameters to be passed to the [Mismatch-PSD-settings] section. *
     *******************************************************************  
-        asd-path            Path to the ASD file. Default: ''.
+        asd-path            Path to the ASD file. Default: https://dcc.ligo.org/ligo-t1800044/public.
         direction           Where to apply the smoothing in the PSD before doing the FFT. If below, it applies to low frequencies, if above to high frequencies, if below-and-above on both. Default: below.
         n_FFT_points        Number of iterations for values of the points that are used to compute the PSD. Default: 1.
         n_iterations_C1     Number of iteriations for the C1 algorithm. Default: 1.

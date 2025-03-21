@@ -189,8 +189,8 @@ def align_waveforms_with_mismatch(t_NR, NR_amp, NR_phi, t_2, NR_r_2, NR_i_2, t_m
     t_peak = t_NR[np.argmax(NR_amp)]
 
     # Convert mismatch time fractions into actual times
-    #t_max_mismatch = t_peak * (1 - t_max_mismatch)
-    #t_min_mismatch = t_peak * (1 - t_min_mismatch)
+    t_max_mismatch = t_peak * (1 - t_max_mismatch)
+    t_min_mismatch = t_peak * (1 - t_min_mismatch)
 
     print(f"* Mismatch window: t_min = {t_min_mismatch:.3f}, t_max = {t_max_mismatch:.3f} (based on t_peak = {t_peak:.3f})")
 
@@ -339,9 +339,6 @@ def extract_NR_params(NR_sim, M):
     # Time axis in seconds, shifted with respect to the starting time
     t_NR_s = (t_NR_cut - t_peak - t_start_g) * M * C_mt
 
-    print("\nEstimated starting and end times and NR simulation lenght")
-    print("t_start={0:.1f}M, t_end={1:.1f}M, NR_length={2:.0f}\n".format(t_start_g, t_end_g, NR_length))
-
     return t_start_g, t_end_g, t_NR_s, NR_length
 
 def extract_flags(flags):
@@ -396,7 +393,7 @@ def extract_and_compute_psd_parameters(psd_dict):
 
         # Check if the ASD path is missing or invalid
         if not asd_path or not os.path.isfile(asd_path):
-            print("* No valid ASD path provided. Using default ASD.")
+            print("* No ASD path provided by user. Using default ASD.")
 
             # Get absolute path relative to the current script location
             project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -429,8 +426,8 @@ def extract_and_compute_psd_parameters(psd_dict):
             raise ValueError("n_FFT_points must be >= 1.")
 
         # Print extracted values
-        print("\nExtracted ASD file parameters")
-        print(f"f_min={f_min:.0f}Hz, f_max={f_max:.0f}Hz, dt={dt:.6f}s, df={df:.4f}Hz, N_points={N_points}\n")
+        print(f"\n* Loading ASD located at: {asd_path}\n")
+        print(f"\nASD parameters: f_min={f_min:.0f}Hz, f_max={f_max:.0f}Hz, dt={dt:.6f}s, df={df:.4f}Hz, N_points={N_points}\n")
 
         # Compute window properties
         window_sizes_DX = np.linspace(psd_dict['window_DX'], psd_dict['window_DX_max'], psd_dict['n_window_DX']).tolist()
