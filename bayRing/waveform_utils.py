@@ -540,7 +540,7 @@ def apply_C1(frequencies, values, f_start, window_size, n_iterations_C1):
     # Initialize the transition array
     transition = values[indices]
 
-    for n in range(0,n_iterations_C1,1):
+    for n in range(0, n_iterations_C1, 1):
 
         # Apply mild concavity by averaging three consecutive elements
         len_indices=indices[0][:-2]
