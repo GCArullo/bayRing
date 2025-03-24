@@ -547,8 +547,8 @@ class NR_simulation():
                  tM_end         = 150.0                         , 
                  t_delay_scd    = 0.0                           , 
                  t_peak_22      = 0.0                           ,
-                 t_min_mismatch = 2692.7480095302817            , #-#
-                 t_max_mismatch = 3792.7480095302817            ):#-#
+                 t_min_mismatch = 3e-1                          ,
+                 t_max_mismatch = 4e-3                          ):
 
         ####################
         # Input parameters #

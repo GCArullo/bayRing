@@ -100,8 +100,8 @@ def read_config(Config):
         'l-NR'             : 2,
         'm'                : 2,
         'error'            : 'align-with-mismatch-res-only',
-        'error-t-min'      : 4e-3,
-        'error-t-max'      : 3e-1,
+        'error-t-min'      : 3e-1,
+        'error-t-max'      : 4e-3,
         'add-const'        : '0.0,0.0',
         'properties-file'  : '',
         't-peak-22'        : 0.0,
@@ -153,6 +153,7 @@ def read_config(Config):
         'Mismatch-PSD-settings':
         {
         'asd-path'              : ''     ,
+        'obs_time'              : 0.     ,
         'direction'             : 'below',
         'window_DX'             : 0.8    ,
         'window_DX_max'         : 10.0   ,
@@ -411,6 +412,7 @@ A dot is present at the end of each description line and is not to be intended a
     * Parameters to be passed to the [Mismatch-PSD-settings] section. *
     *******************************************************************  
         asd-path            Path to the ASD file. Default: https://dcc.ligo.org/ligo-t1800044/public.
+        obs_time            Time of observation [s] related to the PSD (T=1/df). Default: 0, and then computed in the code as 1/df.
         direction           Where to apply the smoothing in the PSD before doing the FFT. If below, it applies to low frequencies, if above to high frequencies, if below-and-above on both. Default: below.
         n_FFT_points        Number of iterations for values of the points that are used to compute the PSD. Default: 1.
         n_iterations_C1     Number of iteriations for the C1 algorithm. Default: 1.

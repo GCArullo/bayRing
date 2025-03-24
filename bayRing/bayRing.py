@@ -220,7 +220,7 @@ def main():
     #===============================#
 
     # Initialize dictionaries
-    psd_data, acf_data, mismatch_data, optimal_SNR_data, condition_numbers = {}, {}, {}, {}, {}
+    psd_data, acf_data, mismatch_data, optimal_SNR_data, condition_numbers_data = {}, {}, {}, {}, {}
 
     # Assign GW parameters
     M, dL, ra, dec, psi = wf_utils.extract_GW_parameters(parameters)
@@ -294,9 +294,6 @@ def main():
                 t_ACF = np.linspace(0, N_fft*dt, len(ACF_smoothed))
                 ACF_truncated_NR = postprocess.truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s, mismatch_print_flag)
 
-                # Store condition number values in dictionary
-                condition_numbers[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = wf_utils.compute_condition_number(ACF_truncated_NR)
-
                 # Compute mismatch for hplus, hcross
                 postprocess.compute_mismatch_hplus_hcross(
                     NR_sim, 
@@ -310,6 +307,7 @@ def main():
                     f_min, f_max,
                     asd_path,
                     window_size_DX, window_size_SX, k,
+                    saturation_DX, saturation_SX,
                     mismatch_print_flag,
                     compare_TD_FD
                 )
@@ -317,7 +315,7 @@ def main():
                 # Plot mismatch sanity checks
 
                 # Read mismatch results from file
-                mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_fft}.txt"
+                mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_fft}.txt"
                 mismatch_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', mismatch_filename)
 
                 with open(mismatch_file, 'r') as f:
@@ -351,6 +349,7 @@ def main():
                     f_min, f_max,
                     asd_path,
                     window_size_DX, window_size_SX, k,
+                    saturation_DX, saturation_SX,
                     compare_TD_FD
                 )
 
@@ -364,28 +363,43 @@ def main():
                                                        M, dL, t_start_g, t_end_g, window_size_DX, window_size_SX, k)
 
                 # Read optimal SNR results from file
-                optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_fft}.txt"
+                optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_fft}.txt"
                 optimal_SNR_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', optimal_SNR_filename)
                 with open(optimal_SNR_file, 'r') as f:
                     lines = f.readlines()[1:]  # Skip the header
 
-                # Store mismatch results in a dictionary
+                # Store optimal SNR results in a dictionary
                 optimal_SNR_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = {'real': {}, 'imaginary': {}}
                 for line in lines:
                     perc, component, optimal_SNR = line.strip().split('\t')
                     perc = int(perc)
                     optimal_SNR_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)][component][perc] = float(optimal_SNR)
 
+                # Build the output filename
+                condition_numbers_filename = f"Condition_number_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_fft}.txt"
+                condition_numbers_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', condition_numbers_filename)
+
+                # Compute the condition number
+                condition_number = wf_utils.compute_condition_number(ACF_truncated_NR)
+
+                # Write to file (each line: Component <tab> Value)
+                with open(condition_numbers_file, 'w') as f:
+                    f.write(f"{condition_number}\n")
+
+                # Store in dictionary for later use if needed
+                condition_numbers_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = condition_number
+            
             except Exception as e:
-                print(f"Optimal SNR computation failed for window_sizes=({window_size_DX, window_size_SX})Hz, k={k}, saturations={(saturation_DX, saturation_SX)}: {e}")
+                print(f"Computation failed for window_sizes=({window_size_DX, window_size_SX})Hz, k={k}, saturations={(saturation_DX, saturation_SX)}: {e}")
 
     #----------------------------------------------------------------------------------- Postprocessing --------------------------------------------------------------------------------------------------------------------------#
 
     if mismatch_section_plot_flag==1:
 
         # Postprocess plots
+        postprocess.plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_SX, parameters['I/O']['outdir'], direction)
         postprocess.plot_psd_and_acf(psd_data, acf_data, asd_path, f_min, f_max, parameters['I/O']['outdir'], direction)
-        postprocess.plot_mismatch_optimal_SNR_condition_number_window_parameters(mismatch_data, optimal_SNR_data, condition_numbers, parameters['I/O']['outdir'], direction, M, dL, N_FFT)
+        postprocess.plot_mismatch_optimal_SNR_condition_number_window_parameters(mismatch_data, optimal_SNR_data, condition_numbers_data, parameters['I/O']['outdir'], direction, M, dL, N_FFT)
 
     # Attempt to generate the global corner plot
     try:
