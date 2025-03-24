@@ -1,8 +1,12 @@
-import numpy as np
+# Standard python imports
+import numpy as np, os
 from scipy.interpolate import interp1d
 from scipy.optimize    import fmin, minimize as min
 from scipy.signal      import find_peaks
-import lal, os
+from scipy.linalg      import toeplitz
+
+# GW-specific imports
+import lal
 
 # Constants
 twopi = 2.*np.pi
@@ -247,6 +251,7 @@ def find_peak_time(t, A, ecc):
     return t_peak
 
 def compute_condition_number(acf):
+
     """
     Compute the condition number of a Toeplitz matrix derived from the ACF.
 
@@ -256,11 +261,13 @@ def compute_condition_number(acf):
     Returns:
         float: Condition number of the Toeplitz matrix.
     """
-    from scipy.linalg import toeplitz
+
     toeplitz_matrix = toeplitz(acf)
+
     return np.linalg.cond(toeplitz_matrix)
 
 def extract_NR_params(NR_sim, M):
+
     """
     Extracts key time-related parameters from an NR_sim object.
 
@@ -274,10 +281,11 @@ def extract_NR_params(NR_sim, M):
     Returns:
         tuple: (t_start_g, t_end_g, t_NR_s, NR_length)
     """
-    t_peak = NR_sim.t_peak
-    t_NR_cut = NR_sim.t_NR_cut
+    
+    t_peak             = NR_sim.t_peak
+    t_NR_cut           = NR_sim.t_NR_cut
     t_start_g, t_end_g = t_NR_cut[0] - t_peak, t_NR_cut[-1] - t_peak
-    NR_length = len(NR_sim.NR_r_cut)
+    NR_length          = len(NR_sim.NR_r_cut)
 
     # Time axis in seconds, shifted with respect to the starting time
     t_NR_s = (t_NR_cut - t_peak - t_start_g) * M * C_mt
@@ -342,14 +350,10 @@ def extract_and_compute_psd_parameters(psd_dict):
             project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
             asd_path = os.path.join(project_root, "PSDs", "asd_aLIGODesignSensitivityT1800044.txt")
 
+            if not os.path.isfile(asd_path): raise FileNotFoundError(f"Default ASD file not found at {asd_path}.")
 
-            if not os.path.isfile(asd_path):
-                raise FileNotFoundError(f"Default ASD file not found at {asd_path}.")
-
-        try:
-            freq_file, _ = np.loadtxt(asd_path, unpack=True)
-        except Exception as e:
-            raise ValueError(f"Error loading ASD file {asd_path}: {e}")
+        try                   : freq_file, _ = np.loadtxt(asd_path, unpack=True)
+        except Exception as e : raise ValueError(f"Error loading ASD file {asd_path}: {e}")
 
         # Extract PSD parameters
         f_min, f_max = np.min(freq_file), np.max(freq_file)
