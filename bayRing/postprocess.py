@@ -1,17 +1,19 @@
 # Standard python packages
-import corner, os, numpy as np, matplotlib.pyplot as plt, scipy.linalg as sl, seaborn as sns, shutil, numba
+import corner, h5py, matplotlib.pyplot as plt, numpy as np, os, qnm, scipy.linalg as sl, seaborn as sns, shutil, numba
 from scipy.interpolate           import interp1d
 
-# Package internal imports
-import bayRing.utils             as utils
-import bayRing.waveform_utils    as waveform_utils
+# GW-packages
 from pycbc.psd                   import from_txt
 from pycbc.types.timeseries      import TimeSeries
 from pycbc.psd                   import aLIGOZeroDetHighPower
 from pycbc.types.frequencyseries import FrequencySeries
 from pycbc.filter                import sigma, overlap as compute_FD_overlap, overlap_cplx as compute_FD_overlap_cplx, match as compute_FD_match, matched_filter_core, matched_filter
-import h5py, lal
+import lal
 from lal.antenna                 import AntennaResponse
+
+# Package internal imports
+import bayRing.utils             as utils
+import bayRing.waveform_utils    as waveform_utils
 
 # Costants
 twopi = 2.*np.pi
@@ -1023,16 +1025,23 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
 
     l,m = NR_sim.l, NR_sim.m
 
-    if(NR_sim.NR_catalog=='cbhdb' or NR_sim.NR_catalog=='charged_raw'):
-        f_rd_fundamental = template.qnm_cached[(2,l,m,0)]['f']
-    else:
-        f_rd_fundamental = template.qnm_cached[(2,l,m,0)]['f']
+    f_rd_fundamental    = template.qnm_cached[(2,l,m,0)]['f']
+    tau_rd_fundamental  = template.qnm_cached[(2,l,m,0)]['tau']
+
+    plot_overtones_flag = 0
+    f_rd_overtones      = {}
+    for n in [1,3,7,9]: 
+        omega_n, _, _     = qnm.modes_cache(s=-2,l=l,m=m,n=n)(a=np.abs(metadata['af']))
+        f_rd_overtones[n] = (np.real(omega_n) / metadata['Mf']) * (1./twopi)
 
     try:
         m1, m2, chi1, chi2 = metadata['m1'], metadata['m2'], metadata['chi1'], metadata['chi2'],
         f_peak             = utils.F_mrg_Nagar(m1, m2, chi1, chi2, geom=1)
     except:
         f_peak             = None
+
+    # get the amplitude at the time close to the peak
+    amp_peak = NR_amp[np.argmin(np.abs(t_NR - t_peak))]
 
     lw_small        = 0.5
     lw_medium       = 1.2
@@ -1043,6 +1052,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     color_model     = '#cc0033'
     color_t_start   = 'mediumseagreen' #'#990066', '#cc0033', '#ff0000'
     color_t_peak    = 'royalblue'
+    color_f_overt   = 'darkorange'
 
     alpha_std       = 1.0
     alpha_med       = 0.8
@@ -1096,7 +1106,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     if not(tail_flag):
         ax1.plot(t_NR - t_peak, NR_r,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
         ax1.axvline(tM_start,                                                              c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
-        ax1.axvline(0.0,                          label=r'$t_{\rm peak}$',            c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
+        ax1.axvline(0.0, label=r'$t_{\rm peak}$',                                          c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax1.set_ylabel(r'$\mathrm{Re[%s]}$'%(label_data), fontsize=fontsize_labels)
 
         ax3.plot(t_NR - t_peak, NR_i,                                                      c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
@@ -1105,15 +1115,21 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
         ax3.set_ylabel(r'$\mathrm{Im[%s]}$'%(label_data), fontsize=fontsize_labels)
         ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
 
-    ax2.semilogy(t_NR - t_peak, NR_amp, label=r'$\mathrm{NR}$',                            c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
+    ax2.semilogy(t_NR - t_peak, NR_amp*np.e**((t_NR- t_peak)/tau_rd_fundamental), label=r'$\mathrm{NR}$',                            c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
     ax2.axvline(tM_start,                                                                  c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
     if(not(tail_flag)): ax2.axvline(0.0,                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
-    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): ax2.set_ylim([1e-6*np.max(NR_amp), 2*np.max(NR_amp)])
+    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): ax2.set_ylim([1e-1*amp_peak, 10*amp_peak])
     elif(  tail_flag  and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): ax2.set_ylim([2*1e-4, 2*np.max(NR_amp)])
     ax2.set_xlabel(r'$\mathrm{t - t_{peak} \, [M}]$', fontsize=fontsize_labels)
 
-    ax4.plot(t_NR - t_peak, NR_f,                                                          c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
-    ax4.axhline(f_rd_fundamental, label=r'$\mathit{f_{%d%d0}}$'%(l,m),                     c=color_f_ring,  lw=lw_std,    alpha=alpha_std, ls=ls_f)
+    ax4.plot(t_NR - t_peak, NR_f,                                                          c=color_NR,      lw=lw_std,     alpha=alpha_std, ls='-' )
+    ax4.axhline(f_rd_fundamental, label=r'$\mathit{f_{%d%d0}}$'%(l,m),                     c=color_f_ring,  lw=lw_std,     alpha=alpha_std, ls=ls_f)
+    if(plot_overtones_flag):
+        for n in [1,3,9]: 
+            if(n==1): leg = r'$\mathit{f_{%d%dn}}$'%(l,m)
+            else    : leg = None
+            ax4.axhline(f_rd_overtones[n], label=leg,         c=color_f_overt, lw=lw_std*0.4, alpha=alpha_std, ls=ls_f)
+
     if(tail_flag): 
         ax4.axhline(0.0,      label=r'$\mathit{f_{\rm tail}}$',                            c=color_model,   lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax4.axvline(tM_start, label=r'$\mathrm{t_{start} = t_{peak} \, + %d M}$'%tM_start, c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
@@ -1197,14 +1213,13 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
                     ax2.semilogy(t_cut - t_peak, wf_amp,                                                       c='royalblue', lw=lw_std,       alpha=alpha_med, ls='--' )
                     ax4.plot(    t_cut - t_peak, wf_f,                                                         c='royalblue', lw=lw_std,       alpha=alpha_med, ls='--' )
 
-
                 if(method=='Minimization'): break
 
     if not(tail_flag):
-        ax1.set_ylabel(r'$\mathit{Re(%s)}$'%(label_data), fontsize=fontsize_labels*rescale)
-        ax3.set_ylabel(r'$\mathit{Im(%s)}$'%(label_data), fontsize=fontsize_labels*rescale)
-    ax2.set_ylabel(    r'$\mathit{A_{%d%d}(t)}$'%(l,m)  , fontsize=fontsize_labels*rescale)
-    ax4.set_ylabel(    r'$\mathit{f_{%d%d}\,(t)}$'%(l,m), fontsize=fontsize_labels*rescale)
+        ax1.set_ylabel(r'$\mathit{Re(%s)}$'%(label_data)                           , fontsize=fontsize_labels*rescale)
+        ax3.set_ylabel(r'$\mathit{Im(%s)}$'%(label_data)                           , fontsize=fontsize_labels*rescale)
+    ax2.set_ylabel(    r'$\mathit{A_{%d%d}(t)} \cdot e^{t/\tau_{%d%d0}}$'%(l,m,l,m), fontsize=fontsize_labels*rescale)
+    ax4.set_ylabel(    r'$\mathit{f_{%d%d}\,(t)}$'%(l,m)                           , fontsize=fontsize_labels*rescale)
 
     plt.rcParams['legend.frameon'] = True
 

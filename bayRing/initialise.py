@@ -164,11 +164,11 @@ def read_config(Config):
         'steepness'             : 7.     ,
         'steepness_max'         : 200.   ,
         'n_steepness'           : 1      ,
-        'saturation_DX'         : 1.      ,
-        'saturation_DX_max'     : 5.      ,
+        'saturation_DX'         : 1.     ,
+        'saturation_DX_max'     : 5.     ,
         'n_saturation_DX'       : 1      ,
-        'saturation_SX'         : 1.      ,
-        'saturation_SX_max'     : 5.      ,
+        'saturation_SX'         : 1.     ,
+        'saturation_SX_max'     : 5.     ,
         'n_saturation_SX'       : 1      ,
         'n_FFT_points'          : 1      ,
         'n_iterations_C1'       : 1      
@@ -304,8 +304,8 @@ A dot is present at the end of each description line and is not to be intended a
                          for `Teukolsky`: ['constant-X', 'resolution'] where X is the constant value selected by the user, \
                          for `RIT`: ['constant-X']. For 'fake_NR': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
                          deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-res-only'.
-        error-t-min      Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time.     Default: 4e-3.
-        error-t-max      Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time.     Default: 3e-1.
+        error-t-min      Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_min_mm = t_peak * (1-`error-t-min`). Default: 3e-1.
+        error-t-max      Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_max_mm = t_peak * (1-`error-t-max`). Default: 4e-3.
         add-const        Parameter of the complex constant to be added to the fit template. Required to account for spurious \
                          effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.
         properties-file  Path to the file containing additional properties of the NR simulation in `.csv` format. \
