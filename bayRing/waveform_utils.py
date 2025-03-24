@@ -357,6 +357,7 @@ def extract_and_compute_psd_parameters(psd_dict):
         dt = 1 / f_sample
         T = psd_dict["obs_time"]
 
+        # Default: we take df as the minimum spacing in the frequency array associated to the PSD.
         if T==0:
 
             df = np.min(np.diff(freq_file))
@@ -364,6 +365,8 @@ def extract_and_compute_psd_parameters(psd_dict):
                 raise ValueError("Invalid frequency resolution calculated (df <= 0).")
             N_points = int(f_sample / df)
             T = N_points * dt
+
+        # Give instead T as the input, and compute df=1/T.
         else:
 
             N_points = int(T / dt)
