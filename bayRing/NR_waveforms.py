@@ -547,8 +547,8 @@ class NR_simulation():
                  tM_end         = 150.0                         , 
                  t_delay_scd    = 0.0                           , 
                  t_peak_22      = 0.0                           ,
-                 t_min_mismatch = 2692.7480095302817            , #-#
-                 t_max_mismatch = 3792.7480095302817            ):#-#
+                 t_min_mismatch = 2692.7480095302817            ,
+                 t_max_mismatch = 3792.7480095302817            ):
 
         ####################
         # Input parameters #
@@ -599,7 +599,7 @@ class NR_simulation():
                 self.download      = download
                 self.fake_error_NR = NR_error
 
-                self.t_NR, self.NR_err_cmplx_SXS, self.t_start = self.extract_data_NR(t_min_mismatch, t_max_mismatch)#-#
+                self.t_NR, self.NR_err_cmplx_SXS, self.t_start = self.extract_data_NR(t_min_mismatch, t_max_mismatch)
 
             else:
 
@@ -802,11 +802,11 @@ class NR_simulation():
                 # Align the waveforms minimising the mismatch over a [t_min, t_max] interval.
                 if('align-with-mismatch' in NR_error):
                     
-                    # Resolution error. #-#
+                    # Resolution error. 
                     NR_r_res    , NR_i_res       = waveform_utils.align_waveforms_with_mismatch(self.t_NR, self.NR_amp, self.NR_phi,  t_res,  NR_r_res,  NR_i_res, t_min_mismatch, t_max_mismatch)
                     NR_r_err_res, NR_i_err_res   = np.abs(self.NR_r-NR_r_res), np.abs(self.NR_i-NR_i_res)
 
-                    # Extrapolation error.  Align different extrapolation orders only if requested. #-#
+                    # Extrapolation error.  Align different extrapolation orders only if requested. 
                     if(NR_error=='align-with-mismatch-all'): 
                         NR_r_extr, NR_i_extr     = waveform_utils.align_waveforms_with_mismatch(self.t_NR, self.NR_amp, self.NR_phi, t_extr, NR_r_extr, NR_i_extr, t_min_mismatch, t_max_mismatch)
                     NR_r_err_extr, NR_i_err_extr = np.abs(self.NR_r-NR_r_extr), np.abs(self.NR_i-NR_i_extr)
