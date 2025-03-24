@@ -92,7 +92,10 @@ def mismatch_waveforms(deltaT_deltaPhi, time, amp1, amp2, phase1, phase2, t1, t2
 
     # Compute the numerator for the mismatch.
     num = np.real(np.sum(amp1(t_masked)*amp2(t_masked-deltaT)*np.exp(-1j*(phase1(t_masked) - phase2(t_masked-deltaT) - deltaPhi))))
-    return 1.-num/np.sqrt(norm1*norm2)
+
+    result = 1.-num/np.sqrt(norm1*norm2)
+
+    return result
 
 def align_waveforms_with_mismatch(t_NR, NR_amp, NR_phi, t_2, NR_r_2, NR_i_2, t_min_mismatch, t_max_mismatch):
 
@@ -215,7 +218,11 @@ def align_waveforms_at_peak(t_NR, NR_amp, NR_phi, t_res, NR_r_res, NR_i_res):
 def find_peak_time(t, A, ecc):
 
     """
-    
+
+    Find the peak time of the amplitude.
+
+    Parameters
+    ----------
     t : array
         Array containing the time samples.
 
@@ -230,7 +237,6 @@ def find_peak_time(t, A, ecc):
 
     t_peak : float
         Peak time of the amplitude.
-
     """
 
     # Find the peak time.
@@ -255,10 +261,12 @@ def compute_condition_number(acf):
     """
     Compute the condition number of a Toeplitz matrix derived from the ACF.
 
-    Parameters:
+    Parameters
+    ----------
         acf (np.ndarray): Autocorrelation function (ACF).
 
-    Returns:
+    Returns
+    -------
         float: Condition number of the Toeplitz matrix.
     """
 
@@ -271,14 +279,17 @@ def extract_NR_params(NR_sim, M):
     """
     Extracts key time-related parameters from an NR_sim object.
 
-    Parameters:
+    Parameters
+    ----------
+
         NR_sim (object): An object containing the attributes:
             - t_peak
             - t_NR_cut (list or array)
             - NR_r_cut (list or array)
         M: mass of the remnant in Solar masses.
 
-    Returns:
+    Returns
+    -------
         tuple: (t_start_g, t_end_g, t_NR_s, NR_length)
     """
     
@@ -293,34 +304,48 @@ def extract_NR_params(NR_sim, M):
     return t_start_g, t_end_g, t_NR_s, NR_length
 
 def extract_flags(flags):
+
     """
     Extracts specific flags from the given flags dictionary.
     
     :param flags: Dictionary containing flag values.
     :return: Tuple containing compare_TD_FD, C1_flag, mismatch_print_flag, and mismatch_section_plot_flag.
     """
-    compare_TD_FD = flags['compare_TD_FD']
-    clear_directory = flags['clear_directory']
+
+    compare_TD_FD                = flags['compare_TD_FD']
+    clear_directory              = flags['clear_directory']
     C1_flag, mismatch_print_flag = flags['C1_flag'], flags['mismatch_print_flag']
-    mismatch_section_plot_flag = flags['mismatch_section_plot_flag']
+    mismatch_section_plot_flag   = flags['mismatch_section_plot_flag']
     
     return compare_TD_FD, clear_directory, C1_flag, mismatch_print_flag, mismatch_section_plot_flag
 
 def extract_GW_parameters(parameters):
+
     """Extract GW parameters for mismatch computation."""
-    return (
-        parameters['Mismatch-GW-parameters']['M'], parameters['Mismatch-GW-parameters']['dL'],
-        parameters['Mismatch-GW-parameters']['ra'], parameters['Mismatch-GW-parameters']['dec'], parameters['Mismatch-GW-parameters']['psi']
-    )
+
+    result = (
+                parameters['Mismatch-GW-parameters'][  'M'], 
+                parameters['Mismatch-GW-parameters'][ 'dL'],
+                parameters['Mismatch-GW-parameters'][ 'ra'], 
+                parameters['Mismatch-GW-parameters']['dec'], 
+                parameters['Mismatch-GW-parameters']['psi']
+             )
+
+    return result
 
 def extract_and_compute_psd_parameters(psd_dict):
+
     """
     Load the PSD file, extract key frequency parameters, and compute window properties.
     
-    Parameters:
+    Parameters
+    ----------
+
         psd_dict (dict): Dictionary containing window properties of the PSD.
     
-    Returns:
+    Returns
+    -------
+
         tuple containing:
             - f_min (float): Minimum frequency in Hz.
             - f_max (float): Maximum frequency in Hz.
@@ -337,9 +362,10 @@ def extract_and_compute_psd_parameters(psd_dict):
             - saturation_SX_values (list): Logarithmic values for saturation_SX.
             - direction (string): Defines where to apply the smoothing of the PSD.
     """
+
     try:
         # Load the frequency data from the ASD file
-        asd_path = psd_dict['asd-path']
+        asd_path  = psd_dict['asd-path']
         direction = psd_dict['direction']
 
         # Check if the ASD path is missing or invalid
@@ -348,7 +374,7 @@ def extract_and_compute_psd_parameters(psd_dict):
 
             # Get absolute path relative to the current script location
             project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-            asd_path = os.path.join(project_root, "PSDs", "asd_aLIGODesignSensitivityT1800044.txt")
+            asd_path     = os.path.join(project_root, "PSDs", "asd_aLIGODesignSensitivityT1800044.txt")
 
             if not os.path.isfile(asd_path): raise FileNotFoundError(f"Default ASD file not found at {asd_path}.")
 
@@ -357,73 +383,72 @@ def extract_and_compute_psd_parameters(psd_dict):
 
         # Extract PSD parameters
         f_min, f_max = np.min(freq_file), np.max(freq_file)
-        f_sample = 2 * f_max
-        dt = 1 / f_sample
-        T = psd_dict["obs_time"]
+        f_sample     = 2 * f_max
+        dt           = 1 / f_sample
+        T            = psd_dict["obs_time"]
 
         if T==0:
 
-            df = np.min(np.diff(freq_file))
-            if df <= 0:
-                raise ValueError("Invalid frequency resolution calculated (df <= 0).")
+            df       = np.min(np.diff(freq_file))
+            if df <= 0: raise ValueError("Invalid frequency resolution calculated (df <= 0).")
             N_points = int(f_sample / df)
-            T = N_points * dt
+            T        = N_points * dt
         else:
 
             N_points = int(T / dt)
-            df = f_sample / N_points
+            df       = f_sample / N_points
 
-        n_FFT_points = psd_dict['n_FFT_points']
+        n_FFT_points    = psd_dict['n_FFT_points']
         n_iterations_C1 = psd_dict['n_iterations_C1']
 
         # Validate n_FFT_points
-        if n_FFT_points < 1:
-            raise ValueError("n_FFT_points must be >= 1.")
+        if n_FFT_points < 1: raise ValueError("n_FFT_points must be >= 1.")
 
         # Print extracted values
         print(f"\n* Loading ASD located at: {asd_path}\n")
         print(f"\nASD parameters: f_min={f_min:.0f}Hz, f_max={f_max:.0f}Hz, dt={dt:.6f}s, df={df:.4f}Hz, N_points={N_points}, T={T:.0f}s\n")
 
         # Compute window properties
-        window_sizes_DX = np.linspace(psd_dict['window_DX'], psd_dict['window_DX_max'], psd_dict['n_window_DX']).tolist()
-        window_sizes_SX = np.linspace(psd_dict['window_SX'], psd_dict['window_SX_max'], psd_dict['n_window_SX']).tolist()
-        steepness_values = np.logspace(np.log10(psd_dict['steepness']), np.log10(psd_dict['steepness_max']), psd_dict['n_steepness']).tolist()
+        window_sizes_DX      = np.linspace(psd_dict['window_DX'], psd_dict['window_DX_max'], psd_dict['n_window_DX']).tolist()
+        window_sizes_SX      = np.linspace(psd_dict['window_SX'], psd_dict['window_SX_max'], psd_dict['n_window_SX']).tolist()
+        steepness_values     = np.logspace(np.log10(psd_dict['steepness']), np.log10(psd_dict['steepness_max']), psd_dict['n_steepness']).tolist()
         saturation_DX_values = np.logspace(np.log10(psd_dict['saturation_DX']), np.log10(psd_dict['saturation_DX_max']), psd_dict['n_saturation_DX']).tolist()
         saturation_SX_values = np.logspace(np.log10(psd_dict['saturation_SX']), np.log10(psd_dict['saturation_SX_max']), psd_dict['n_saturation_SX']).tolist()
         
         return f_min, f_max, dt, df, N_points, n_FFT_points, asd_path, n_iterations_C1, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values, direction
     
-    except Exception as e:
-        print(f"Error processing PSD data: {e}")
+    except Exception as e: print(f"Error processing PSD data: {e}")
+
         return None
 
-def acf_from_asd(asd_filepath, f_min, f_max, N_points):
+def DEPRECATED_acf_from_asd(asd_filepath, f_min, f_max, N_points):
 
-    ''' 
-        VERSION WITHOUT WINDOWING THE PSD
-        Compute the autocovariance function (ACF) from a given amplitude spectral density (ASD),
-        given a frequency range and the number of points of the corresponding time array. 
-        Note that this function was rewritten with the smoothing implementation at the edges of the PSD.
+    """
+    VERSION WITHOUT WINDOWING THE PSD
 
-        Parameters
-        ----------
-        
-        f_min : float
-            Minimum frequency to consider.
-        f_max : float
-            Maximum frequency to consider.
-        n_points : int
-            Number of points of the time array.
-        asd_filepath : str
-            Path to the ASD file.
-        
-        Returns
-        -------
+    Compute the autocovariance function (ACF) from a given amplitude spectral density (ASD),
+    given a frequency range and the number of points of the corresponding time array. 
+    Note that this function was rewritten with the smoothing implementation at the edges of the PSD `acf_from_asd_with_smoothing`.
 
-        ACF : array
-            Autocovariance function.
+    Parameters
+    ----------
+    
+    f_min : float
+        Minimum frequency to consider.
+    f_max : float
+        Maximum frequency to consider.
+    n_points : int
+        Number of points of the time array.
+    asd_filepath : str
+        Path to the ASD file.
+    
+    Returns
+    -------
 
-     '''
+    ACF : array
+        Autocovariance function.
+
+    """
     
     # Frequency axis construction
     s_rate = f_max * 2
@@ -450,41 +475,43 @@ def acf_from_asd(asd_filepath, f_min, f_max, N_points):
     return ACF
 
 def smoothing_function(frequencies, values, f_anchor, window_size, target_value, k, indices, is_above):
-        """
-        Function to apply smoothing to a specified frequency range.
 
-        Parameters:
-            frequencies (np.ndarray): Frequency array.
-            values (np.ndarray): Corresponding values array.
-            f_anchor (float): Anchor frequency.
-            window_size (float): Smoothing window size.
-            target_value (float): Target value for the smoothed region.
-            k (float): Smoothing steepness parameter.
-            is_above (bool): If True, applies smoothing from above; otherwise, from below.
+    """
+    Function to apply smoothing to a specified frequency range.
 
-        Returns:
-            np.ndarray: Smoothed values for the selected range.
-        """
+    Parameters:
+        frequencies (np.ndarray): Frequency array.
+        values (np.ndarray): Corresponding values array.
+        f_anchor (float): Anchor frequency.
+        window_size (float): Smoothing window size.
+        target_value (float): Target value for the smoothed region.
+        k (float): Smoothing steepness parameter.
+        is_above (bool): If True, applies smoothing from above; otherwise, from below.
 
-        if window_size == 0:
-            return values
+    Returns:
+        np.ndarray: Smoothed values for the selected range.
+    """
 
-        if is_above:
-            smooth_range = frequencies[(frequencies >= f_anchor - window_size) & (frequencies <= f_anchor)]
-            smoothing_factor = 1 - np.exp(-(smooth_range - (f_anchor - window_size)) * k)
-
-        else:
-            smooth_range = frequencies[(frequencies >= f_anchor) & (frequencies <= f_anchor + window_size)]
-            smoothing_factor = 1 - np.exp((smooth_range - (f_anchor + window_size)) * k)
-
-        # Normalizing factor, fo that at f=f_min, or f=f_max, the PSD tends to the target value.   
-        s_norm = 1 - np.exp(- (window_size) * k)
-
-        # Apply the smoothing formula
-        values[indices] = values[indices] * (1 - smoothing_factor) + target_value * smoothing_factor / s_norm
+    if window_size == 0:
         return values
 
+    if is_above:
+        smooth_range = frequencies[(frequencies >= f_anchor - window_size) & (frequencies <= f_anchor)]
+        smoothing_factor = 1 - np.exp(-(smooth_range - (f_anchor - window_size)) * k)
+
+    else:
+        smooth_range = frequencies[(frequencies >= f_anchor) & (frequencies <= f_anchor + window_size)]
+        smoothing_factor = 1 - np.exp((smooth_range - (f_anchor + window_size)) * k)
+
+    # Normalizing factor, fo that at f=f_min, or f=f_max, the PSD tends to the target value.   
+    s_norm = 1 - np.exp(- (window_size) * k)
+
+    # Apply the smoothing formula
+    values[indices] = values[indices] * (1 - smoothing_factor) + target_value * smoothing_factor / s_norm
+    return values
+
 def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, saturation_SX, k, window_size_DX, window_size_SX, direction):
+    
     """
     Apply smoothing saturation to specified frequency ranges.
 
@@ -544,6 +571,7 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
     return values
 
 def apply_C1(frequencies, values, f_start, window_size, n_iterations_C1):
+    
     """
     Applies moving average between 3 points in order to C1 the PSD.
 
@@ -581,6 +609,7 @@ def apply_C1(frequencies, values, f_start, window_size, n_iterations_C1):
     return values
 
 def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, direction, C1_flag, n_iterations_C1):
+    
     """
     Compute the ACF from the ASD with smoothing applied.
 
