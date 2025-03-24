@@ -94,63 +94,6 @@ def mismatch_waveforms(deltaT_deltaPhi, time, amp1, amp2, phase1, phase2, t1, t2
     num = np.real(np.sum(amp1(t_masked)*amp2(t_masked-deltaT)*np.exp(-1j*(phase1(t_masked) - phase2(t_masked-deltaT) - deltaPhi))))
     return 1.-num/np.sqrt(norm1*norm2)
 
-def align_waveforms_with_mismatch_original(t_NR, NR_amp, NR_phi, t_2, NR_r_2, NR_i_2, t_min_mismatch, t_max_mismatch):
-
-    """
-
-    Align two waveforms using the mismatch between them.
-
-    Parameters
-    ----------
-
-    t_NR : array
-        Time array for the first NR waveform.
-    NR_amp : array
-        Amplitude of the first NR waveform.
-    NR_phi : array
-        Phase of the first NR waveform.
-    t_2 : array
-        Time array for the second NR waveform.
-    NR_r_2 : array
-        Real part of the second NR waveform.
-    NR_i_2 : array
-        Imaginary part of the second NR waveform.
-    t_min_mismatch : float
-        Initial time for the mismatch computation.
-    t_max_mismatch : float
-        Final time for the mismatch computation.
-
-    Returns
-    -------
-
-    rough_deltaPhi_estimate_2 : float
-        Rough estimate of the phase shift between the two waveforms.
-    deltaT_estimate_2 : float
-        Rough estimate of the time shift between the two waveforms.
-    mismatch : float
-        Mismatch between the two waveforms.
-
-    """
-
-    NR_amp_interp, NR_phi_interp     = interp1d(t_NR, NR_amp, fill_value=0.0, bounds_error=False), interp1d(t_NR, NR_phi, fill_value=0.0, bounds_error=False)
-
-    # Amplitude and phase decomposition for NR simulation with different resolutions/extrapolation orders.
-    NR_amp_2, NR_phi_2               = amp_phase_from_re_im(NR_r_2, NR_i_2)
-    NR_amp_2_interp, NR_phi_2_interp = interp1d(t_2, NR_amp_2, fill_value=0.0, bounds_error=False), interp1d(t_2, NR_phi_2, fill_value=0.0, bounds_error=False)
-    
-    # Initial guess (used in the minimisation algorithm) of dephasing between different resolutions/extrapolation orders. Will use 0 for deltaT
-    rough_deltaPhi_estimate_2        = NR_phi_interp(t_min_mismatch) - NR_phi_2_interp(t_min_mismatch)
-    # Get deltaT and deltaPhi for alignment by minimising the mismatch.
-    # THE DOCUMENTATION OF THIS FUNCTION SUCKS SO BADLY. To get the actual value of the mismatch, need to add: `full_output=True, disp=False)[1]` at the end of the line.
-    deltaT_2, deltaPhi_2             = fmin(mismatch_waveforms, np.array([0.,rough_deltaPhi_estimate_2]), args=(t_NR, NR_amp_interp, NR_amp_2_interp, NR_phi_interp, NR_phi_2_interp, t_min_mismatch, t_max_mismatch), ftol=1e-15)
-    
-    # Align the waveforms.
-    NR_cmplx_2_aligned               = NR_amp_2_interp(t_NR-deltaT_2) * np.exp(1j*(NR_phi_2_interp(t_NR-deltaT_2) + deltaPhi_2))
-    NR_r_2_aligned, NR_i_2_aligned   = np.real(NR_cmplx_2_aligned), -np.imag(NR_cmplx_2_aligned)
-
-    return NR_r_2_aligned, NR_i_2_aligned
-
-
 def align_waveforms_with_mismatch(t_NR, NR_amp, NR_phi, t_2, NR_r_2, NR_i_2, t_min_mismatch, t_max_mismatch):
 
     """
@@ -416,12 +359,20 @@ def extract_and_compute_psd_parameters(psd_dict):
         f_min, f_max = np.min(freq_file), np.max(freq_file)
         f_sample = 2 * f_max
         dt = 1 / f_sample
-        df = np.min(np.diff(freq_file))
+        T = psd_dict["obs_time"]
 
-        if df <= 0:
-            raise ValueError("Invalid frequency resolution calculated (df <= 0).")
+        if T==0:
 
-        N_points = int(f_sample / df)
+            df = np.min(np.diff(freq_file))
+            if df <= 0:
+                raise ValueError("Invalid frequency resolution calculated (df <= 0).")
+            N_points = int(f_sample / df)
+            T = N_points * dt
+        else:
+
+            N_points = int(T / dt)
+            df = f_sample / N_points
+
         n_FFT_points = psd_dict['n_FFT_points']
         n_iterations_C1 = psd_dict['n_iterations_C1']
 
@@ -431,7 +382,7 @@ def extract_and_compute_psd_parameters(psd_dict):
 
         # Print extracted values
         print(f"\n* Loading ASD located at: {asd_path}\n")
-        print(f"\nASD parameters: f_min={f_min:.0f}Hz, f_max={f_max:.0f}Hz, dt={dt:.6f}s, df={df:.4f}Hz, N_points={N_points}\n")
+        print(f"\nASD parameters: f_min={f_min:.0f}Hz, f_max={f_max:.0f}Hz, dt={dt:.6f}s, df={df:.4f}Hz, N_points={N_points}, T={T:.0f}s\n")
 
         # Compute window properties
         window_sizes_DX = np.linspace(psd_dict['window_DX'], psd_dict['window_DX_max'], psd_dict['n_window_DX']).tolist()
@@ -498,6 +449,41 @@ def acf_from_asd(asd_filepath, f_min, f_max, N_points):
 
     return ACF
 
+def smoothing_function(frequencies, values, f_anchor, window_size, target_value, k, indices, is_above):
+        """
+        Function to apply smoothing to a specified frequency range.
+
+        Parameters:
+            frequencies (np.ndarray): Frequency array.
+            values (np.ndarray): Corresponding values array.
+            f_anchor (float): Anchor frequency.
+            window_size (float): Smoothing window size.
+            target_value (float): Target value for the smoothed region.
+            k (float): Smoothing steepness parameter.
+            is_above (bool): If True, applies smoothing from above; otherwise, from below.
+
+        Returns:
+            np.ndarray: Smoothed values for the selected range.
+        """
+
+        if window_size == 0:
+            return values
+
+        if is_above:
+            smooth_range = frequencies[(frequencies >= f_anchor - window_size) & (frequencies <= f_anchor)]
+            smoothing_factor = 1 - np.exp(-(smooth_range - (f_anchor - window_size)) * k)
+
+        else:
+            smooth_range = frequencies[(frequencies >= f_anchor) & (frequencies <= f_anchor + window_size)]
+            smoothing_factor = 1 - np.exp((smooth_range - (f_anchor + window_size)) * k)
+
+        # Normalizing factor, fo that at f=f_min, or f=f_max, the PSD tends to the target value.   
+        s_norm = 1 - np.exp(- (window_size) * k)
+
+        # Apply the smoothing formula
+        values[indices] = values[indices] * (1 - smoothing_factor) + target_value * smoothing_factor / s_norm
+        return values
+
 def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, saturation_SX, k, window_size_DX, window_size_SX, direction):
     """
     Apply smoothing saturation to specified frequency ranges.
@@ -516,37 +502,6 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
     Returns:
         np.ndarray: Smoothed values. If `window_size` is 0, returns the original values.
     """
-
-    def smoothing_function(frequencies, values, f_anchor, window_size, target_value, k, indices, is_above):
-        """
-        Function to apply smoothing to a specified frequency range.
-
-        Parameters:
-            frequencies (np.ndarray): Frequency array.
-            values (np.ndarray): Corresponding values array.
-            f_anchor (float): Anchor frequency.
-            window_size (float): Smoothing window size.
-            target_value (float): Target value for the smoothed region.
-            k (float): Smoothing steepness parameter.
-            is_above (bool): If True, applies smoothing from above; otherwise, from below.
-
-        Returns:
-            np.ndarray: Smoothed values for the selected range.
-        """
-        if is_above:
-            smooth_range = frequencies[(frequencies >= f_anchor - window_size) & (frequencies <= f_anchor)]
-            smoothing_factor = 1 - np.exp(-(smooth_range - (f_anchor - window_size)) * k)
-
-        else:
-            smooth_range = frequencies[(frequencies >= f_anchor) & (frequencies <= f_anchor + window_size)]
-            smoothing_factor = 1 - np.exp((smooth_range - (f_anchor + window_size)) * k)
-
-        # Normalizing factor, fo that at f=f_min, or f=f_max, the PSD tends to the target value.   
-        s_norm = 1 - np.exp(- (window_size) * k)
-
-        # Apply the smoothing formula
-        values[indices] = values[indices] * (1 - smoothing_factor) + target_value * smoothing_factor / s_norm
-        return values
 
     # Apply smoothing for 'below', 'above', or 'below-and-above'
     if direction == 'below':
@@ -579,6 +534,7 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
 
         # Apply left smoothing
         values = smoothing_function(frequencies, values, f_anchor_l, window_size_DX, target_value_l, k, indices_below, is_above=False)
+        
         # Apply right smoothing
         values = smoothing_function(frequencies, values, f_anchor_h, window_size_SX, target_value_h, k, indices_above, is_above=True)
 
@@ -664,10 +620,11 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size_DX
     smoothed_PSD = PSD_band.copy()
     smoothed_PSD = apply_smoothing(f, smoothed_PSD, f_min, f_max, saturation_DX, saturation_SX, k, window_size_DX, window_size_SX, direction)
 
-    # Extend PSD for 0 < f < f_min
+    # Extend PSD for f < f_min with a constant value equal to the smoothed value at f_min
     f_below_min = f[f < f_min]
     if len(f_below_min) > 0:
-        PSD_below_min = np.full_like(f_below_min, saturation_DX*smoothed_PSD[0])
+        value_at_f_min = smoothed_PSD[np.argmin(np.abs(f - f_min))]
+        PSD_below_min = np.full_like(f_below_min, saturation_DX*smoothed_PSD[0])#value_at_f_min)
         smoothed_PSD[:len(f_below_min)] = PSD_below_min
 
     #-----------------------------------------------------C1 fixing------------------------------------------------------------#

@@ -783,14 +783,14 @@ def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, metho
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
                 continue
 
-def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g_true, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, mismatch_print_flag, compare_TD_FD):
+def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, mismatch_print_flag, compare_TD_FD):
     """
     Compute the mismatch of the model with respect to NR simulations.
     """
     print("\nProcessing mismatch computation for plus and cross polarizations.\n")
 
     # File paths for saving results
-    mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}.txt"
+    mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
     outFile_path = os.path.join(outdir, 'Algorithm', mismatch_filename)
     
     with open(outFile_path, 'w') as outFile_mismatch:
@@ -851,7 +851,7 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
 
                 if compare_TD_FD:
 
-                    mismatch_filename_fd = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}.txt"
+                    mismatch_filename_fd = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}.txt"
                     outFile_path_fd = os.path.join(outdir, 'Algorithm', mismatch_filename_fd)
 
                     with open(outFile_path_fd, 'w') as outFile_mismatch_fd:
@@ -875,13 +875,13 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
                 continue
 
-def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, ra, dec, psi, t_start_g_true, window_size_DX, window_size_SX, k):
+def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, ra, dec, psi, t_start_g, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX):
     """
     Compute the mismatch of the model with respect to NR simulations.
     """
     print("\nProcessing mismatch computation for the total signal.\n")
     # File paths for saving results
-    mismatch_filename = f"Mismatch_h_tot_M_{M}_dL_{dL}_alpha_{ra}_delta_{dec}_psi_{psi}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}.txt"
+    mismatch_filename = f"Mismatch_h_tot_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
     outFile_path = os.path.join(outdir, 'Algorithm', mismatch_filename)
     
     with open(outFile_path, 'w') as outFile_mismatch:
@@ -928,14 +928,14 @@ def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf,
             with open(outFile_path, 'a') as outFile_mismatch:
                 outFile_mismatch.write(f'{perc}\t{TD_mismatch}\n')
 
-def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, compare_TD_FD):
+def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, compare_TD_FD):
     """
     Compute the optimal SNR of the model waveform.
     """
     print("\nProcessing optimal SNR computation for plus and cross polarizations.\n")
 
     # File paths for saving results
-    optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}.txt"
+    optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
     optimal_SNR_filename_fd = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}_FD.txt"
     outFile_path = os.path.join(outdir, 'Algorithm', optimal_SNR_filename)
     outFile_path_fd = os.path.join(outdir, 'Algorithm', optimal_SNR_filename_fd)
