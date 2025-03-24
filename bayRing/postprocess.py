@@ -396,20 +396,20 @@ def compare_with_GR_QNMs(results_object, qnm_cached, NR_sim, outdir):
 
 def compute_FD_optimal_SNR(asd_file, h, n, f_min, f_max):
 
-        # Ensure PSD matches the waveform's `delta_f`
-        delta_f = 2*f_max/n
-        psd     = from_txt(
-            filename        = asd_file,
-            length          = n,
-            delta_f         = delta_f,
-            low_freq_cutoff = f_min,
-            is_asd_file     = True
-        )
+    # Ensure PSD matches the waveform's `delta_f`
+    delta_f = 2*f_max/n
+    psd     = from_txt(
+                        filename        = asd_file,
+                        length          = n,
+                        delta_f         = delta_f,
+                        low_freq_cutoff = f_min,
+                        is_asd_file     = True
+                    )
 
-        h_tilde = h.to_frequencyseries(delta_f=delta_f)
-        fd_snr = sigma(h_tilde, psd=psd, low_frequency_cutoff=f_min)
+    h_tilde = h.to_frequencyseries(delta_f=delta_f)
+    fd_snr  = sigma(h_tilde, psd=psd, low_frequency_cutoff=f_min)
 
-        return fd_snr
+    return fd_snr
 
 @numba.njit
 def fast_interpolation(x, xp, fp):
@@ -417,26 +417,30 @@ def fast_interpolation(x, xp, fp):
     return np.interp(x, xp, fp)
 
 def interpolate_waveform(t_start_g, t_end_g, M, wf_lNR, acf):
+
     """
     Interpolates the waveform to match the length of the autocovariance function (ACF).
     
-    Parameters:
+    Parameters
+    ----------
     - t_start_g (float) : Start time in geometrical units.
     - t_end_g   (float) : End time in geometrical units.
     - M (float)         : Mass of the system.
     - wf_lNR (array)    : The original NR waveform data.
     - acf (array)       : The autocovariance function (defines new length).
 
-    Returns:
+    Returns
+    -------
     - wf_int (array) Interpolated waveform with the same length as `acf`.
     """
+
     # Compute start and end time in physical units
     t_start = t_start_g * C_mt * M
-    t_end = t_end_g * C_mt * M
+    t_end   = t_end_g * C_mt * M
 
     # Generate time arrays
     t_array = np.linspace(t_start, t_end, len(wf_lNR))  # Original waveform time
-    t_int = np.linspace(t_start, t_end, len(acf))       # Target interpolation time
+    t_int   = np.linspace(t_start, t_end, len(acf))       # Target interpolation time
 
     # Use Numba-optimized interpolation
     wf_int = fast_interpolation(t_int, t_array, wf_lNR)
@@ -444,26 +448,27 @@ def interpolate_waveform(t_start_g, t_end_g, M, wf_lNR, acf):
     return wf_int
 
 def convert_asd_to_pycbc_psd(asd_file, delta_f):
+
     """
     Load an ASD file, compute the PSD, and convert it to a PyCBC FrequencySeries.
 
-    Parameters:
+    Parameters
+    ----------
+
     asd_file (str): Path to the ASD file (two columns: frequency, ASD value)
 
-    Returns:
+    Returns
+    -------
+
     pycbc.types.FrequencySeries: The computed PSD as a FrequencySeries object.
     """
     
     # Load ASD data from file
-    data = np.loadtxt(asd_file)
+    data       = np.loadtxt(asd_file)
     asd_values = data[:, 1]   # Second column: ASD values
     
     # Compute PSD by squaring ASD values
     psd_values = asd_values ** 2
-
-    #frequency
-    #f = np.linspace(0)
-    #psd_interpolate = interp1d()
     
     print(f"Loaded ASD file: {asd_file}, PSD length: {len(psd_values)}")
 
@@ -473,34 +478,37 @@ def convert_asd_to_pycbc_psd(asd_file, delta_f):
     return psd
 
 def clear_directory(directory_path):
+
     """
     Clears all files inside a directory without deleting the directory itself.
 
-    Parameters:
+    Parameters
+    ----------
         directory_path (str): Path to the directory to be cleared.
 
-    Returns:
+    Returns
+    -------
         None
     """
+
     if os.path.exists(directory_path):
         for filename in os.listdir(directory_path):
             file_path = os.path.join(directory_path, filename)
             try:
-                if os.path.isfile(file_path) or os.path.islink(file_path):
-                    os.unlink(file_path)  # Delete files and symlinks
-                elif os.path.isdir(file_path):
-                    shutil.rmtree(file_path)  # Recursively delete folders
-            except Exception as e:
-                print(f"Failed to delete {file_path}: {e}")
+                if os.path.isfile(file_path) or os.path.islink(file_path): os.unlink(file_path)     # Delete files and symlinks
+                elif os.path.isdir(file_path)                            : shutil.rmtree(file_path) # Recursively delete folders
+            except Exception as e: print(f"Failed to delete {file_path}: {e}")
 
     else:
         os.makedirs(directory_path, exist_ok=True)
 
 def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s, print_truncation_info):
+
     """
     Truncate and interpolate the Autocorrelation Function (ACF) based on time constraints.
 
-    Parameters:
+    Parameters
+    ----------
         ACF_smoothed (np.ndarray): the original smoothed ACF.
         t_ACF (np.ndarray): the time axis associated to ACF_smoothed.
         t_start (float): Start time for analysis [geometric units].
@@ -508,26 +516,27 @@ def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_N
         t_NR_s (np.ndarray): NR time array in seconds, starting at 0, and ending at t_end-t_start.
         N_sim (int): The number of points for the interpolated ACF.
 
-    Returns:
+    Returns
+    -------
         np.ndarray: The new array corresponding to the interpolated ACF on the NR time array.
     """
 
     # First, we take only the first half of the ACF, which is the one associated to positive frequencies
-    half_index = len(ACF_smoothed) // 2
-    t_ACF_half = t_ACF[:half_index]
+    half_index        = len(ACF_smoothed) // 2
+    t_ACF_half        = t_ACF[:half_index]
     ACF_smoothed_half = ACF_smoothed[:half_index]
 
     # Compute the truncation point (T_RD = t_end - t_start)
-    T_RD = (t_end_g - t_start_g) * C_mt * M
+    T_RD  = (t_end_g - t_start_g) * C_mt * M
     index = np.argmin(np.abs(t_ACF_half - T_RD))
 
     # Truncate the ACF to ringdown analysis (See https://arxiv.org/abs/2107.05609 for discussion on truncation)
-    ACF_truncated = ACF_smoothed_half[:index+1]
+    ACF_truncated   = ACF_smoothed_half[:index+1]
     t_ACF_truncated = t_ACF_half[:index+1]
 
     # Perform linear interpolation
     interpolator = interp1d(t_ACF_truncated, ACF_truncated, kind='linear', fill_value="extrapolate")
-    ACF_trunc = interpolator(t_NR_s)
+    ACF_trunc    = interpolator(t_NR_s)
 
     if print_truncation_info:
 
@@ -546,6 +555,7 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
 
     Parameters
     ----------
+
     NR_sim : NR_sim
         NR simulation object.
 
@@ -572,7 +582,8 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
 
     Returns
     -------
-    Nothing, does some plots for understanding if there is everything okay :)
+    
+    Nothing, only creates sanity plots.
     """
 
     # outdir
@@ -583,7 +594,7 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
 
     #start and end times of the analysis [s]
     t_start = t_start_g * C_mt * M
-    t_end = t_end_g * C_mt * M
+    t_end   = t_end_g * C_mt * M
     t_trunc = np.linspace(t_start, t_end, len(NR_sim.t_NR_cut))
 
     # Calculate scaled NR waveform components
@@ -614,7 +625,7 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
     wf_i_whitened = {perc: sl.solve_toeplitz(acf, wf_i_quantiles[perc], check_finite=False) for perc in [5, 50, 95]}
 
     # Create Toeplitz matrix from acf and compute its inverse
-    acf_toeplitz = sl.toeplitz(acf)
+    acf_toeplitz     = sl.toeplitz(acf)
     acf_toeplitz_inv = np.linalg.inv(acf_toeplitz)
 
     # Apply whitening using the Toeplitz inverse matrix
@@ -713,7 +724,10 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
 
     print("Plots saved to:", os.path.join(outdir, 'Algorithm'))
 
+    return
+
 def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size, k, compare_TD_FD, sanity_check_mm):
+   
     """
     OLD VERSION. Compute the mismatch of the model with respect to NR simulations.
     """
@@ -783,22 +797,26 @@ def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, metho
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
                 continue
 
+    return
+
 def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, mismatch_print_flag, compare_TD_FD):
+   
     """
     Compute the mismatch of the model with respect to NR simulations.
     """
+
     print("\nProcessing mismatch computation for plus and cross polarizations.\n")
 
     # File paths for saving results
     mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
-    outFile_path = os.path.join(outdir, 'Algorithm', mismatch_filename)
+    outFile_path      = os.path.join(outdir, 'Algorithm', mismatch_filename)
     
     with open(outFile_path, 'w') as outFile_mismatch:
         outFile_mismatch.write('#CI\tStrain_data\tMismatch\n')
 
     # Extract NR waveform components (physical units)
-    NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
-    NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
+    NR_r    = NR_sim.NR_r_cut * (C_md * M) / dL
+    NR_i    = NR_sim.NR_i_cut * (C_md * M) / dL
     NR_dict = {'real': NR_r, 'imaginary': NR_i}
 
     for NR_quant, NR_data in NR_dict.items():
@@ -806,10 +824,9 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
 
             # Compute <NR|NR>
             whiten_whiten_h_NR = sl.solve_toeplitz(acf, NR_data, check_finite=False)
-            h_NR_h_NR_sqrt = np.sqrt(abs(np.dot(NR_data, whiten_whiten_h_NR)))
+            h_NR_h_NR_sqrt     = np.sqrt(abs(np.dot(NR_data, whiten_whiten_h_NR)))
 
-            if mismatch_print_flag:
-                print(f"<NR|NR>**0.5={h_NR_h_NR_sqrt:.1f}")
+            if mismatch_print_flag: print(f"<NR|NR>**0.5={h_NR_h_NR_sqrt:.1f}")
 
         except Exception as e:
             print(f"Error in NR scalar product for {NR_quant}: {e}")
@@ -828,17 +845,17 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
                 wf_i = np.percentile(np.array(models_im_list), [perc], axis=0)[0]
 
                 # Convert to physical units
-                wf_r *= (C_md * M) / dL
-                wf_i *= (C_md * M) / dL
+                wf_r    *= (C_md * M) / dL
+                wf_i    *= (C_md * M) / dL
                 wf_quant = {'real': wf_r, 'imaginary': wf_i}
 
                 # Compute scalar products with h_wf
                 whiten_whiten_h_wf = sl.solve_toeplitz(acf, wf_quant[NR_quant], check_finite=False)
-                h_wf_h_wf_sqrt = np.sqrt(abs(np.dot(wf_quant[NR_quant], whiten_whiten_h_wf)))
-                h_wf_h_NR = np.dot(wf_quant[NR_quant], whiten_whiten_h_NR)
+                h_wf_h_wf_sqrt     = np.sqrt(abs(np.dot(wf_quant[NR_quant], whiten_whiten_h_wf)))
+                h_wf_h_NR          = np.dot(wf_quant[NR_quant], whiten_whiten_h_NR)
 
                 # Match and mismatch computations
-                TD_match = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
+                TD_match    = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
                 TD_mismatch = 1 - TD_match
 
                 if mismatch_print_flag==1:
@@ -852,13 +869,13 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
                 if compare_TD_FD:
 
                     mismatch_filename_fd = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}.txt"
-                    outFile_path_fd = os.path.join(outdir, 'Algorithm', mismatch_filename_fd)
+                    outFile_path_fd      = os.path.join(outdir, 'Algorithm', mismatch_filename_fd)
 
                     with open(outFile_path_fd, 'w') as outFile_mismatch_fd:
                         outFile_mismatch_fd.write('#CI\tStrain_data\tFD_Mismatch\n')
 
-                    psd = convert_asd_to_pycbc_psd(asd_file, f_min, f_max, delta_f=2*f_max/len(acf))
-                    h_TS = TimeSeries(wf_quant[NR_quant], delta_t=1/(2*f_max))
+                    psd   = convert_asd_to_pycbc_psd(asd_file, f_min, f_max, delta_f=2*f_max/len(acf))
+                    h_TS  = TimeSeries(wf_quant[NR_quant], delta_t=1/(2*f_max))
                     NR_TS = TimeSeries(NR_data, delta_t=1/(2*f_max))
 
                     FD_match_m = float(compute_FD_match(h_TS, NR_TS, psd=psd, low_frequency_cutoff=f_min, high_frequency_cutoff=f_max)[0])
@@ -875,14 +892,18 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
                 continue
 
+    return
+
 def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, ra, dec, psi, t_start_g, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX):
+    
     """
     Compute the mismatch of the model with respect to NR simulations.
+    
     """
     print("\nProcessing mismatch computation for the total signal.\n")
     # File paths for saving results
     mismatch_filename = f"Mismatch_h_tot_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
-    outFile_path = os.path.join(outdir, 'Algorithm', mismatch_filename)
+    outFile_path      = os.path.join(outdir, 'Algorithm', mismatch_filename)
     
     with open(outFile_path, 'w') as outFile_mismatch:
         outFile_mismatch.write('#CI\tStrain_data\tMismatch\n')
@@ -892,13 +913,13 @@ def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf,
     NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
 
     # Compute polarizations
-    resp = AntennaResponse('H1', ra=ra, dec=dec, psi=psi, tensor=True, times=1126259462.43)
+    resp            = AntennaResponse('H1', ra=ra, dec=dec, psi=psi, tensor=True, times=1126259462.43)
     F_plus, F_cross = resp.plus, resp.cross
-    NR_data = F_plus * NR_r + F_cross * NR_i
+    NR_data         = F_plus * NR_r + F_cross * NR_i
 
     # Compute <NR|NR>
     whiten_whiten_h_NR = sl.solve_toeplitz(acf, NR_data, check_finite=False)
-    h_NR_h_NR_sqrt = np.sqrt(abs(np.dot(NR_data, whiten_whiten_h_NR)))
+    h_NR_h_NR_sqrt     = np.sqrt(abs(np.dot(NR_data, whiten_whiten_h_NR)))
 
     # Load waveform template
     if method == 'Nested-sampler':
@@ -914,19 +935,21 @@ def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf,
             # Convert to physical units
             wf_r *= (C_md * M) / dL
             wf_i *= (C_md * M) / dL
-            wf = F_plus * wf_r + F_cross * wf_i
+            wf    = F_plus * wf_r + F_cross * wf_i
 
             # Compute scalar products with h_wf
             whiten_whiten_h_wf = sl.solve_toeplitz(acf, wf, check_finite=False)
-            h_wf_h_wf_sqrt = np.sqrt(abs(np.dot(wf, whiten_whiten_h_wf)))
-            h_wf_h_NR = np.dot(wf, whiten_whiten_h_NR)
+            h_wf_h_wf_sqrt     = np.sqrt(abs(np.dot(wf, whiten_whiten_h_wf)))
+            h_wf_h_NR          = np.dot(wf, whiten_whiten_h_NR)
 
             # Match/mismatch computations
-            TD_match = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
+            TD_match    = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
             TD_mismatch = 1 - TD_match
 
             with open(outFile_path, 'a') as outFile_mismatch:
                 outFile_mismatch.write(f'{perc}\t{TD_mismatch}\n')
+        
+    return 
 
 def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, compare_TD_FD):
     """
