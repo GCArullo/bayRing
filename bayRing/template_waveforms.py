@@ -227,7 +227,6 @@ class WaveformModel(cpnest.model.Model):
                                    ecc_par       = ecc_par      ,
                                    NR_fit_coeffs = NR_fit_coeffs)
 
-
         return ringdown_model
 
     def waveform(self, params, fixed_params):
