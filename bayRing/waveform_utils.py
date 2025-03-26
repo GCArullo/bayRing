@@ -378,7 +378,7 @@ def extract_and_compute_psd_parameters(psd_dict):
 
             if not os.path.isfile(asd_path): raise FileNotFoundError(f"Default ASD file not found at {asd_path}.")
 
-        try                   : freq_file, _ = np.loadtxt(asd_path, unpack=True)
+        try                   : freq_file, asd = np.loadtxt(asd_path, unpack=True)
         except Exception as e : raise ValueError(f"Error loading ASD file {asd_path}: {e}")
 
         # Extract PSD parameters
@@ -386,6 +386,10 @@ def extract_and_compute_psd_parameters(psd_dict):
         f_sample     = 2 * f_max
         dt           = 1 / f_sample
         T            = psd_dict["obs_time"]
+
+        # Extract frequencies between f_min and f_max
+        mask = (freq_file >= f_min) & (freq_file <= f_max)
+        freq_file = freq_file[mask]
 
         # Default: we take df as the minimum spacing in the frequency array associated to the PSD.
         if T==0:
@@ -410,7 +414,11 @@ def extract_and_compute_psd_parameters(psd_dict):
         # Print extracted values
         print(f"\n* Loading ASD located at: {asd_path}\n")
         print(f"\nASD parameters: f_min={f_min:.0f}Hz, f_max={f_max:.0f}Hz, dt={dt:.6f}s, df={df:.4f}Hz, N_points={N_points}, T={T:.0f}s\n")
-
+        
+        psd_min, psd_max = np.min(asd[mask]**2), np.max(asd[mask]**2)
+        condition_number = psd_max/psd_min
+        print(f"min(PSD) = {psd_min:.2e}, max(PSD) = {psd_max:.2e}, condition number = {condition_number:.1f}")
+              
         # Compute window properties
         window_sizes_DX      = np.linspace(psd_dict['window_DX'], psd_dict['window_DX_max'], psd_dict['n_window_DX']).tolist()
         window_sizes_SX      = np.linspace(psd_dict['window_SX'], psd_dict['window_SX_max'], psd_dict['n_window_SX']).tolist()
