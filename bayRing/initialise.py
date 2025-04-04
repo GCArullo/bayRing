@@ -100,8 +100,8 @@ def read_config(Config):
         'l-NR'             : 2,
         'm'                : 2,
         'error'            : 'align-with-mismatch-res-only',
-        'error-t-min'      : 2692.7480095302817, # SXS-0305 specific
-        'error-t-max'      : 3792.7480095302817, # SXS-0305 specific
+        'error-t-min'      : 3e-1,
+        'error-t-max'      : 4e-3,
         'add-const'        : '0.0,0.0',
         'properties-file'  : '',
         't-peak-22'        : 0.0,
@@ -133,29 +133,64 @@ def read_config(Config):
         'Inference':
         {
         'method'           : 'Nested-sampler',
-        'likelihood'       : 'gaussian',
-        'sampler'          : 'cpnest',
-        'nlive'            : 256,
-        'maxmcmc'          : 256,
-        'seed'             : 1234,
-        'nnest'            : 1,
-        'nensemble'        : 1,
+        'likelihood'       : 'gaussian'      ,
+        'sampler'          : 'cpnest'        ,
+        'nlive'            : 256             ,
+        'maxmcmc'          : 256             ,
+        'seed'             : 1234            ,
+        'nnest'            : 1               ,
+        'nensemble'        : 1               ,
 
-        't-start'          : 20.0,
+        't-start'          : 20.0 ,
         't-end'            : 140.0,
-        'dt-scd'           : 0.0,
+        'dt-scd'           : 0.0  ,
         
         'min-method'       : 'lm',
-        'min-iter-min'     : 1,
+        'min-iter-min'     : 1   ,
         'min-iter-max'     : 1000,
         },
 
-        'Mismatch':
+        'Mismatch-PSD-settings':
         {
-        'f-min'            : 20.0,
-        'f-max'            : 2048.0,
-        'asd-path'         : '',
+        'asd-path'              : ''     ,
+        'obs_time'              : 0.     ,
+        'direction'             : 'below',
+        'window_DX'             : 0.8    ,
+        'window_DX_max'         : 10.0   ,
+        'window_SX'             : 0.8    ,
+        'window_SX_max'         : 10.0   ,
+        'n_window_DX'           : 1      ,
+        'n_window_SX'           : 1      ,
+        'steepness'             : 7.     ,
+        'steepness_max'         : 200.   ,
+        'n_steepness'           : 1      ,
+        'saturation_DX'         : 1.     ,
+        'saturation_DX_max'     : 5.     ,
+        'n_saturation_DX'       : 1      ,
+        'saturation_SX'         : 1.     ,
+        'saturation_SX_max'     : 5.     ,
+        'n_saturation_SX'       : 1      ,
+        'n_FFT_points'          : 1      ,
+        'n_iterations_C1'       : 1      
         },
+
+        'Mismatch-GW-parameters':
+        {
+        'M'                    : 60     ,
+        'dL'                   : 410    ,
+        'ra'                   : 1.375  ,
+        'dec'                  : -0.2108,
+        'psi'                  : 2.659
+        },
+
+        'Flags': 
+        {
+        'C1_flag'                      : 1,
+        'clear_directory'              : 1,
+        'compare_TD_FD'                : 0,
+        'mismatch_print_flag'          : 0,
+        'mismatch_section_plot_flag'   : 0,
+        }
 
     }
 
@@ -269,8 +304,8 @@ A dot is present at the end of each description line and is not to be intended a
                          for `Teukolsky`: ['constant-X', 'resolution'] where X is the constant value selected by the user, \
                          for `RIT`: ['constant-X']. For 'fake_NR': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
                          deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-res-only'.
-        error-t-min      Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option.     Default: 2692.7480095302817, SXS-0305 specific.
-        error-t-max      Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option.     Default: 3792.7480095302817, SXS-0305 specific.
+        error-t-min      Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_min_mm = t_peak * (1-`error-t-min`). Default: 3e-1.
+        error-t-max      Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_max_mm = t_peak * (1-`error-t-max`). Default: 4e-3.
         add-const        Parameter of the complex constant to be added to the fit template. Required to account for spurious \
                          effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.
         properties-file  Path to the file containing additional properties of the NR simulation in `.csv` format. \
@@ -372,16 +407,72 @@ A dot is present at the end of each description line and is not to be intended a
         Prior default bounds can be changed by adding 'param-min=value' or 'param-max=value' to this section, where `param` is the name of the parameter under consideration.
 
         User-controlled starting values for the minimization can be set by adding`'param-start=value` to the [Priors] section, where `param` is the name of the parameter under consideration. User-defined starting values overrun the `seeding` option for that parameter.
+        
+    *******************************************************************
+    * Parameters to be passed to the [Mismatch-PSD-settings] section. *
+    *******************************************************************  
+        asd-path            Path to the ASD file. Default: https://dcc.ligo.org/ligo-t1800044/public.
+        obs_time            Time of observation [s] related to the PSD (T=1/df). Default: 0, and then computed in the code as 1/df.
+        direction           Where to apply the smoothing in the PSD before doing the FFT. If below, it applies to low frequencies, if above to high frequencies, if below-and-above on both. Default: below.
+        n_FFT_points        Number of iterations for values of the points that are used to compute the PSD. Default: 1.
+        n_iterations_C1     Number of iteriations for the C1 algorithm. Default: 1.
+        window_DX           Minimum window size for smoothing on the right side. Default: 0.8.
+        window_DX_max       Maximum window size for smoothing on the right side. Default: 10.
+        n_window_DX         Number of steps for the right-side windowing. Default: 1.
+        window_SX           Minimum window size for smoothing on the left side. Default: 0.8.
+        window_SX_max       Maximum window size for smoothing on the left side. Default: 10.
+        n_window_SX         Number of steps for the left-side windowing. Default: 1.
+        steepness           Minimum steepness parameter for smoothing. Default: 7.
+        steepness_max       Maximum steepness parameter for smoothing. Default: 200.
+        n_steepness         Number of steps in the steepness parameter range. Default: 1.
+        saturation_DX       Minimum saturation value for the right-side windowing. Default: 1.0.
+        saturation_DX_max   Maximum saturation value for the right-side windowing. Default: 5.0.
+        n_saturation_DX     Number of steps for right-side saturation values. Default: 1.
+        saturation_SX       Minimum saturation value for the left-side windowing. Default: 1.0.
+        saturation_SX_max   Maximum saturation value for the left-side windowing. Default: 5.0.
+        n_saturation_SX     Number of steps for left-side saturation values. Default: 1.
 
+    *************************************************
+    * Parameters to be passed in the Flags section. *
+    *************************************************
+
+        C1_flag              Enables or disables C1 fixing on the PSD after smoothing application.
+                             - 1: Enable C1 iterations.
+                             - 0: Disable C1 iterations.
+                             Default: 1.
+
+        clear_directory      Controls whether the output directory for the smoothing section is cleared before the run.
+                             - 1: Clear the directory before execution.
+                             - 0: Keep existing files.
+                             Default: 1.
+
+        mismatch_print_flag  Determines whether to print mismatch information (e.g. the scalar products involved in the mismatch).
+                             - 1: Print mismatch values.
+                             - 0: Do not print mismatch values.
+                             Default: 0.
+
+        mismatch_section_plot_flag  
+                             Determines whether to plot sanity check plots regarding the mismatch section (for instance, the windowed PSD vs the original one).
+                             - 1: Generate and save mismatch section plots.
+                             - 0: Do not generate plots.
+                             Default: 0.
+
+        compare_TD_FD        Enables comparison between Time Domain (TD) and Frequency Domain (FD) mismatches.
+                             - 1: Compute and compare both TD and FD mismatches.
+                             - 0: Skip comparison.
+                             Default: 0.
+
+    
 
     ******************************************************
-    * Parameters to be passed to the [Mismatch] section. *
-    ******************************************************  
-
-        f-min            Minimum frequency (in Hz) to consider in the mismatch computation.         Default: 20.0.   
-        f-max            Maximum frequency (in Hz) to consider in the mismatch computation.         Default: 2048.0.
-        asd-path         Path to the ASD file, used to evaluate the mismatch at the end of the run. Default: ''.
-
+    * Parameters to be passed to the [Mismatch-GW-parameters] section. *
+    ******************************************************
+        M                The mass of the remnant (in solar masses).                                 Default: 60.
+        dL               The luminosity distance of the source with respect to the observer.        Default: 410.
+        ra               Right ascension (in radiants).                                             Default: 1.375.
+        dec              Declination (in radiants).                                                 Default: -0.2108.
+        psi              Polarization angle (in radiants).                                          Default: 2.659.
+        
 """
                                                      
 try:
