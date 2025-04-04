@@ -430,7 +430,7 @@ def extract_and_compute_psd_parameters(psd_dict):
     
     except Exception as e: print(f"Error processing PSD data: {e}")
 
-        return None
+    return None
 
 def DEPRECATED_acf_from_asd(asd_filepath, f_min, f_max, N_points):
 

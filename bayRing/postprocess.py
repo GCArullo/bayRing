@@ -1716,48 +1716,60 @@ def plot_psd_and_acf(psd_data, acf_data, asd_filepath, f_min, f_max, outdir, dir
         # Clear the directory if it exists, otherwise create it
         os.makedirs(save_path, exist_ok=True)
 
-        # Create a single figure with two subplots
-        fig, axs = plt.subplots(2, 1, figsize=(12, 12))
-
         # ------------------ Plot PSD ------------------ #
-        axs[0].plot(freq_file, psd_file, label="No window application", linewidth=1.2, linestyle='--', color="black")
+        fig_psd, ax_psd = plt.subplots(figsize=(10, 6))
+        ax_psd.plot(freq_file, psd_file, label="No window application", linewidth=1.2, linestyle='--', color="black")
+
         for i, (label, PSD_smoothed) in enumerate(psd_data.items()):
             freq = np.linspace(0, f_max, len(PSD_smoothed))
             alpha = max(0.3, 1 - (i * 0.15))  # Decrease opacity for different curves
-            axs[0].plot(freq, PSD_smoothed, label=label, linewidth=2, color=colbBlue, alpha=alpha)
+            ax_psd.plot(freq, PSD_smoothed, label=label, linewidth=2, color=colbBlue, alpha=alpha)
 
-        axs[0].set_xlabel("Frequency [Hz]")
-        axs[0].set_ylabel("PSD [Hz^-1]")
-        axs[0].set_title(f"Smoothed PSD ({direction.capitalize()})")
-        axs[0].set_xscale("log")
-        axs[0].set_yscale("log")
-        axs[0].grid(True)
+        ax_psd.set_xlabel("Frequency [Hz]", fontsize=22)
+        ax_psd.set_ylabel("PSD [Hz^-1]",fontsize=22)
+        #ax_psd.set_title(f"Smoothed PSD ({direction.capitalize()})")
+        ax_psd.set_xscale("log")
+        ax_psd.set_yscale("log")
+        plt.xticks(fontsize=18)
+        plt.yticks(fontsize=18)
+        ax_psd.set_xlim(f_min * 0.9, f_max * 1.1)
+        ax_psd.grid(True)
+        ax_psd.legend(loc="upper right")
 
-        # ------------------ Plot ACF ------------------
+        # Save PSD figure
+        filename_psd = "PSD_Smoothed.pdf"
+        path_psd = os.path.join(save_path, filename_psd)
+        plt.tight_layout()
+        plt.savefig(path_psd)
+        plt.close(fig_psd)
+
+        # ------------------ Plot ACF ------------------ #
+        fig_acf, ax_acf = plt.subplots(figsize=(10, 6))
+
         # Duration time
-        dt = 1/(2*f_max)
+        dt = 1 / (2 * f_max)
 
         for i, (label, ACF_smoothed) in enumerate(acf_data.items()):
             N_FFT = len(ACF_smoothed)
-            T = N_FFT*dt
+            T = N_FFT * dt
             t_array = np.linspace(0, T, N_FFT)
             alpha = max(0.3, 1 - (i * 0.15))  # Decrease opacity for different curves
-            axs[1].plot(t_array, ACF_smoothed, label=label, linewidth=2, color=colbBlue, alpha=alpha)
+            ax_acf.plot(t_array, ACF_smoothed, label=label, linewidth=2, color=colbBlue, alpha=alpha)
 
-        axs[1].set_xlabel("Time [s]")
-        axs[1].set_ylabel("ACF")
-        axs[1].set_title(f"Smoothed ACF ({direction.capitalize()})")
-        axs[1].grid(True)
+        ax_acf.set_xlabel("Time [s]")
+        ax_acf.set_ylabel("ACF")
+        ax_acf.set_title(f"Smoothed ACF ({direction.capitalize()})")
+        ax_acf.grid(True)
+        plt.xticks(fontsize=18)
+        plt.yticks(fontsize=18)
+        ax_acf.legend(loc="upper center")
 
-        # Center the legend inside the plot
-        axs[1].legend(loc="upper center")
-
-        # Adjust layout and save the plot
+        # Save ACF figure
+        filename_acf = "ACF_Smoothed.pdf"
+        path_acf = os.path.join(save_path, filename_acf)
         plt.tight_layout()
-        filename = "PSD_and_ACF_Smoothed.pdf"
-        path = os.path.join(save_path, filename)
-        plt.savefig(path)
-        plt.close(fig)
+        plt.savefig(path_acf)
+        plt.close(fig_acf)
 
     except Exception as e:
         print(f"Failed to generate smoothed PSD and ACF plots ({direction}): {e}")
