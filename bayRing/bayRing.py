@@ -268,7 +268,6 @@ def main():
                 # Print window parameters
                 print(f"\n\n* Applying window on the PSD with parameters: w_DX={round(window_size_DX,1)}Hz, w_SX={round(window_size_SX,1)}Hz, k={round(k,1)}, saturation_DX={round(saturation_DX,1)}, saturation_SX={round(saturation_SX,1)}, N_FFT={N_fft}\n")
 
-
                 # Compute PSD and ACF with smoothing at PSD edges
                 PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_with_smoothing(
                     asd_path,
@@ -312,8 +311,6 @@ def main():
                     compare_TD_FD
                 )
 
-                # Plot mismatch sanity checks
-
                 # Read mismatch results from file
                 mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_fft}.txt"
                 mismatch_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', mismatch_filename)
@@ -345,7 +342,7 @@ def main():
                     ACF_truncated_NR,
                     N_fft,
                     M, dL,
-                    t_start_g, t_end_g,
+                    t_start_g_true, t_end_g,
                     f_min, f_max,
                     asd_path,
                     window_size_DX, window_size_SX, k,
@@ -353,6 +350,7 @@ def main():
                     compare_TD_FD
                 )
 
+                # Plot mismatch sanity checks
                 if mismatch_section_plot_flag==1:
                     postprocess.mismatch_sanity_checks(NR_sim, 
                                                        results_object, 
@@ -363,7 +361,7 @@ def main():
                                                        M, dL, t_start_g, t_end_g, window_size_DX, window_size_SX, k)
 
                 # Read optimal SNR results from file
-                optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_fft}.txt"
+                optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_fft}.txt"
                 optimal_SNR_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', optimal_SNR_filename)
                 with open(optimal_SNR_file, 'r') as f:
                     lines = f.readlines()[1:]  # Skip the header
@@ -376,7 +374,7 @@ def main():
                     optimal_SNR_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)][component][perc] = float(optimal_SNR)
 
                 # Build the output filename
-                condition_numbers_filename = f"Condition_number_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_fft}.txt"
+                condition_numbers_filename = f"Condition_number_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_fft}.txt"
                 condition_numbers_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', condition_numbers_filename)
 
                 # Compute the condition number
