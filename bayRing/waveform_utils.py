@@ -318,7 +318,7 @@ def extract_flags(flags):
     C1_flag, mismatch_print_flag = flags['C1_flag'], flags['mismatch_print_flag']
     mismatch_section_plot_flag   = flags['mismatch_section_plot_flag']
     
-    return compare_TD_FD, clear_directory, C1_flag, mismatch_print_flag, mismatch_section_plot_flag
+    return apply_window, compare_TD_FD, clear_directory, C1_flag, mismatch_print_flag, mismatch_section_plot_flag
 
 def extract_GW_parameters(parameters):
 

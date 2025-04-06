@@ -295,9 +295,6 @@ def main():
                     PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_no_window_at_edges(
                         asd_path, f_min, f_max, N_fft
                     )
-                    print(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)
-
-                print(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)
 
                 # Store smoothed PSD/ACF data in dictionaries
                 psd_data[f"wDX={round(window_size_DX,1)}Hz, wSX={round(window_size_SX,1)}Hz, k={round(k,0)}, satDX={round(saturation_DX,1)}, satSX={round(saturation_SX,1)}, N_FFT={N_fft}"] = PSD_smoothed
