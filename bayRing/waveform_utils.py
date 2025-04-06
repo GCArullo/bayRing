@@ -312,6 +312,7 @@ def extract_flags(flags):
     :return: Tuple containing compare_TD_FD, C1_flag, mismatch_print_flag, and mismatch_section_plot_flag.
     """
 
+    apply_window                 = flags['apply_window']
     compare_TD_FD                = flags['compare_TD_FD']
     clear_directory              = flags['clear_directory']
     C1_flag, mismatch_print_flag = flags['C1_flag'], flags['mismatch_print_flag']
@@ -432,7 +433,7 @@ def extract_and_compute_psd_parameters(psd_dict):
 
     return None
 
-def DEPRECATED_acf_from_asd(asd_filepath, f_min, f_max, N_points):
+def acf_from_asd_no_window_at_edges(asd_filepath, f_min, f_max, N_points):
 
     """
     VERSION WITHOUT WINDOWING THE PSD
@@ -483,7 +484,7 @@ def DEPRECATED_acf_from_asd(asd_filepath, f_min, f_max, N_points):
     # Compute the ACF. We are using the one-sided PSD, thus it is twice the Fourier transform of the autocorrelation function (see eq. 7.15 of Maggiore Vol.1). We take the real part just to convert the complex output of fft to a real numpy float. The imaginary part if already 0 when coming out of the fft.
     ACF = 0.5 * np.real(np.fft.irfft(PSD*df)) * N_points 
 
-    return ACF
+    return PSD, ACF
 
 def smoothing_function(frequencies, values, f_anchor, window_size, target_value, k, indices, is_above):
 

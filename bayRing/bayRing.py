@@ -236,7 +236,7 @@ def main():
     f_min, f_max, dt, _, N_points, n_FFT_points, asd_path, n_iterations_C1, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values, direction = wf_utils.extract_and_compute_psd_parameters(parameters['Mismatch-PSD-settings'])
 
     # Load flags
-    compare_TD_FD, clear_directory, C1_flag, mismatch_print_flag, mismatch_section_plot_flag = wf_utils.extract_flags(parameters['Flags'])
+    apply_window, compare_TD_FD, clear_directory, C1_flag, mismatch_print_flag, mismatch_section_plot_flag = wf_utils.extract_flags(parameters['Flags'])
 
     # Choose if iterate or not on N_FFT
     N_FFT = [N_points] if n_FFT_points == 1 else list(map(int, np.logspace(np.log10(NR_length), np.log10(2*N_points), n_FFT_points)))
@@ -268,20 +268,33 @@ def main():
                 # Print window parameters
                 print(f"\n\n* Applying window on the PSD with parameters: w_DX={round(window_size_DX,1)}Hz, w_SX={round(window_size_SX,1)}Hz, k={round(k,1)}, saturation_DX={round(saturation_DX,1)}, saturation_SX={round(saturation_SX,1)}, N_FFT={N_fft}\n")
 
-                # Compute PSD and ACF with smoothing at PSD edges
-                PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_with_smoothing(
-                    asd_path,
-                    f_min, f_max,
-                    N_fft,
-                    window_size_DX=window_size_DX,
-                    window_size_SX=window_size_SX,
-                    k=k,
-                    saturation_DX=saturation_DX,
-                    saturation_SX=saturation_SX,
-                    direction=direction,
-                    C1_flag=C1_flag,
-                    n_iterations_C1=n_iterations_C1
-                )
+                if apply_window ==1:
+
+
+                    # Compute PSD and ACF with smoothing at PSD edges
+                    PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_with_smoothing(
+                        asd_path,
+                        f_min, f_max,
+                        N_fft,
+                        window_size_DX=window_size_DX,
+                        window_size_SX=window_size_SX,
+                        k=k,
+                        saturation_DX=saturation_DX,
+                        saturation_SX=saturation_SX,
+                        direction=direction,
+                        C1_flag=C1_flag,
+                        n_iterations_C1=n_iterations_C1
+                    )
+                    
+                else:
+
+                    # Set a default value of the window parameters for the files to be saved
+                    window_size_DX, window_size_SX, k, saturation_DX, saturation_SX = 0.0, 0.0, 0.0, 1.0, 1.0
+
+                     # Compute PSD and ACF with smoothing at PSD edges
+                    PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_no_window_at_edges(
+                        asd_path, f_min, f_max, N_fft
+                    )
 
                 # Store smoothed PSD/ACF data in dictionaries
                 psd_data[f"wDX={round(window_size_DX,1)}Hz, wSX={round(window_size_SX,1)}Hz, k={round(k,0)}, satDX={round(saturation_DX,1)}, satSX={round(saturation_SX,1)}, N_FFT={N_fft}"] = PSD_smoothed

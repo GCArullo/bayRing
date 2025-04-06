@@ -185,6 +185,7 @@ def read_config(Config):
 
         'Flags': 
         {
+        'apply_window'                 : 1,
         'C1_flag'                      : 1,
         'clear_directory'              : 1,
         'compare_TD_FD'                : 0,
