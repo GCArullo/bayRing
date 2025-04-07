@@ -555,7 +555,7 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
         indices_below = np.where((frequencies >= f_anchor_l) & (frequencies <= f_anchor_l + window_size_DX))
 
         # We acceed to the last element (when we have f = f_anchor_l + window_size)
-        target_value_l = saturation_DX*max(values[indices_below])
+        target_value_l = saturation_DX*values[indices_below[0][0]] #max(values[indices_below])
         values         = smoothing_function(frequencies, values, f_anchor_l, window_size_DX, target_value_l, k, indices_below, is_above=False)
 
     elif direction == 'above':
@@ -564,7 +564,7 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
         indices_above  = np.where((frequencies >= f_anchor_h - window_size_SX) & (frequencies <= f_anchor_h))
 
         # We acceed to the first element (when we have f = f_anchor_h - window_size)
-        target_value_h = saturation_SX*max(values[indices_above])
+        target_value_h = saturation_SX*values[indices_above[0][-1]] #max(values[indices_above])
         values         = smoothing_function(frequencies, values, f_anchor_h, window_size_SX, target_value_h, k, indices_above, is_above=True)
 
     elif direction == 'below-and-above':
@@ -574,8 +574,8 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
         indices_above  = np.where((frequencies >= f_anchor_h - window_size_SX) & (frequencies <= f_anchor_h))
         
         # Define targets
-        target_value_l = saturation_DX*max(values[indices_below])
-        target_value_h = saturation_SX*max(values[indices_above])
+        target_value_l = saturation_DX*values[indices_below[0][0]] #max(values[indices_below])
+        target_value_h = saturation_SX*values[indices_above[0][-1]] #max(values[indices_above])
 
         # Apply left smoothing
         values = smoothing_function(frequencies, values, f_anchor_l, window_size_DX, target_value_l, k, indices_below, is_above=False)
