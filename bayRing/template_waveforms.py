@@ -106,23 +106,26 @@ class WaveformModel(cpnest.model.Model):
     def Damped_sinusoids_waveform(self, params, fixed_params):
 
         ringdown_model = np.zeros(len(self.t_NR), dtype=np.complex128)
-        
-        amp_value = utils.get_param_override(fixed_params,params,'ln_A_{}'.format(i))
-        phi_value = utils.get_param_override(fixed_params,params, 'phi_{}'.format(i))
-        f_value   = utils.get_param_override(fixed_params,params,   'f_{}'.format(i))
-        tau_value = utils.get_param_override(fixed_params,params, 'tau_{}'.format(i))
 
-        # In this case modes is an integer storing the number of free damped sinusoids
+        # Loop over each damped sinusoid mode
         for i in range(self.N_ds_modes):
-            ringdown_model += wf.damped_sinusoid(np.exp(amp_value)   ,
-                                                        f_value      ,
-                                                        tau_value    ,
-                                                        phi_value    ,
-                                                        self.t_start ,
-                                                        self.t_start ,
-                                                        self.t_NR    )
-            
+            amp_value = utils.get_param_override(fixed_params, params, 'ln_A_{}'.format(i))
+            phi_value = utils.get_param_override(fixed_params, params, 'phi_{}'.format(i))
+            f_value   = utils.get_param_override(fixed_params, params, 'f_{}'.format(i))
+            tau_value = utils.get_param_override(fixed_params, params, 'tau_{}'.format(i))
+
+            ringdown_model += wf.damped_sinusoid(
+                np.exp(amp_value),
+                f_value,
+                tau_value,
+                phi_value,
+                self.t_start,
+                self.t_start,
+                self.t_NR
+            )
+
         return ringdown_model
+
 
     def KerrBinary_waveform(self, params, fixed_params):
 

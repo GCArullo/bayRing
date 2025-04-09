@@ -858,7 +858,7 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
                 TD_match    = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
                 TD_mismatch = 1 - TD_match
 
-                if mismatch_print_flag==1:
+                if mismatch_print_flag:
                     print(f"<h|h>**0.5={h_wf_h_wf_sqrt:.1f}")
                     print(f"<h|NR>={h_wf_h_NR:.1f}")
                     print(f"Time domain mismatch={TD_mismatch}")
@@ -996,6 +996,63 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
 
                     with open(outFile_path_fd, 'a') as outFile_SNR_fd:
                         outFile_SNR_fd.write(f'{perc}\t{NR_quant}\t{optimal_SNR_FD}\n')
+
+            except Exception as e:
+                print(f"Error processing optimal SNR for {perc}% CI and {NR_quant}: {e}")
+                continue
+
+def compute_optimal_SNR_zeros(NR_sim, results, inference_model, outdir, method, acf, acf_tot, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, compare_TD_FD):
+    """
+    Compute the optimal SNR of the model waveform.
+    """
+    print("\nProcessing optimal SNR computation for plus and cross polarizations.\n")
+
+    # File paths for saving results
+    optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
+    optimal_SNR_filename_fd = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}_FD.txt"
+    outFile_path = os.path.join(outdir, 'Algorithm', optimal_SNR_filename)
+    outFile_path_fd = os.path.join(outdir, 'Algorithm', optimal_SNR_filename_fd)
+
+    with open(outFile_path, 'w') as outFile_SNR, open(outFile_path_fd, 'w') as outFile_SNR_fd:
+        outFile_SNR.write('#CI\tStrain_data\tOptimal_SNR\n')
+        outFile_SNR_fd.write('#CI\tStrain_data\tOptimal_SNR_FD\n')
+
+    NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
+    NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
+    NR_dict = {'real': NR_r, 'imaginary': NR_i}
+
+    for NR_quant, NR_data in NR_dict.items():
+
+        for perc in [5, 50, 95]:
+            try:
+                wf_r = np.percentile([np.real(np.array(inference_model.model(p))) for p in results], [perc], axis=0)[0]
+                wf_i = np.percentile([np.imag(np.array(inference_model.model(p))) for p in results], [perc], axis=0)[0]
+
+                wf_r *= (C_md * M) / dL
+                wf_i *= (C_md * M) / dL
+                wf_int = interpolate_waveform(t_start_g, t_end_g, M, wf_lNR=wf_r if NR_quant == "real" else wf_i, acf=acf_tot)
+
+                if len(wf_int) < len(acf_tot):
+                        pad_width = len(acf_tot) - len(wf_int)
+                        wf_int = np.pad(wf_int, (0, pad_width))
+                        #print("padded")
+
+                #print(len(wf_int), len(acf), len(acf_tot))
+
+                optimal_SNR_TD = np.sqrt(abs(np.dot(wf_int, sl.solve_toeplitz(acf_tot, wf_int, check_finite=False))))
+
+                with open(outFile_path, 'a') as outFile_SNR:
+                    outFile_SNR.write(f'{perc}\t{NR_quant}\t{optimal_SNR_TD}\n')
+
+                #print(len(acf_tot))
+                h_TS = TimeSeries(wf_int, delta_t=1/(2*f_max))
+                optimal_SNR_FD = compute_FD_optimal_SNR(asd_file, h_TS, len(acf_tot), f_min, f_max)
+
+                print("Optimal TD SNR: ", optimal_SNR_TD)
+                print("Optimal FD SNR: ", optimal_SNR_FD)
+
+                #with open(outFile_path_fd, 'a') as outFile_SNR_fd:
+                #outFile_SNR_fd.write(f'{perc}\t{NR_quant}\t{optimal_SNR_FD}\n')
 
             except Exception as e:
                 print(f"Error processing optimal SNR for {perc}% CI and {NR_quant}: {e}")

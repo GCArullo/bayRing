@@ -363,6 +363,26 @@ def main():
                     compare_TD_FD
                 )
 
+                if compare_TD_FD:
+
+                    postprocess.compute_optimal_SNR_zeros(
+                        NR_sim, 
+                        results_object, 
+                        inference_model, 
+                        parameters['I/O']['outdir'],
+                        parameters['Inference']['method'], 
+                        ACF_truncated_NR,
+                        ACF_smoothed,
+                        N_fft,
+                        M, dL,
+                        t_start_g_true, t_end_g,
+                        f_min, f_max,
+                        asd_path,
+                        window_size_DX, window_size_SX, k,
+                        saturation_DX, saturation_SX,
+                        compare_TD_FD
+                    )
+
                 # Plot mismatch sanity checks
                 if mismatch_section_plot_flag==1:
                     postprocess.mismatch_sanity_checks(NR_sim, 
