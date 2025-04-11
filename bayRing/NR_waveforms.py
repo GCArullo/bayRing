@@ -369,23 +369,40 @@ def read_NR_metadata(NR_sim, NR_catalog):
         Dictionary containing the metadata of the NR simulation.
 
     """
-
     if(NR_catalog=='SXS'):
-
-        M = 1.0
-        metadata = {
-                    'q'    : NR_sim.q,
-                    'chi1' : NR_sim.chi1,
-                    'chi2' : NR_sim.chi2,
-                    'tilt1': NR_sim.tilt1,
-                    'tilt2': NR_sim.tilt2,
-                    'm1'   : pyRing_utils.m1_from_m_q(M, NR_sim.q),
-                    'm2'   : pyRing_utils.m2_from_m_q(M, NR_sim.q),
-                    'ecc'  : NR_sim.ecc,
-                    'Mf'   : NR_sim.Mf,
-                    'af'   : NR_sim.af,
-                }
-                
+        try:
+            M = 1.0
+            metadata = {
+                        'q'    : NR_sim.q,
+                        'chi1' : NR_sim.chi1,
+                        'chi2' : NR_sim.chi2,
+                        'tilt1': NR_sim.tilt1,
+                        'tilt2': NR_sim.tilt2,
+                        'm1'   : pyRing_utils.m1_from_m_q(M, NR_sim.q),
+                        'm2'   : pyRing_utils.m2_from_m_q(M, NR_sim.q),
+                        'ecc'  : NR_sim.ecc,
+                        'Mf'   : NR_sim.Mf,
+                        'af'   : NR_sim.af,
+                        'A_peak_22'     : NR_sim.A_peak_22,
+                        'omg_peak_22'   : NR_sim.omg_peak_22,
+                        'A_nr_error'    : NR_sim.A_nr_error,
+                        'A_peak22dotdot': NR_sim.A_peak22dotdot
+                    }
+        except:
+            M = 1.0
+            metadata = {
+                        'q'    : NR_sim.q,
+                        'chi1' : NR_sim.chi1,
+                        'chi2' : NR_sim.chi2,
+                        'tilt1': NR_sim.tilt1,
+                        'tilt2': NR_sim.tilt2,
+                        'm1'   : pyRing_utils.m1_from_m_q(M, NR_sim.q),
+                        'm2'   : pyRing_utils.m2_from_m_q(M, NR_sim.q),
+                        'ecc'  : NR_sim.ecc,
+                        'Mf'   : NR_sim.Mf,
+                        'af'   : NR_sim.af,
+                    }
+            
     elif(NR_catalog=='cbhdb'):
 
         M = 1.0
@@ -714,16 +731,20 @@ class NR_simulation():
         
             self.download = download
             self.q, self.chi1, self.chi2, self.tilt1, self.tilt2, self.ecc, self.Mf, self.af = self.read_SXS_metadata()
+            try:
+                self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = self.load_SXS_addn_metadata(csv_path=self.additional_NR_properties, ID_str=self.NR_ID)
+            except:
+                self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = None, None, None, None
 
             # Build NR waveform and time axis.
 
             if(self.res_level==-1):
                 for res_level_x in [6,5,4,3,2,1]:
-                    try: 
+                    try:
                         self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_SXS(self.extrap_order, res_level_x)
                         self.res_level = res_level_x
                         break
-                    except(ValueError):
+                    except:
                         pass
                 print("\n* Setting the resolution level to the maximum available: {}\n".format(self.res_level))
             else:
@@ -804,6 +825,10 @@ class NR_simulation():
 
             if('constant' in NR_error):
                 error_value                = float(NR_error.split('-')[-1])
+                self.NR_err_cmplx          = self.generate_constant_error(error_value)
+
+            elif(NR_error == 'late-time-const-error'):
+                error_value                = self.A_nr_error
                 self.NR_err_cmplx          = self.generate_constant_error(error_value)
 
             else:
@@ -1287,6 +1312,17 @@ class NR_simulation():
         if isinstance(ecc, str): ecc = float(ecc[1:])
 
         return q, chi1, chi2, tilt1, tilt2, ecc, Mf, chif
+
+
+    def load_SXS_addn_metadata(self, csv_path, ID_str):
+
+        additional_data = pd.read_csv(csv_path) 
+        A_peak_22 = additional_data.loc[additional_data['ID'] == int(ID_str), 'A_peak22'].values[0]
+        omg_peak_22 = additional_data.loc[additional_data['ID'] == int(ID_str), 'omega_peak22'].values[0]
+        A_nr_error = additional_data.loc[additional_data['ID'] == int(ID_str), 'A_nr_error'].values[0]
+        A_peak22dotdot = additional_data.loc[additional_data['ID'] == int(ID_str), 'A_peak22dotdot'].values[0]
+
+        return A_peak_22, omg_peak_22, A_nr_error, A_peak22dotdot
 
     # FIXME: The two functions below have been written in a rush and should be adapted to the overall code style.
     def read_RIT_metadata(self):

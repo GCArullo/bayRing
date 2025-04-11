@@ -430,8 +430,6 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, nest_model, outdir, me
     except:
         f_peak             = None
 
-    if NR_sim.NR_catalog=='RIT':
-        t_peak = waveform_utils.find_peak_time(t_NR, NR_amp, NR_sim.ecc)
     # get the amplitude at the time close to the peak
     amp_peak = NR_amp[np.argmin(np.abs(t_NR - t_peak))]
 
