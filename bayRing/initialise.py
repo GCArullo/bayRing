@@ -438,7 +438,7 @@ A dot is present at the end of each description line and is not to be intended a
     *************************************************
 
         apply_window         Choose wheter to apply window at the edges of the PSD or not. 
-                             Default: 1.
+                             Default: 0.
 
         C1_flag              Enables or disables C1 fixing on the PSD after smoothing application.
                              - 1: Enable C1 iterations.

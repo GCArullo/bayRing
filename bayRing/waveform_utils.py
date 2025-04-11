@@ -8,6 +8,9 @@ from scipy.linalg      import toeplitz
 # GW-specific imports
 import lal
 
+# Package internal imports
+from bayRing.utils import set_prefix
+
 # Constants
 twopi = 2.*np.pi
 
@@ -334,7 +337,7 @@ def extract_GW_parameters(parameters):
 
     return result
 
-def extract_and_compute_psd_parameters(psd_dict):
+def extract_and_compute_psd_parameters(psd_dict, mismatch_print_flag):
 
     """
     Load the PSD file, extract key frequency parameters, and compute window properties.
@@ -372,10 +375,10 @@ def extract_and_compute_psd_parameters(psd_dict):
         # Check if the ASD path is missing or invalid
         if not asd_path or not os.path.isfile(asd_path):
             print("* No ASD path provided by user. Using default ASD.")
-
-            # Get absolute path relative to the current script location
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-            asd_path     = os.path.join(project_root, "PSDs", "asd_aLIGODesignSensitivityT1800044.txt")
+            
+            BAYRING_PREFIX    = set_prefix()
+            asd_relative_path = "PSDs/asd_aLIGODesignSensitivityT1800044.txt"        
+            asd_path          = os.path.join(BAYRING_PREFIX, asd_relative_path)
 
             if not os.path.isfile(asd_path): raise FileNotFoundError(f"Default ASD file not found at {asd_path}.")
 
@@ -413,13 +416,14 @@ def extract_and_compute_psd_parameters(psd_dict):
         if n_FFT_points < 1: raise ValueError("n_FFT_points must be >= 1.")
 
         # Print extracted values
-        print(f"\n* Loading ASD located at: {asd_path}\n")
-        print(f"\nASD parameters: f_min={f_min:.0f}Hz, f_max={f_max:.0f}Hz, dt={dt:.6f}s, df={df:.4f}Hz, N_points={N_points}, T={T:.0f}s\n")
-        
+        print(f"* Loading ASD located at: {asd_path}")
+
         psd_min, psd_max = np.min(asd[mask]**2), np.max(asd[mask]**2)
         condition_number = psd_max/psd_min
-        print(f"min(PSD) = {psd_min:.2e}, max(PSD) = {psd_max:.2e}, condition number = {condition_number:.1f}")
-              
+        if(mismatch_print_flag):
+            print(f"* ASD parameters: f_min={f_min:.0f}Hz, f_max={f_max:.0f}Hz, dt={dt:.6f}s, df={df:.4f}Hz, N_points={N_points}, T={T:.0f}s")
+            print(f"* min(PSD) = {psd_min:.2e}, max(PSD) = {psd_max:.2e}, condition number = {condition_number:.1f}")
+
         # Compute window properties
         window_sizes_DX      = np.linspace(psd_dict['window_DX'], psd_dict['window_DX_max'], psd_dict['n_window_DX']).tolist()
         window_sizes_SX      = np.linspace(psd_dict['window_SX'], psd_dict['window_SX_max'], psd_dict['n_window_SX']).tolist()
@@ -428,7 +432,7 @@ def extract_and_compute_psd_parameters(psd_dict):
         saturation_SX_values = np.logspace(np.log10(psd_dict['saturation_SX']), np.log10(psd_dict['saturation_SX_max']), psd_dict['n_saturation_SX']).tolist()
         
         return f_min, f_max, dt, df, N_points, n_FFT_points, asd_path, n_iterations_C1, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values, direction
-    
+
     except Exception as e: print(f"Error processing PSD data: {e}")
 
     return None
@@ -478,7 +482,6 @@ def acf_from_asd_no_window_at_edges(asd_filepath, f_min, f_max, N_points):
     psd_file  =  psd_file[freq_file < f_max]
     freq_file = freq_file[freq_file < f_max]
 
-    print('\n\n\nFIXME: edges should go to the same constant when taking the FT\n\n\n')
     PSD       = np.interp(f, freq_file, psd_file)
 
     # Compute the ACF. We are using the one-sided PSD, thus it is twice the Fourier transform of the autocorrelation function (see eq. 7.15 of Maggiore Vol.1). We take the real part just to convert the complex output of fft to a real numpy float. The imaginary part if already 0 when coming out of the fft.

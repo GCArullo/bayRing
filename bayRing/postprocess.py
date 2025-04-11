@@ -320,7 +320,7 @@ def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir):
     l2_residual = np.trapz(np.sqrt((NR_r - wf_r) ** 2 + (NR_i - wf_i) ** 2), t_cut)
 
     print(f'\n* L2 norm of residual is {l2_residual}')
-    print(f'\n* L2 norm of NR error is {l2_NR}\n')
+    print(f'* L2 norm of NR error is {l2_NR}\n')
 
     outFile_L2_errors = open(os.path.join(outdir,'Algorithm/L2_errors.txt'), 'w')
     outFile_L2_errors.write('# L2 norm of residual is \n')
@@ -745,7 +745,7 @@ def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, metho
     # Extract NR waveform components
     NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
     NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
-    NR_dict = {'real': NR_r, 'imaginary': NR_i}
+    NR_dict = {'real': NR_r, 'imag': NR_i}
 
     for NR_quant, NR_data in NR_dict.items():
         try:
@@ -769,7 +769,7 @@ def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, metho
 
                 wf_r *= (C_md * M) / dL
                 wf_i *= (C_md * M) / dL
-                wf_quant = {'real': wf_r, 'imaginary': wf_i}
+                wf_quant = {'real': wf_r, 'imag': wf_i}
 
                 wf_int = interpolate_waveform(t_start_g, t_end_g, M, wf_lNR=wf_quant[NR_quant], acf=acf)
                 whiten_whiten_h_wf = sl.solve_toeplitz(acf, wf_int, check_finite=False)
@@ -783,15 +783,14 @@ def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, metho
                     outFile_mismatch.write(f'{perc}\t{NR_quant}\t{TD_mismatch}\n')
 
                 if compare_TD_FD:
-                    psd = convert_asd_to_pycbc_psd(asd_file, f_min, f_max, delta_f=2*f_max/len(acf))
-                    h_TS = TimeSeries(wf_int, delta_t=1/(2*f_max))
+                    psd   = convert_asd_to_pycbc_psd(asd_file, f_min, f_max, delta_f=2*f_max/len(acf))
+                    h_TS  = TimeSeries(wf_int, delta_t=1/(2*f_max))
                     NR_TS = TimeSeries(NR_int, delta_t=1/(2*f_max))
 
-                    FD_match_m = float(compute_FD_match(h_TS, NR_TS, psd=psd, low_frequency_cutoff=f_min, high_frequency_cutoff=f_max)[0])
+                    FD_match_m  = float(compute_FD_match(h_TS, NR_TS, psd=psd, low_frequency_cutoff=f_min, high_frequency_cutoff=f_max)[0])
                     FD_mismatch = 1 - FD_match_m
 
-                    with open(outFile_path_fd, 'a') as outFile_mismatch_fd:
-                        outFile_mismatch_fd.write(f'{perc}\t{NR_quant}\t{FD_mismatch}\n')
+                    with open(outFile_path_fd, 'a') as outFile_mismatch_fd: outFile_mismatch_fd.write(f'{perc}\t{NR_quant}\t{FD_mismatch}\n')
 
             except Exception as e:
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
@@ -805,7 +804,7 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
     Compute the mismatch of the model with respect to NR simulations.
     """
 
-    print("\nProcessing mismatch computation for plus and cross polarizations.\n")
+    print(f"\n* Computing mismatch for plus and cross polarizations assuming: M={M}, D_L={dL}.")
 
     # File paths for saving results
     mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
@@ -817,7 +816,7 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
     # Extract NR waveform components (physical units)
     NR_r    = NR_sim.NR_r_cut * (C_md * M) / dL
     NR_i    = NR_sim.NR_i_cut * (C_md * M) / dL
-    NR_dict = {'real': NR_r, 'imaginary': NR_i}
+    NR_dict = {'real': NR_r, 'imag': NR_i}
 
     for NR_quant, NR_data in NR_dict.items():
         try:
@@ -847,7 +846,7 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
                 # Convert to physical units
                 wf_r    *= (C_md * M) / dL
                 wf_i    *= (C_md * M) / dL
-                wf_quant = {'real': wf_r, 'imaginary': wf_i}
+                wf_quant = {'real': wf_r, 'imag': wf_i}
 
                 # Compute scalar products with h_wf
                 whiten_whiten_h_wf = sl.solve_toeplitz(acf, wf_quant[NR_quant], check_finite=False)
@@ -861,7 +860,8 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
                 if mismatch_print_flag:
                     print(f"<h|h>**0.5={h_wf_h_wf_sqrt:.1f}")
                     print(f"<h|NR>={h_wf_h_NR:.1f}")
-                    print(f"Time domain mismatch={TD_mismatch}")
+
+                if(perc==50): print(f"* Time-domain mismatch (h {NR_quant}): {TD_mismatch}")
 
                 with open(outFile_path, 'a') as outFile_mismatch:
                     outFile_mismatch.write(f'{perc}\t{NR_quant}\t{TD_mismatch}\n')
@@ -881,9 +881,7 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
                     FD_match_m = float(compute_FD_match(h_TS, NR_TS, psd=psd, low_frequency_cutoff=f_min, high_frequency_cutoff=f_max)[0])
                     FD_mismatch = 1 - FD_match_m
 
-                    if mismatch_print_flag==1:
-                        print(f"Time domain mismatch={TD_mismatch}")
-                        print(f"Frequency domain mismatch={TD_mismatch}")
+                    print(f"* Frequency-domain mismatch={FD_mismatch}")
 
                     with open(outFile_path_fd, 'a') as outFile_mismatch_fd:
                         outFile_mismatch_fd.write(f'{perc}\t{NR_quant}\t{FD_mismatch}\n')
@@ -900,7 +898,8 @@ def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf,
     Compute the mismatch of the model with respect to NR simulations.
     
     """
-    print("\nProcessing mismatch computation for the total signal.\n")
+    print(f"* Computing mismatch for the strain assuming: M={M}, D_L={dL}, ra={ra}, dec={dec}, psi={psi}")
+
     # File paths for saving results
     mismatch_filename = f"Mismatch_h_tot_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
     outFile_path      = os.path.join(outdir, 'Algorithm', mismatch_filename)
@@ -955,7 +954,7 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
     """
     Compute the optimal SNR of the model waveform.
     """
-    print("\nProcessing optimal SNR computation for plus and cross polarizations.\n")
+    print(f"* Optimal SNR computation for plus and cross polarizations assuming: M={M}, D_L={dL}.")
 
     # File paths for saving results
     optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
@@ -969,7 +968,7 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
 
     NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
     NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
-    NR_dict = {'real': NR_r, 'imaginary': NR_i}
+    NR_dict = {'real': NR_r, 'imag': NR_i}
 
     for NR_quant, NR_data in NR_dict.items():
 
@@ -987,11 +986,12 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
                 with open(outFile_path, 'a') as outFile_SNR:
                     outFile_SNR.write(f'{perc}\t{NR_quant}\t{optimal_SNR_TD}\n')
 
+                if(perc==50): print(f"* Optimal TD SNR (h {NR_quant}): {optimal_SNR_TD}")
+
                 if compare_TD_FD:
                     h_TS = TimeSeries(wf_int, delta_t=1/(2*f_max))
                     optimal_SNR_FD = compute_FD_optimal_SNR(asd_file, h_TS, len(acf), f_min, f_max)
 
-                    print("Optimal TD SNR: ", optimal_SNR_TD)
                     print("Optimal FD SNR: ", optimal_SNR_FD)
 
                     with open(outFile_path_fd, 'a') as outFile_SNR_fd:
@@ -1019,7 +1019,7 @@ def compute_optimal_SNR_zeros(NR_sim, results, inference_model, outdir, method, 
 
     NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
     NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
-    NR_dict = {'real': NR_r, 'imaginary': NR_i}
+    NR_dict = {'real': NR_r, 'imag': NR_i}
 
     for NR_quant, NR_data in NR_dict.items():
 
@@ -1960,7 +1960,7 @@ def plot_mismatch_by_window_DX(mismatch_data, outdir, direction, M, dL, N_fft):
     """
     Plot mismatch for real and imaginary components against window_size_DX for fixed other parameters.
     """
-    components = ['real', 'imaginary']
+    components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)
@@ -1990,7 +1990,7 @@ def plot_mismatch_by_window_SX(mismatch_data, outdir, direction, M, dL, N_fft):
     """
     Plot mismatch for real and imaginary components against window_size_SX for fixed other parameters.
     """
-    components = ['real', 'imaginary']
+    components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)
@@ -2020,7 +2020,7 @@ def plot_optimal_SNR_by_window_DX(optimal_SNR_data, outdir, direction, M, dL, N_
     """
     Plot optimal SNR for real and imaginary components against window_size_DX for fixed k and saturations.
     """
-    components = ['real', 'imaginary']
+    components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)
@@ -2050,7 +2050,7 @@ def plot_optimal_SNR_by_window_SX(optimal_SNR_data, outdir, direction, M, dL, N_
     """
     Plot optimal SNR for real and imaginary components against window_size_SX for fixed k and saturations.
     """
-    components = ['real', 'imaginary']
+    components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)
@@ -2132,7 +2132,7 @@ def plot_mismatch_by_k(mismatch_data, outdir, direction, M, dL, N_fft):
     """
     Plot mismatch for real and imaginary components by varying k, keeping window sizes and saturations fixed.
     """
-    components = ['real', 'imaginary']
+    components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)
@@ -2172,7 +2172,7 @@ def plot_optimal_SNR_by_k(optimal_SNR_data, outdir, direction, M, dL, N_fft):
     """
     Plot optimal SNR for real and imaginary components by varying k, keeping window sizes and saturations fixed.
     """
-    components = ['real', 'imaginary']
+    components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)
@@ -2248,7 +2248,7 @@ def plot_mismatch_by_saturation_DX(mismatch_data, outdir, direction, M, dL, N_ff
     """
     Plot mismatch for real and imaginary components by varying saturation_DX, keeping window sizes, k, and saturation_SX fixed.
     """
-    components = ['real', 'imaginary']
+    components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)
@@ -2288,7 +2288,7 @@ def plot_optimal_SNR_by_saturation_DX(optimal_SNR_data, outdir, direction, M, dL
     """
     Plot optimal SNR for real and imaginary components by varying saturation_DX, keeping window sizes, k, and saturation_SX fixed.
     """
-    components = ['real', 'imaginary']
+    components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)
@@ -2364,7 +2364,7 @@ def plot_mismatch_by_saturation_SX(mismatch_data, outdir, direction, M, dL, N_ff
     """
     Plot mismatch for real and imaginary components by varying saturation_SX, keeping window sizes, k, and saturation_DX fixed.
     """
-    components = ['real', 'imaginary']
+    components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)
@@ -2404,7 +2404,7 @@ def plot_optimal_SNR_by_saturation_SX(optimal_SNR_data, outdir, direction, M, dL
     """
     Plot optimal SNR for real and imaginary components by varying saturation_SX, keeping window sizes, k, and saturation_DX fixed.
     """
-    components = ['real', 'imaginary']
+    components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
     save_path = os.path.join(outdir, "Algorithm", subfolder)

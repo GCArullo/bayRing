@@ -6,6 +6,10 @@ from scipy.interpolate import interp1d, CubicSpline
 from optparse       import OptionParser
 try:                import configparser
 except ImportError: import ConfigParser as configparser
+
+# GW-specific imports
+from pyRing.utils import print_section
+import lal
 import cpnest, cpnest.model
 
 # Package internal imports
@@ -16,8 +20,6 @@ import bayRing.QNM_utils          as QNM_utils
 import bayRing.inference          as inference
 import bayRing.template_waveforms as template_waveforms
 import bayRing.waveform_utils     as wf_utils
-from pyRing.utils import print_section
-import lal
 
 # Constants
 twopi = 2.*np.pi
@@ -232,11 +234,11 @@ def main():
     # Convert estimated start and end time in seconds
     t_start, t_end = t_start_g * C_mt * M, t_end_g * C_mt * M
 
-    # Load PSD parameters
-    f_min, f_max, dt, _, N_points, n_FFT_points, asd_path, n_iterations_C1, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values, direction = wf_utils.extract_and_compute_psd_parameters(parameters['Mismatch-PSD-settings'])
-
     # Load flags
     apply_window, compare_TD_FD, clear_directory, C1_flag, mismatch_print_flag, mismatch_section_plot_flag = wf_utils.extract_flags(parameters['Flags'])
+
+    # Load PSD parameters
+    f_min, f_max, dt, _, N_points, n_FFT_points, asd_path, n_iterations_C1, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values, direction = wf_utils.extract_and_compute_psd_parameters(parameters['Mismatch-PSD-settings'], mismatch_print_flag)
 
     # Choose if iterate or not on N_FFT
     N_FFT = [N_points] if n_FFT_points == 1 else list(map(int, np.logspace(np.log10(NR_length), np.log10(2*N_points), n_FFT_points)))
@@ -266,10 +268,9 @@ def main():
             try:
 
                 # Print window parameters
-                print(f"\n\n* Applying window on the PSD with parameters: w_DX={round(window_size_DX,1)}Hz, w_SX={round(window_size_SX,1)}Hz, k={round(k,1)}, saturation_DX={round(saturation_DX,1)}, saturation_SX={round(saturation_SX,1)}, N_FFT={N_fft}\n")
 
-                if apply_window ==1:
-
+                if(apply_window==1):
+                    print(f"* Applying window on the PSD with parameters: w_DX={round(window_size_DX,1)}Hz, w_SX={round(window_size_SX,1)}Hz, k={round(k,1)}, saturation_DX={round(saturation_DX,1)}, saturation_SX={round(saturation_SX,1)}, N_FFT={N_fft}")
 
                     # Compute PSD and ACF with smoothing at PSD edges
                     PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_with_smoothing(
@@ -287,6 +288,7 @@ def main():
                     )
 
                 else:
+                    print(f"* Computing ACF from PSD without smoothing")
 
                     # Set a default value of the window parameters for the files to be saved
                     window_size_DX, window_size_SX, k, saturation_DX, saturation_SX = 0.0, 0.0, 0.0, 1.0, 1.0
@@ -332,7 +334,7 @@ def main():
                     lines = f.readlines()[1:]  # Skip the header
 
                 # Store mismatch results in a dictionry
-                mismatch_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = {'real': {}, 'imaginary': {}}
+                mismatch_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = {'real': {}, 'imag': {}}
                 for line in lines:
                     perc, component, mismatch = line.strip().split('\t')
                     perc = int(perc)
@@ -400,7 +402,7 @@ def main():
                     lines = f.readlines()[1:]  # Skip the header
 
                 # Store optimal SNR results in a dictionary
-                optimal_SNR_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = {'real': {}, 'imaginary': {}}
+                optimal_SNR_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = {'real': {}, 'imag': {}}
                 for line in lines:
                     perc, component, optimal_SNR = line.strip().split('\t')
                     perc = int(perc)
