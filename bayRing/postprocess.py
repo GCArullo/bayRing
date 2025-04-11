@@ -2612,7 +2612,6 @@ def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX
                 f"_satSD_{round(satSX,1)}_NFFT_{N_fft}.txt"
             )
             path = os.path.join(outdir, "Algorithm/Mismatch", filename)
-
             if os.path.exists(path):
                 with open(path, "r") as f:
                     lines = f.readlines()[1:]
@@ -2622,7 +2621,7 @@ def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX
                         if perc == "50":
                             if component == "real":
                                 real_50 = float(mismatch)
-                            elif component == "imaginary":
+                            elif component == "imag":
                                 imag_50 = float(mismatch)
                     if real_50 is not None and imag_50 is not None:
                         nffts_found.append(N_fft)
