@@ -33,6 +33,7 @@ def set_output(outdir, screen_output, method, config_file, run_type):
         
     if not os.path.exists(outdir):                                     os.makedirs(outdir)
     if not os.path.exists(os.path.join(outdir,'Algorithm')):           os.makedirs(os.path.join(outdir,'Algorithm'))
+    if not os.path.exists(os.path.join(outdir,'Algorithm/Mismatch')):  os.makedirs(os.path.join(outdir,'Algorithm/Mismatch'))
     if not os.path.exists(os.path.join(outdir,'Peak_quantities')):     os.makedirs(os.path.join(outdir,'Peak_quantities'))
     if(method=='Nested-sampler'):
         if not os.path.exists(os.path.join(outdir,'Plots','Chains')):  os.makedirs(os.path.join(outdir,'Plots','Chains'))

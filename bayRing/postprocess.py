@@ -736,8 +736,8 @@ def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, metho
     # File paths for saving results
     mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}.txt"
     mismatch_filename_fd = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_w_{round(window_size,1)}_k_{round(k,2)}_NFFT_{N_FFT}_FD.txt"
-    outFile_path = os.path.join(outdir, 'Algorithm', mismatch_filename)
-    outFile_path_fd = os.path.join(outdir, 'Algorithm', mismatch_filename_fd)
+    outFile_path = os.path.join(outdir, 'Algorithm/Mismatch', mismatch_filename)
+    outFile_path_fd = os.path.join(outdir, 'Algorithm/Mismatch', mismatch_filename_fd)
 
     with open(outFile_path, 'w') as outFile_mismatch, open(outFile_path_fd, 'w') as outFile_mismatch_fd:
         outFile_mismatch.write('#CI\tStrain_data\tMismatch\n')
@@ -809,7 +809,7 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
 
     # File paths for saving results
     mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
-    outFile_path      = os.path.join(outdir, 'Algorithm', mismatch_filename)
+    outFile_path      = os.path.join(outdir, 'Algorithm/Mismatch', mismatch_filename)
     
     with open(outFile_path, 'w') as outFile_mismatch:
         outFile_mismatch.write('#CI\tStrain_data\tMismatch\n')
@@ -870,7 +870,7 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
                 if compare_TD_FD:
 
                     mismatch_filename_fd = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}.txt"
-                    outFile_path_fd      = os.path.join(outdir, 'Algorithm', mismatch_filename_fd)
+                    outFile_path_fd      = os.path.join(outdir, 'Algorithm/Mismatch', mismatch_filename_fd)
 
                     with open(outFile_path_fd, 'w') as outFile_mismatch_fd:
                         outFile_mismatch_fd.write('#CI\tStrain_data\tFD_Mismatch\n')
@@ -903,7 +903,7 @@ def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf,
 
     # File paths for saving results
     mismatch_filename = f"Mismatch_h_tot_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
-    outFile_path      = os.path.join(outdir, 'Algorithm', mismatch_filename)
+    outFile_path      = os.path.join(outdir, 'Algorithm/Mismatch', mismatch_filename)
     
     with open(outFile_path, 'w') as outFile_mismatch:
         outFile_mismatch.write('#CI\tStrain_data\tMismatch\n')
@@ -960,8 +960,8 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
     # File paths for saving results
     optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
     optimal_SNR_filename_fd = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}_FD.txt"
-    outFile_path = os.path.join(outdir, 'Algorithm', optimal_SNR_filename)
-    outFile_path_fd = os.path.join(outdir, 'Algorithm', optimal_SNR_filename_fd)
+    outFile_path = os.path.join(outdir, 'Algorithm/Mismatch', optimal_SNR_filename)
+    outFile_path_fd = os.path.join(outdir, 'Algorithm/Mismatch', optimal_SNR_filename_fd)
 
     with open(outFile_path, 'w') as outFile_SNR, open(outFile_path_fd, 'w') as outFile_SNR_fd:
         outFile_SNR.write('#CI\tStrain_data\tOptimal_SNR\n')
@@ -1011,8 +1011,8 @@ def compute_optimal_SNR_zeros(NR_sim, results, inference_model, outdir, method, 
     # File paths for saving results
     optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
     optimal_SNR_filename_fd = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}_FD.txt"
-    outFile_path = os.path.join(outdir, 'Algorithm', optimal_SNR_filename)
-    outFile_path_fd = os.path.join(outdir, 'Algorithm', optimal_SNR_filename_fd)
+    outFile_path = os.path.join(outdir, 'Algorithm/Mismatch', optimal_SNR_filename)
+    outFile_path_fd = os.path.join(outdir, 'Algorithm/Mismatch', optimal_SNR_filename_fd)
 
     with open(outFile_path, 'w') as outFile_SNR, open(outFile_path_fd, 'w') as outFile_SNR_fd:
         outFile_SNR.write('#CI\tStrain_data\tOptimal_SNR\n')
@@ -2611,7 +2611,7 @@ def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX
                 f"_wSX_{round(window_SX,1)}Hz_k_{round(k,2)}_satDX_{round(satDX,1)}"
                 f"_satSD_{round(satSX,1)}_NFFT_{N_fft}.txt"
             )
-            path = os.path.join(outdir, "Algorithm", filename)
+            path = os.path.join(outdir, "Algorithm/Mismatch", filename)
 
             if os.path.exists(path):
                 with open(path, "r") as f:
