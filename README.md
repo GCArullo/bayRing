@@ -20,6 +20,14 @@ For the vast majority of applications the software will need some edits, hence w
 
 First, install the `hm_nc_fit` branch of [pyRing](https://git.ligo.org/lscsoft/pyring), see instructions [here](https://lscsoft.docs.ligo.org/pyring/#install-and-run).
 
+Add in your ~/.bashrc add:
+
+$ export BAYRING_PREFIX=/home/installation_directory/bayRing
+
+From the terminal run:
+
+$ source ~/.bashrc
+
 Then, the bayRing source code can be installed through: 
 
   ```
