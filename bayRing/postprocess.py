@@ -1,6 +1,7 @@
 # Standard python packages
 import corner, h5py, matplotlib.pyplot as plt, numpy as np, os, qnm, scipy.linalg as sl, seaborn as sns, shutil, numba
 from scipy.interpolate           import interp1d
+from itertools import product
 
 # GW-packages
 from pycbc.psd                   import from_txt
@@ -1694,7 +1695,7 @@ def global_corner(x, names, output, truths=None):
                         use_math_text = True,
                         truths = truths
                         )
-    plt.savefig(os.path.join(output, 'Plots', 'Results', 'corner.png'), bbox_inches='tight')
+    plt.savefig(os.path.join(output, 'Plots', 'Results', 'corner.pdf'), bbox_inches='tight')
 
     return
 
@@ -1745,7 +1746,7 @@ def plot_multiple_psd(psd_data, f_min, f_max, outdir, direction, window):
         plt.grid(True)
 
         # Save the plot
-        filename = "Multiple_Smoothed_PSD.png"
+        filename = "Multiple_Smoothed_PSD.pdf"
         path = os.path.join(save_path, filename)
         plt.savefig(path)
         plt.close()
@@ -2523,7 +2524,7 @@ def plot_condition_numbers(outdir, condition_numbers, thresholds=(1e3, 1e6)):
 
     # Save plot to file
     os.makedirs(outdir, exist_ok=True)
-    plot_file_path = os.path.join(outdir, "Algorithm/Condition_Numbers_Plot.png")
+    plot_file_path = os.path.join(outdir, "Algorithm/Condition_Numbers_Plot.pdf")
     plt.savefig(plot_file_path)
     print(f"Condition number plot saved to {plot_file_path}")
 
@@ -2586,3 +2587,85 @@ def plot_mismatch_optimal_SNR_condition_number_window_parameters(mismatch_data, 
                     plot_function(data_dict, outdir, direction, M, dL, N_FFT)
                 else:
                     print(f"Warning: Function {func_name} not found in global scope.")
+
+def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX_list, window_SX_list, k_list, saturation_DX_list, saturation_SX_list,  outdir, direction):
+    
+    """
+    Loop through all combinations of windowing parameters and plot mismatch (real & imaginary at 50% CI) vs N_FFT.
+    """
+
+    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
+    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    os.makedirs(save_path, exist_ok=True)
+
+    for (window_DX, window_SX, k, satDX, satSX) in product(
+        window_DX_list, window_SX_list, k_list, saturation_DX_list, saturation_SX_list
+    ):
+        real_mismatches = []
+        imag_mismatches = []
+        nffts_found = []
+
+        for N_fft in N_FFT_list:
+            filename = (
+                f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_DX,1)}Hz"
+                f"_wSX_{round(window_SX,1)}Hz_k_{round(k,2)}_satDX_{round(satDX,1)}"
+                f"_satSD_{round(satSX,1)}_NFFT_{N_fft}.txt"
+            )
+            path = os.path.join(outdir, "Algorithm", filename)
+
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    lines = f.readlines()[1:]
+                    real_50, imag_50 = None, None
+                    for line in lines:
+                        perc, component, mismatch = line.strip().split()
+                        if perc == "50":
+                            if component == "real":
+                                real_50 = float(mismatch)
+                            elif component == "imaginary":
+                                imag_50 = float(mismatch)
+                    if real_50 is not None and imag_50 is not None:
+                        nffts_found.append(N_fft)
+                        real_mismatches.append(real_50)
+                        imag_mismatches.append(imag_50)
+            else:
+                print(f"File not found: {filename}")
+
+        if not nffts_found:
+            print(f"Skipping: No data for combo wDX={window_DX}, wSX={window_SX}, k={k}, satDX={satDX}, satSX={satSX}")
+            continue
+
+        # Sort by NFFT
+        nffts_found, real_mismatches, imag_mismatches = zip(
+            *sorted(zip(nffts_found, real_mismatches, imag_mismatches))
+        )
+
+        # Plot
+        plt.figure(figsize=(8, 6))
+        plt.plot(nffts_found, real_mismatches, marker='o', label='real', linewidth=2, color=colbGreen)
+        plt.plot(nffts_found, imag_mismatches, marker='s', label='imaginary', linewidth=2, color=colbBlue)
+        plt.axvline(x=N_points, color="black", linestyle='--', linewidth=1)
+        plt.xscale("log")
+        plt.yscale("log")
+        plt.xlabel(r"$N_{\rm FFT}$", fontsize=13)
+        plt.ylabel("Mismatch (50% CI)", fontsize=13)
+        plt.title(
+            rf"$w_{{\rm DX}}$={window_DX:.1f}, $w_{{\rm SX}}$={window_SX:.1f}, "
+            rf"$k$={k:.2f}, satDX={satDX:.1f}, satSX={satSX:.1f}",
+            fontsize=12
+        )
+        plt.grid(True, which="both", ls=':')
+        plt.legend()
+        plt.tight_layout()
+
+        # Save
+        fname = (
+            f"Mismatch_vs_NFFT_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_"
+            f"wDX_{round(window_DX,1)}_wSX_{round(window_SX,1)}_k_{round(k,2)}"
+            f"_satDX_{round(satDX,1)}_satSX_{round(satSX,1)}.pdf"
+        )
+        full_path = os.path.join(save_path, fname)
+        plt.savefig(full_path, bbox_inches="tight")
+        print(f"\nSaved: {full_path}\n")
+        plt.close()
+

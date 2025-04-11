@@ -275,8 +275,11 @@ A dot is present at the end of each description line and is not to be intended a
     *************************************************
 
         run-type         Type of run. Available options: ['full', 'post-processing', 'plot-NR-only'].                        Default: 'full'.
+        
         screen-output    Boolean to divert stdout and stderr to files or to screen.                                          Default: 0.
+        
         show-plots       Boolean to show results plots.                                                                      Default: 0.
+        
         outdir           Path of the output directory.                                                                       Default: './'.
 
     *****************************************************
@@ -284,35 +287,52 @@ A dot is present at the end of each description line and is not to be intended a
     *****************************************************
 
         download         Boolean to ask for the download of the requested SXS NR simulation.                                 Default 1.
+        
         dir              Absolute path of NR local data.                                                                     Default: ''.
+        
         catalog          NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'fake_NR']. Default: 'SXS'.
+        
         ID               Simulation ID to be considered. Example for SXS: 0305. Example for Teukolsky: \
                          `a_0.7_A_0.141_w_1.4_ingoing_ang_15`.                                                               Default: 0305.
+        
         extrap-order     Extrapolation order of the `SXS` simulations. Smaller N is better for ringdown \
               (data.black-holes.org/waveforms/index.html). Available options: ['2', '3', '4'].                               Default: 2.
+        
         res-level        Resolution level of the simulation. For `SXS`: -1 selects the maximum available resolution. \
               Available values for Teukosly data: [1,...,9] (lowest to highest). Fixes `res-nx` and `res-nl`.                Default: -1.
+        
         res-nx           Number of collocation points in the radial direction [only for Teukolsky data]. \
             Overwrites `res-level`.                                                                                          Default: 0. 
+        
         res-nl           Number of collocation points in the angular direction [only for Teukolsky data]. \
             Overwrites `res-level`.                                                                                          Default: 0.
+        
         pert-order       Perturbation order to consider in Teukolsky data. Available options: ['lin', 'scd'].                Default: `lin`.
+        
         l-NR             Polar NR spherical index to be fitted, possibly different than QNM ones, \
             since mixing between different l happens.                                                                        Default: 2.
+        
         m                Angular spherical index to be fitted (same for IMR and QNMs), since only modes with same m do mix.  Default: 2.
+        
         error            Method to compute the NR error. Available options for `SXS`: \
                          ['constant-X', 'align-with-mismatch-all', 'align-with-mismatch-res-only', 'align-at-peak'], \
                          for `Teukolsky`: ['constant-X', 'resolution'] where X is the constant value selected by the user, \
                          for `RIT`: ['constant-X']. For 'fake_NR': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
                          deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-res-only'.
+        
         error-t-min      Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_min_mm = t_peak * (1-`error-t-min`). Default: 3e-1.
+        
         error-t-max      Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_max_mm = t_peak * (1-`error-t-max`). Default: 4e-3.
+        
         add-const        Parameter of the complex constant to be added to the fit template. Required to account for spurious \
                          effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.
+        
         properties-file  Path to the file containing additional properties of the NR simulation in `.csv` format. \
                          Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
+        
         t-peak-22        Time of the peak of the 22 mode. Used as reference time in KerrBinary model. Must be passed when \
                          fitting HMs with KerrBinary.                                                                        Default: 0.0.                         
+        
         waveform-type    Type of waveform to be used. Available options: ['strain', 'psi4'].                                 Default: 'strain'.
 
     ************************************************************
@@ -320,11 +340,14 @@ A dot is present at the end of each description line and is not to be intended a
     ************************************************************
         
         modes            Modes that will be included in the generated QNMs strain. Example: '220,221'.                       Default: '220,221,320'.
+        
         times            Mode to choose the times at which to compute the NR strain. Options: ['from-metadata', \
                          'from-SXS-NR']. If the error is taken from the SXS simulation, the times must be taken \
                          from the SXS sim as well.                                                                           Default: 'from-SXS-NR'.
+        
         noise            Noise injection option. If None, the noise is not added to the simulated Kerr QNMs data; \
             if '1', the noise is added to the data. Options: None, '1'.                                                      Default: None.
+        
         tail             Option to add the tail to the simulated Kerr QNMs data; if '1', the tail is added to the data. \
             Options: None, '1'.                                                                                              Default: None.
 
@@ -334,21 +357,29 @@ A dot is present at the end of each description line and is not to be intended a
     
         template                         Fitting template. Available options: ['Damped-sinusoids', 'Kerr', 'Kerr-Damped-sinusoids',\
               'KerrBinary', 'TEOBPM'].                                                                                                                                  Default: 'Kerr'.
+        
         N-DS-modes                       Number of free modes in the ringdown model if 'Damped-sinusoids' in template. Otherwise, ignored.                                Default: 1.
+        
         QNM-modes                        List of modes of the ringdown model, if 'Kerr' in template. Otherwise, ignored. \
                                          Example format: '220,221,320'.                                                                                                   Default: '220,221,320'.
+        
         QQNM-modes                       List of quadratic modes of the ringdown model if 'Kerr' in template. Otherwise, ignored. \
                                          Example format: '--QQNM-modes ``Px220x321,Px220x221', i.e. (child_term x parent1 x parent2), \
                                          where the child mode is assumed to be equal to the selected (l_NR,m) multipole and child_term=P,M \
                                          (parent frequencies sum or difference).                                                                                          Default: ''.
+        
         Kerr-tail                        Boolean to add a tail factor to the Kerr template.                                                                               Default: 0.
+        
         Kerr-tail-modes                  Modes to which a tail will be added in the fitting template. Example format: '22,32'.                                            Default: '22'.
+        
         KerrBinary-version               Option to select the version of the KerrBinary model to be used. Available options: ['London2018', 'Cheung2023', 'noncircular'].     Default: 'London2018'.
+        
         KerrBinary-amplitudes-nc-version Option to select the version of the KerrBinary model amplitudes noncircular correction fit to be used. Format: `X-Y`, \ 
                                          where each entry selects a noncircular variable to be used for the noncircular fit, among ['bmrg','Emrg', 'Jmrg', 'Mf', 'af']. \
                                          Can also pass a single variable instead of two, but not less than one or more than two.                                          Default: ''.
 
         TEOB-NR-fit                      Boolean to fit also for NR calibration coefficients within TEOB model, otherwise, use default fits.                              Default: 0.
+        
         TEOB-template                    TEOB template to be used. Available options: ['qc', 'nc']. The 'qc' version is defined in  \
                                          arXiv:1904.09550, arXiv:2001.09082, while the 'nc' in II.C of arXiv:2305.19336.                                                  Default: 'qc'.
 
@@ -372,11 +403,17 @@ A dot is present at the end of each description line and is not to be intended a
         ***************************************
 
         likelihood       Likelihood type to be used. Available options: ['gaussian', 'laplace'].                             Default: 'gaussian'.
+        
         sampler          Which sampler to use. Available options: ['cpnest', 'raynest'].                                     Default: 'cpnest'.
+        
         nlive            Number of live points to be used for the sampling.                                                  Default: 256.
+        
         maxmcmc          Number of maximum Markov Chain Monte Carlo steps to be used during the sampling.                    Default: 256.
+        
         seed             Seed for the random initialisation of the sampler.                                                  Default: 1234.
+        
         nnest            Number of nested samplers to run in parallel ('massively-parallel' branch only).                    Default: 1.
+        
         nensemble        Total number of ensemble processes running. nensemble = nnest * N_ev, where N_ev is the number \
                          of live points being substituted at each NS step. Requires N_ev << nlive. \
                          Also n_cpu = nnest+nensemble.                                                                       Default: 1.
@@ -394,8 +431,11 @@ A dot is present at the end of each description line and is not to be intended a
                 - is forced to run for a minimum number of iterations, and to stop after a maximum number of iterations; 
         
             min-method       Method to be used in the scipy.least_squares() function. Available options: ['lm', 'None'].         Default: 'lm'.
+            
             min-iter-min     Minimum number of iterations for the minimization algorithm.                                        Default: 1.
+            
             min-iter-max     Maximum number of iterations for the minimization algorithm.                                        Default: 1000.
+            
             n-random-seeds   Number of random seeds to be used to initialize the minimization.                                   Default: 1.
 
         
@@ -412,69 +452,94 @@ A dot is present at the end of each description line and is not to be intended a
     *******************************************************************
     * Parameters to be passed to the [Mismatch-PSD-settings] section. *
     *******************************************************************  
+
         asd-path            Path to the ASD file. Default: https://dcc.ligo.org/ligo-t1800044/public.
+
         obs_time            Time of observation [s] related to the PSD (T=1/df). Default: 0, and then computed in the code as 1/df.
+        
         direction           Where to apply the smoothing in the PSD before doing the FFT. If below, it applies to low frequencies, if above to high frequencies, if below-and-above on both. Default: below.
+        
         n_FFT_points        Number of iterations for values of the points that are used to compute the PSD. Default: 1.
+        
         n_iterations_C1     Number of iteriations for the C1 algorithm. Default: 1.
+        
         window_DX           Minimum window size for smoothing on the right side. Default: 0.8.
+        
         window_DX_max       Maximum window size for smoothing on the right side. Default: 10.
+        
         n_window_DX         Number of steps for the right-side windowing. Default: 1.
+        
         window_SX           Minimum window size for smoothing on the left side. Default: 0.8.
+        
         window_SX_max       Maximum window size for smoothing on the left side. Default: 10.
+        
         n_window_SX         Number of steps for the left-side windowing. Default: 1.
+        
         steepness           Minimum steepness parameter for smoothing. Default: 7.
+        
         steepness_max       Maximum steepness parameter for smoothing. Default: 200.
+        
         n_steepness         Number of steps in the steepness parameter range. Default: 1.
+        
         saturation_DX       Minimum saturation value for the right-side windowing. Default: 1.0.
+        
         saturation_DX_max   Maximum saturation value for the right-side windowing. Default: 5.0.
+        
         n_saturation_DX     Number of steps for right-side saturation values. Default: 1.
+        
         saturation_SX       Minimum saturation value for the left-side windowing. Default: 1.0.
+        
         saturation_SX_max   Maximum saturation value for the left-side windowing. Default: 5.0.
+        
         n_saturation_SX     Number of steps for left-side saturation values. Default: 1.
 
     *************************************************
     * Parameters to be passed in the Flags section. *
     *************************************************
 
-        apply_window         Choose wheter to apply window at the edges of the PSD or not. 
-                             Default: 0.
+        apply_window                Choose wheter to apply window at the edges of the PSD or not. 
+                                    - 1: Apply window with default parameters.
+                                    - 0: Do not apply.
+                                    Default: 0.
 
-        C1_flag              Enables or disables C1 fixing on the PSD after smoothing application.
-                             - 1: Enable C1 iterations.
-                             - 0: Disable C1 iterations.
-                             Default: 1.
+        C1_flag                     Enables or disables C1 fixing on the PSD after smoothing application.
+                                    - 1: Enable C1 iterations.
+                                    - 0: Disable C1 iterations.
+                                    Default: 1.
 
-        clear_directory      Controls whether the output directory for the smoothing section is cleared before the run.
-                             - 1: Clear the directory before execution.
-                             - 0: Keep existing files.
-                             Default: 1.
+        clear_directory             Controls whether the output directory for the smoothing section is cleared before the run.
+                                    - 1: Clear the directory before execution.
+                                    - 0: Keep existing files.
+                                    Default: 1.
 
-        mismatch_print_flag  Determines whether to print mismatch information (e.g. the scalar products involved in the mismatch).
-                             - 1: Print mismatch values.
-                             - 0: Do not print mismatch values.
-                             Default: 0.
+        compare_TD_FD               Enables comparison between Time Domain (TD) and Frequency Domain (FD) mismatches.
+                                    - 1: Compute and compare both TD and FD mismatches.
+                                    - 0: Skip comparison.
+                                    Default: 0.                     
+
+        mismatch_print_flag         Determines whether to print mismatch information (e.g. the scalar products involved in the mismatch).
+                                    - 1: Print mismatch values.
+                                    - 0: Do not print mismatch values.
+                                    Default: 0.
 
         mismatch_section_plot_flag  
-                             Determines whether to plot sanity check plots regarding the mismatch section (for instance, the windowed PSD vs the original one).
-                             - 1: Generate and save mismatch section plots.
-                             - 0: Do not generate plots.
-                             Default: 0.
+                                    Determines whether to plot sanity check plots regarding the mismatch section (for instance, the windowed PSD vs the original one).
+                                    - 1: Generate and save mismatch section plots.
+                                    - 0: Do not generate plots.
+                                    Default: 0.    
 
-        compare_TD_FD        Enables comparison between Time Domain (TD) and Frequency Domain (FD) mismatches.
-                             - 1: Compute and compare both TD and FD mismatches.
-                             - 0: Skip comparison.
-                             Default: 0.
-
-    
-
-    ******************************************************
+    ********************************************************************
     * Parameters to be passed to the [Mismatch-GW-parameters] section. *
-    ******************************************************
+    ********************************************************************
+        
         M                The mass of the remnant (in solar masses).                                 Default: 60.
+        
         dL               The luminosity distance of the source with respect to the observer.        Default: 410.
+        
         ra               Right ascension (in radiants).                                             Default: 1.375.
+        
         dec              Declination (in radiants).                                                 Default: -0.2108.
+        
         psi              Polarization angle (in radiants).                                          Default: 2.659.
         
 """

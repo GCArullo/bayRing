@@ -292,6 +292,7 @@ def main():
 
                     # Set a default value of the window parameters for the files to be saved
                     window_size_DX, window_size_SX, k, saturation_DX, saturation_SX = 0.0, 0.0, 0.0, 1.0, 1.0
+                    window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values = [window_size_DX], [window_size_SX], [k], [saturation_DX], [saturation_SX]
 
                      # Compute PSD and ACF with smoothing at PSD edges
                     PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_no_window_at_edges(
@@ -433,6 +434,24 @@ def main():
         postprocess.plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_SX, parameters['I/O']['outdir'], direction)
         postprocess.plot_psd_and_acf(psd_data, acf_data, asd_path, f_min, f_max, parameters['I/O']['outdir'], direction)
         postprocess.plot_mismatch_optimal_SNR_condition_number_window_parameters(mismatch_data, optimal_SNR_data, condition_numbers_data, parameters['I/O']['outdir'], direction, M, dL, N_FFT)
+
+        if len(N_FFT) > 1:
+            postprocess.plot_mismatch_optimal_SNR_condition_number_window_parameters(
+                mismatch_data, optimal_SNR_data, condition_numbers_data,
+                parameters['I/O']['outdir'], direction, M, dL, N_FFT
+            )
+
+            postprocess.plot_mismatch_vs_NFFT(
+                N_FFT, N_points,
+                M, dL, t_start_g_true,
+                window_DX_list=window_sizes_DX,
+                window_SX_list=window_sizes_SX,
+                k_list=steepness_values,
+                saturation_DX_list=saturation_DX_values,
+                saturation_SX_list=saturation_SX_values,
+                outdir = parameters['I/O']['outdir'], 
+                direction = direction
+            )
 
     # Attempt to generate the global corner plot
     try:
