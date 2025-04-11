@@ -249,7 +249,7 @@ def main():
         # Define the directory path
         smoothing_paths = ["Left_smoothing", "Right_smoothing", "Both_edges_smoothing"]
         for smoothing_path in smoothing_paths:
-            algorithm_dir = os.path.join(parameters['I/O']['outdir'], "Algorithm", smoothing_path)
+            algorithm_dir = os.path.join(parameters['I/O']['outdir'], "Algorithm/Mismatch", smoothing_path)
 
             postprocess.clear_directory(algorithm_dir) 
 
@@ -329,7 +329,7 @@ def main():
 
                 # Read mismatch results from file
                 mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_fft}.txt"
-                mismatch_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', mismatch_filename)
+                mismatch_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm/Mismatch', mismatch_filename)
 
                 with open(mismatch_file, 'r') as f:
                     lines = f.readlines()[1:]  # Skip the header
@@ -398,7 +398,7 @@ def main():
 
                 # Read optimal SNR results from file
                 optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_fft}.txt"
-                optimal_SNR_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', optimal_SNR_filename)
+                optimal_SNR_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm/Mismatch', optimal_SNR_filename)
                 with open(optimal_SNR_file, 'r') as f:
                     lines = f.readlines()[1:]  # Skip the header
 
@@ -411,7 +411,7 @@ def main():
 
                 # Build the output filename
                 condition_numbers_filename = f"Condition_number_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_fft}.txt"
-                condition_numbers_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm', condition_numbers_filename)
+                condition_numbers_file = os.path.join(parameters['I/O']['outdir'], 'Algorithm/Mismatch', condition_numbers_filename)
 
                 # Compute the condition number
                 condition_number = wf_utils.compute_condition_number(ACF_truncated_NR)
@@ -424,7 +424,7 @@ def main():
                 condition_numbers_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = condition_number
             
             except Exception as e:
-                print(f"Computation failed for window_sizes=({window_size_DX, window_size_SX})Hz, k={k}, saturations={(saturation_DX, saturation_SX)}: {e}")
+                print(f"* Mismatch omputation failed for window_sizes=({window_size_DX, window_size_SX})Hz, k={k}, saturations={(saturation_DX, saturation_SX)}: {e}")
 
     #----------------------------------------------------------------------------------- Postprocessing --------------------------------------------------------------------------------------------------------------------------#
 
