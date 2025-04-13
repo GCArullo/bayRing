@@ -138,9 +138,6 @@ class WaveformModel(cpnest.model.Model):
 
         available_modes_with_given_lm = utils.filter_dict_by_key(pyr_utils.available_modes_dict_KerrBinary[self.KerrBinary_version], (self.l_NR,self.m_NR))
 
-        print('london is off, cheung ok')
-        exit()
-
         ringdown_model = wf.KerrBinary(self.t_start                                            ,
                                        self.t_peak                                             ,
                                        self.Mf                                                 ,
