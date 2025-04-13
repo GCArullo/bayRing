@@ -136,10 +136,15 @@ class WaveformModel(cpnest.model.Model):
 
         phi_value = utils.get_param_override(fixed_params,params,'phi')
 
-        ringdown_model = wf.KerrBinary(self.t_start                                        ,
-                                       self.t_peak                                         ,
-                                       self.Mf                                             ,
-                                       self.af                                             ,
+        available_modes_with_given_lm = utils.filter_dict_by_key(pyr_utils.available_modes_dict_KerrBinary[self.KerrBinary_version], (self.l_NR,self.m_NR))
+
+        print('london is off, cheung ok')
+        exit()
+
+        ringdown_model = wf.KerrBinary(self.t_start                                            ,
+                                       self.t_peak                                             ,
+                                       self.Mf                                                 ,
+                                       self.af                                                 ,
 
                                        KerrBinary_params['Mi']                                 ,
                                        KerrBinary_params['eta']                                ,
@@ -155,9 +160,7 @@ class WaveformModel(cpnest.model.Model):
                                        noncircular_params      = noncircular_parameters        ,
                                        noncircular_amp_version = self.KerrBinary_amp_nc_version,
 
-                                       single_spherical_mode   = 1                             ,
-                                       single_spherical_l      = self.l_NR                     ,
-                                       single_spherical_m      = self.m_NR                     ,
+                                       modes                   = available_modes_with_given_lm ,
 
                                        geom                    = 1                             ,
                                        qnm_fit                 = 0                             ,

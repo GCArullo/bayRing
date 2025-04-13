@@ -13,6 +13,36 @@ def get_param_override(fixed_params, x, name):
     if name in fixed_params: return fixed_params[name]
     else:                    return x[name]
 
+def filter_dict_by_key(a, target_key):
+
+    """
+
+    Filter a dictionary by a specific key, returning a new dictionary with the specified key and its corresponding values.
+
+    Parameters
+    ----------
+
+    a : dict
+        Dictionary to be filtered.
+    target_key : str
+        Key to filter the dictionary by.
+
+    Returns
+    -------
+
+    filtered : dict
+        Filtered dictionary containing the specified key and its corresponding values.
+
+    """
+
+    filtered = {}
+    for category in ['linear', 'quadratic']:
+        subdict = a.get(category, {})
+        if target_key in subdict: filtered[category] = {target_key: subdict[target_key]}
+        else                    : filtered[category] = {}
+
+    return filtered
+
 def find_longest_name_length(names):
     
     """
