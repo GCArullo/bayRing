@@ -318,7 +318,7 @@ A dot is present at the end of each description line and is not to be intended a
         error            Method to compute the NR error. Available options for `SXS`: \
                          ['constant-X', 'align-with-mismatch-all', 'align-with-mismatch-res-only', 'align-at-peak'], \
                          for `Teukolsky`: ['constant-X', 'resolution'] where X is the constant value selected by the user, \
-                         for `RIT`: ['constant-X']. For 'fake_NR': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
+                         for `RIT`: ['constant-X', 'late-time-const-error']. For 'fake_NR': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
                          deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-res-only'.
         
         error-t-min      Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_min_mm = t_peak * (1-`error-t-min`). Default: 3e-1.
