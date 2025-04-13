@@ -104,7 +104,6 @@ def main():
                                              t_peak_22      = parameters['NR-data']['t-peak-22']    ,
                                              t_min_mismatch = parameters['NR-data']['error-t-min']  , 
                                              t_max_mismatch = parameters['NR-data']['error-t-max']  )
-
     error       = NR_sim.NR_cpx_err_cut
     NR_metadata = NR_waveforms.read_NR_metadata(NR_sim, parameters['NR-data']['catalog'])
 

@@ -199,7 +199,7 @@ class WaveformModel(cpnest.model.Model):
                                                         'c4p'                 : params[       'c4p_{}{}'.format(self.l_NR,self.m_NR)]            ,
                                                         'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]       ,
                                                         'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu      ,
-                                                        'A_peakdotdot_over_nu': params[       'A_peakdotdot_{}{}'.format(self.l_NR,self.m_NR)]/nu,
+                                                        'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR,self.m_NR)]/nu,
                                                         }
                                 }
             else:
