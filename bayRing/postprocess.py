@@ -1978,12 +1978,12 @@ def plot_mismatch_by_window_DX(mismatch_data, outdir, direction, M, dL, N_fft):
                             window_vals.append(wDX)
                             mismatch_vals.append(data[component][perc])
                     plt.plot(window_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
-                plt.xlabel("wDX [Hz]", fontsize=26)
+                plt.xlabel(r"$w_l$ [Hz]", fontsize=26)
                 plt.ylabel("Mismatch", fontsize=26)
                 plt.xticks(fontsize=22)
                 plt.yticks(fontsize=22)
                 plt.grid(True)
-                filename = f"Mismatch_M={M}_dL={dL}_k={round(k,0)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_wsx={window_size_SX}_direction={direction}_NFFT_{N_FFT}.pdf"
+                filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_k={round(k,0)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_wsx={window_size_SX}_direction={direction}_NFFT_{N_FFT}.pdf"
                 plt.savefig(os.path.join(save_path, filename))
                 plt.close()
 
@@ -2008,12 +2008,12 @@ def plot_mismatch_by_window_SX(mismatch_data, outdir, direction, M, dL, N_fft):
                             window_vals.append(wSX)
                             mismatch_vals.append(data[component][perc])
                     plt.plot(window_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
-                plt.xlabel("wSX [Hz]", fontsize=26)
+                plt.xlabel(r"$w_h$ [Hz]", fontsize=26)
                 plt.ylabel("Mismatch", fontsize=26)
                 plt.xticks(fontsize=22)
                 plt.yticks(fontsize=22)
                 plt.grid(True)
-                filename = f"Mismatch_M={M}_dL={dL}_k={round(k,0)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_wdx={window_size_DX}_direction={direction}_NFFT_{N_FFT}.pdf"
+                filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_k={round(k,0)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_wdx={window_size_DX}_direction={direction}_NFFT_{N_FFT}.pdf"
                 plt.savefig(os.path.join(save_path, filename))
                 plt.close()
 
@@ -2038,12 +2038,12 @@ def plot_optimal_SNR_by_window_DX(optimal_SNR_data, outdir, direction, M, dL, N_
                             window_vals.append(wDX)
                             snr_vals.append(data[component][perc])
                     plt.plot(window_vals, snr_vals, label=f"{perc}% CI", marker='o')
-                plt.xlabel("wDX [Hz]", fontsize=26)
+                plt.xlabel(r"$w_l$ [Hz]", fontsize=26)
                 plt.ylabel("Optimal SNR", fontsize=26)
                 plt.xticks(fontsize=22)
                 plt.yticks(fontsize=22)
                 plt.grid(True)
-                filename = f"Optimal_SNR_M={M}_dL={dL}_k={round(k,0)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_wsx={window_size_SX}_direction={direction}_NFFT_{N_FFT}.pdf"
+                filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_k={round(k,0)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_wsx={window_size_SX}_direction={direction}_NFFT_{N_FFT}.pdf"
                 plt.savefig(os.path.join(save_path, filename))
                 plt.close()
 
@@ -2068,12 +2068,12 @@ def plot_optimal_SNR_by_window_SX(optimal_SNR_data, outdir, direction, M, dL, N_
                             window_vals.append(wSX)
                             snr_vals.append(data[component][perc])
                     plt.plot(window_vals, snr_vals, label=f"{perc}% CI", marker='o')
-                plt.xlabel("wSX [Hz]", fontsize=26)
+                plt.xlabel(r"$w_h$ [Hz]", fontsize=26)
                 plt.ylabel("Optimal SNR", fontsize=26)
                 plt.xticks(fontsize=22)
                 plt.yticks(fontsize=22)
                 plt.grid(True)
-                filename = f"Optimal_SNR_M={M}_dL={dL}_k={round(k,0)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_wdx={window_size_DX}_direction={direction}_NFFT_{N_FFT}.pdf"
+                filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_k={round(k,0)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_wdx={window_size_DX}_direction={direction}_NFFT_{N_FFT}.pdf"
                 plt.savefig(os.path.join(save_path, filename))
                 plt.close()
 
@@ -2092,14 +2092,14 @@ def plot_condition_number_by_window_DX(condition_numbers, outdir, direction, M, 
             window_vals.append(wDX)
             cond_vals.append(cond_number)
         plt.plot(window_vals, cond_vals, marker='o')
-        plt.xlabel("wDX [Hz]", fontsize=26)
+        plt.xlabel(r"$w_l$ [Hz]", fontsize=26)
         plt.ylabel("Condition Number", fontsize=26)
         plt.xscale("log")
         plt.yscale('log')
         plt.xticks(fontsize=22)
         plt.yticks(fontsize=22)
         plt.grid(True)
-        filename = f"Condition_Number_M={M}_dL={dL}_direction={direction}_NFFT_{N_FFT}.pdf"
+        filename = f"Condition_Number_M={M}M0_dL={dL}Mpc_direction={direction}_NFFT_{N_FFT}.pdf"
         plt.savefig(os.path.join(save_path, filename))
         plt.close()
 
@@ -2118,14 +2118,14 @@ def plot_condition_number_by_window_SX(condition_numbers, outdir, direction, M, 
             window_vals.append(wSX)
             cond_vals.append(cond_number)
         plt.plot(window_vals, cond_vals, marker='o')
-        plt.xlabel("wSX [Hz]", fontsize=26)
+        plt.xlabel(r"$w_h$ [Hz]", fontsize=26)
         plt.ylabel("Condition Number", fontsize=26)
         plt.xscale("log")
         plt.yscale('log')
         plt.xticks(fontsize=22)
         plt.yticks(fontsize=22)
         plt.grid(True)
-        filename = f"Condition_Number_M={M}_dL={dL}_direction={direction}_NFFT_{N_FFT}.pdf"
+        filename = f"Condition_Number_M={M}M0_dL={dL}Mpc_direction={direction}_NFFT_{N_FFT}.pdf"
         plt.savefig(os.path.join(save_path, filename))
         plt.close()
 
@@ -2274,7 +2274,7 @@ def plot_mismatch_by_saturation_DX(mismatch_data, outdir, direction, M, dL, N_ff
                                         sat_DX_vals.append(sDX)
                                         mismatch_vals.append(data[component][perc])
                             plt.plot(sat_DX_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
-                            plt.xlabel("Saturation DX", fontsize=26)
+                            plt.xlabel(r"$\mathcal{I}_l$", fontsize=26)
                             plt.ylabel("Mismatch", fontsize=26)
                             plt.xticks(fontsize=22)
                             plt.yticks(fontsize=22)
@@ -2314,14 +2314,14 @@ def plot_optimal_SNR_by_saturation_DX(optimal_SNR_data, outdir, direction, M, dL
                                         sat_DX_vals.append(sDX)
                                         snr_vals.append(data[component][perc])
                             plt.plot(sat_DX_vals, snr_vals, label=f"{perc}% CI", marker='o')
-                            plt.xlabel("Saturation DX", fontsize=26)
+                            plt.xlabel(r"$\mathcal{I}_l$", fontsize=26)
                             plt.ylabel("Optimal SNR", fontsize=26)
                             plt.xticks(fontsize=22)
                             plt.yticks(fontsize=22)
                             plt.legend()
                             plt.xscale('log')
                             plt.grid(True)
-                            filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_wDX={round(window_size_DX,1)}_wSX={round(window_size_SX,1)}_k={round(k,0)}_satSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.pdf"
+                            filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_wDX={round(window_size_DX,1)}_wSX={round(window_size_SX,1)}_k={round(k,0)}_satSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.pdf"
                             plt.savefig(os.path.join(save_path, filename))
                             plt.close()
 
@@ -2350,7 +2350,7 @@ def plot_condition_number_by_saturation_DX(condition_numbers, outdir, direction,
                                 sat_DX_vals.append(sDX)
                                 cond_vals.append(cond_number)
                         plt.plot(sat_DX_vals, cond_vals, marker='o')
-                        plt.xlabel("Saturation DX", fontsize=26)
+                        plt.xlabel(r"$\mathcal{I}_l$", fontsize=26)
                         plt.ylabel("Condition Number", fontsize=26)
                         plt.xticks(fontsize=22)
                         plt.yticks(fontsize=22)
@@ -2390,7 +2390,7 @@ def plot_mismatch_by_saturation_SX(mismatch_data, outdir, direction, M, dL, N_ff
                                         sat_SX_vals.append(sSX)
                                         mismatch_vals.append(data[component][perc])
                             plt.plot(sat_SX_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
-                            plt.xlabel("Saturation SX", fontsize=26)
+                            plt.xlabel(r"$\mathcal{I}_h$", fontsize=26)
                             plt.ylabel("Mismatch", fontsize=26)
                             plt.xticks(fontsize=22)
                             plt.yticks(fontsize=22)
@@ -2430,14 +2430,14 @@ def plot_optimal_SNR_by_saturation_SX(optimal_SNR_data, outdir, direction, M, dL
                                         sat_SX_vals.append(sSX)
                                         snr_vals.append(data[component][perc])
                             plt.plot(sat_SX_vals, snr_vals, label=f"{perc}% CI", marker='o')
-                            plt.xlabel("Saturation SX", fontsize=26)
+                            plt.xlabel(r"$\mathcal{I}_h$", fontsize=26)
                             plt.ylabel("Optimal SNR", fontsize=26)
                             plt.xticks(fontsize=22)
                             plt.yticks(fontsize=22)
                             plt.xscale('log')
                             plt.legend()
                             plt.grid(True)
-                            filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_wDX={round(window_size_DX,1)}_wSX={round(window_size_SX,1)}_k={round(k,0)}_satDX={saturation_DX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.pdf"
+                            filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_wDX={round(window_size_DX,1)}_wSX={round(window_size_SX,1)}_k={round(k,0)}_satDX={saturation_DX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.pdf"
                             plt.savefig(os.path.join(save_path, filename))
                             plt.close()
 
@@ -2466,7 +2466,7 @@ def plot_condition_number_by_saturation_SX(condition_numbers, outdir, direction,
                                 sat_SX_vals.append(sSX)
                                 cond_vals.append(cond_number)
                         plt.plot(sat_SX_vals, cond_vals, marker='o')
-                        plt.xlabel("Saturation SX", fontsize=26)
+                        plt.xlabel(r"$\mathcal{I}_h$", fontsize=26)
                         plt.ylabel("Condition Number", fontsize=26)
                         plt.xticks(fontsize=22)
                         plt.yticks(fontsize=22)

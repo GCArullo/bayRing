@@ -269,7 +269,7 @@ def main():
                 # Print window parameters
 
                 if(apply_window==1):
-                    print(f"* Applying window on the PSD with parameters: w_DX={round(window_size_DX,1)}Hz, w_SX={round(window_size_SX,1)}Hz, k={round(k,1)}, saturation_DX={round(saturation_DX,1)}, saturation_SX={round(saturation_SX,1)}, N_FFT={N_fft}")
+                    print(f"\n\n\n* Applying window on the PSD with parameters: w_DX={round(window_size_DX,1)}Hz, w_SX={round(window_size_SX,1)}Hz, k={round(k,1)}, saturation_DX={round(saturation_DX,1)}, saturation_SX={round(saturation_SX,1)}, N_FFT={N_fft}")
 
                     # Compute PSD and ACF with smoothing at PSD edges
                     PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_with_smoothing(
@@ -439,6 +439,8 @@ def main():
                 mismatch_data, optimal_SNR_data, condition_numbers_data,
                 parameters['I/O']['outdir'], direction, M, dL, N_FFT
             )
+
+            print(N_FFT)
 
             postprocess.plot_mismatch_vs_NFFT(
                 N_FFT, N_points,
