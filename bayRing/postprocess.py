@@ -1915,8 +1915,8 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_
         axs[1].set_ylabel("PSD [Hz^-1]")
         axs[1].set_title(f"Smoothed PSD near f_max ({direction.capitalize()})")
         axs[1].set_yscale("log")
-        axs[1].set_xlim(x_min2 * 0.9, x_max2 *1.01)
-        axs[1].set_ylim(y_min2 * 0.02, y_max2 * 1.1)
+        axs[1].set_xlim(x_min2, x_max2)
+        axs[1].set_ylim(y_min2, y_max2)
         #axs[1].set_ylim(1e-46, 1e-41)
         axs[1].grid(True)
 

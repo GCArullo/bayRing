@@ -516,10 +516,10 @@ def smoothing_function(frequencies, values, f_anchor, window_size, target_value,
         smoothing_factor = 1 - np.exp(-(smooth_range - (f_anchor - window_size)) * k)
 
     else:
-        smooth_range     = frequencies[(frequencies >= f_anchor) & (frequencies <= f_anchor + window_size)]
+        smooth_range     = frequencies[(frequencies >= 0) & (frequencies <= f_anchor + window_size)]
         smoothing_factor = 1 - np.exp((smooth_range - (f_anchor + window_size)) * k)
 
-    # Normalizing factor, fo that at f=f_min, or f=f_max, the PSD tends to the target value.   
+    # Normalizing factor, or that at f=f_min, or f=f_max, the PSD tends to the target value.   
     s_norm = 1 - np.exp(- (window_size) * k)
 
     # Apply the smoothing formula
@@ -555,7 +555,7 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
     if direction == 'below':
 
         # Select only the indices in the low-frequency range
-        indices_below = np.where((frequencies >= f_anchor_l) & (frequencies <= f_anchor_l + window_size_DX))
+        indices_below = np.where((frequencies >= 0) & (frequencies <= f_anchor_l + window_size_DX))
 
         # We acceed to the last element (when we have f = f_anchor_l + window_size)
         target_value_l = saturation_DX*max(values[indices_below]) #values[indices_below[0][0]]
@@ -573,7 +573,7 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
     elif direction == 'below-and-above':
 
         # Define indices for both below and above
-        indices_below  = np.where((frequencies >= f_anchor_l) & (frequencies <= f_anchor_l + window_size_DX))
+        indices_below  = np.where((frequencies >= 0) & (frequencies <= f_anchor_l + window_size_DX))
         indices_above  = np.where((frequencies >= f_anchor_h - window_size_SX) & (frequencies <= f_anchor_h))
         
         # Define targets
@@ -591,7 +591,7 @@ def apply_smoothing(frequencies, values, f_anchor_l, f_anchor_h, saturation_DX, 
 
     return values
 
-def apply_C1(frequencies, values, f_start, window_size, n_iterations_C1):
+def apply_C1(frequencies, values, f_start, f_end, n_iterations_C1):
     
     """
     Applies moving average between 3 points in order to C1 the PSD.
@@ -612,15 +612,15 @@ def apply_C1(frequencies, values, f_start, window_size, n_iterations_C1):
     """
 
     # Define the range for concavity control
-    C1_window = window_size*2
-    f_up      = f_start+C1_window
-    f_down    = f_start-C1_window
-    indices   = np.where((frequencies >= f_down) & (frequencies <= f_up))
+    #C1_window = window_size*2
+    #f_up      = f_start+C1_window
+    #f_down    = f_start-C1_window
+    indices   = np.where((frequencies >= f_start) & (frequencies <= f_end))
 
     # Initialize the transition array
     transition = values[indices]
 
-    for n in range(0,n_iterations_C1,1):
+    for n in range(0, n_iterations_C1, 1):
 
         # Apply mild concavity by averaging three consecutive elements
         len_indices=indices[0][:-2]
@@ -680,10 +680,12 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size_DX
     # Extend PSD for f < f_min with a constant value equal to the smoothed value at f_min
     f_below_min = f[f < f_min]
 
+    """
     if len(f_below_min) > 0:
         PSD_below_min                   = np.full_like(f_below_min, saturation_DX*smoothed_PSD[0])
         smoothed_PSD[:len(f_below_min)] = PSD_below_min
-
+    """
+        
     #-----------------------------------------------------C1 fixing------------------------------------------------------------#
 
     if C1_flag==True:
@@ -691,24 +693,28 @@ def acf_from_asd_with_smoothing(asd_path, f_min, f_max, N_points, window_size_DX
         if direction=='below':
 
             # Apply the C1 fixing near f_min + window_low
-            f_transition_start = f_min + window_size_DX
-            smoothed_PSD = apply_C1(f, smoothed_PSD, f_transition_start, window_size_DX, n_iterations_C1)
+            f_start = 0
+            f_end   = f_min + window_size_DX*3
+            smoothed_PSD = apply_C1(f, smoothed_PSD, f_start, f_end, n_iterations_C1)
 
         elif direction=='above':
 
             # Apply the C1 fixing near f_max - window_low
-            f_transition_start = f_max - window_size_SX
-            smoothed_PSD       = apply_C1(f, smoothed_PSD, f_transition_start, window_size_SX, n_iterations_C1)
+            f_start = f_max - window_size_SX*3
+            f_end   = f_max
+            smoothed_PSD       = apply_C1(f, smoothed_PSD, f_start, f_end, n_iterations_C1)
 
         elif direction=='below-and-above':
 
             # Apply the C1 fixing near f_min + window_low
-            f_transition_start = f_min + window_size_DX
-            smoothed_PSD       = apply_C1(f, smoothed_PSD, f_transition_start, window_size_DX, n_iterations_C1)
+            f_start = 0
+            f_end   = f_min + window_size_DX*3
+            smoothed_PSD       = apply_C1(f, smoothed_PSD, f_start, f_end, n_iterations_C1)
 
             # Apply the C1 fixing near f_max - window_low
-            f_transition_start = f_max - window_size_SX
-            smoothed_PSD       = apply_C1(f, smoothed_PSD, f_transition_start, window_size_SX, n_iterations_C1)
+            f_start = f_max - window_size_SX*3
+            f_end   = f_max
+            smoothed_PSD       = apply_C1(f, smoothed_PSD, f_start, f_end, n_iterations_C1)
 
     # ACF for smoothed PSD
     ACF_smoothed = 0.5 * np.real(np.fft.irfft(smoothed_PSD * df)) * N_points
