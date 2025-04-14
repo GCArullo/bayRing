@@ -160,6 +160,8 @@ class WaveformModel(cpnest.model.Model):
                                        noncircular_params      = noncircular_parameters        ,
                                        noncircular_amp_version = self.KerrBinary_amp_nc_version,
 
+                                       modes                   = available_modes_with_given_lm ,
+
                                        geom                    = 1                             ,
                                        qnm_fit                 = 0                             ,
                                        qnm_interpolants        = None                          ,
