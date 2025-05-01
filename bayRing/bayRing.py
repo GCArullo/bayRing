@@ -384,8 +384,6 @@ def main():
                         compare_TD_FD
                     )
 
-                print("Done")
-
                 # Plot mismatch sanity checks
                 if mismatch_section_plot_flag==1:
                     postprocess.mismatch_sanity_checks(NR_sim, 
