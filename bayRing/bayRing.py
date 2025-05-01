@@ -267,7 +267,6 @@ def main():
             try:
 
                 # Print window parameters
-
                 if(apply_window==1):
                     print(f"\n\n\n* Applying window on the PSD with parameters: w_DX={round(window_size_DX,1)}Hz, w_SX={round(window_size_SX,1)}Hz, k={round(k,1)}, saturation_DX={round(saturation_DX,1)}, saturation_SX={round(saturation_SX,1)}, N_FFT={N_fft}")
 
@@ -276,14 +275,14 @@ def main():
                         asd_path,
                         f_min, f_max,
                         N_fft,
-                        window_size_DX=window_size_DX,
-                        window_size_SX=window_size_SX,
-                        k=k,
-                        saturation_DX=saturation_DX,
-                        saturation_SX=saturation_SX,
-                        direction=direction,
-                        C1_flag=C1_flag,
-                        n_iterations_C1=n_iterations_C1
+                        window_size_DX  = window_size_DX,
+                        window_size_SX  = window_size_SX,
+                        k               = k,
+                        saturation_DX   = saturation_DX,
+                        saturation_SX   = saturation_SX,
+                        direction       = direction,
+                        C1_flag         = C1_flag,
+                        n_iterations_C1 = n_iterations_C1
                     )
 
                 else:
@@ -367,7 +366,7 @@ def main():
 
                 if compare_TD_FD:
 
-                    postprocess.compute_optimal_SNR_zeros(
+                    postprocess.compute_optimal_SNR_compare_TD_FD(
                         NR_sim, 
                         results_object, 
                         inference_model, 
@@ -384,6 +383,8 @@ def main():
                         saturation_DX, saturation_SX,
                         compare_TD_FD
                     )
+
+                print("Done")
 
                 # Plot mismatch sanity checks
                 if mismatch_section_plot_flag==1:
@@ -440,18 +441,16 @@ def main():
                 parameters['I/O']['outdir'], direction, M, dL, N_FFT
             )
 
-            print(N_FFT)
-
             postprocess.plot_mismatch_vs_NFFT(
                 N_FFT, N_points,
                 M, dL, t_start_g_true,
-                window_DX_list=window_sizes_DX,
-                window_SX_list=window_sizes_SX,
-                k_list=steepness_values,
-                saturation_DX_list=saturation_DX_values,
-                saturation_SX_list=saturation_SX_values,
-                outdir = parameters['I/O']['outdir'], 
-                direction = direction
+                window_DX_list     = window_sizes_DX,
+                window_SX_list     = window_sizes_SX,
+                k_list             = steepness_values,
+                saturation_DX_list = saturation_DX_values,
+                saturation_SX_list = saturation_SX_values,
+                outdir             = parameters['I/O']['outdir'], 
+                direction          = direction
             )
 
     # Attempt to generate the global corner plot
@@ -464,3 +463,5 @@ def main():
     # Show plots if the option is enabled
     if parameters['I/O']['show-plots']:
         plt.show()
+
+    print(f"\nOutput directory for results: {parameters['I/O']['outdir']}")

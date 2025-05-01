@@ -419,10 +419,10 @@ def extract_and_compute_psd_parameters(psd_dict, mismatch_print_flag):
         print(f"* Loading ASD located at: {asd_path}")
 
         psd_min, psd_max = np.min(asd[mask]**2), np.max(asd[mask]**2)
-        condition_number = psd_max/psd_min
+        
         if(mismatch_print_flag):
             print(f"* ASD parameters: f_min={f_min:.0f}Hz, f_max={f_max:.0f}Hz, dt={dt:.6f}s, df={df:.4f}Hz, N_points={N_points}, T={T:.0f}s")
-            print(f"* min(PSD) = {psd_min:.2e}, max(PSD) = {psd_max:.2e}, condition number = {condition_number:.1f}")
+            print(f"* min(PSD) = {psd_min:.2e}, max(PSD) = {psd_max:.2e}")
 
         # Compute window properties
         window_sizes_DX      = np.linspace(psd_dict['window_DX'], psd_dict['window_DX_max'], psd_dict['n_window_DX']).tolist()

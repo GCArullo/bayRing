@@ -537,15 +537,19 @@ def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_N
 
     # Perform linear interpolation
     interpolator = interp1d(t_ACF_truncated, ACF_truncated, kind='linear', fill_value="extrapolate")
+
+    # Then, resample the truncated ACF with the NR array (expressed in seconds)
     ACF_trunc    = interpolator(t_NR_s)
 
     if print_truncation_info:
 
-        print("Truncation info:")
-        print("ACF time array expr. in [s] (full): ", t_ACF)
-        print("ACF time array expr. in [s] (first half, associated to positive frequencies): ", t_ACF_half)
-        print("Truncated ACF time array expr. in [s] : ", t_ACF_truncated)
-        print("Truncated waveform time array expr. in geometrical units : ", t_NR_s/(M*C_mt))
+        print("\nTruncation info:")
+        print(f"\nt_start[g] = {t_start_g}")
+        print(f"\nt_end[g] = {t_end_g}")
+        print("\nACF time array expr. in [s] (full): ", t_ACF)
+        print("\nACF time array expr. in [s] (first half, associated to positive frequencies): ", t_ACF_half)
+        print("\nTruncated ACF time array expr. in [s] : ", t_ACF_truncated)
+        print("\nTruncated waveform time array expr. in geometrical units : ", t_NR_s/(M*C_mt))
     
     return ACF_trunc
 
@@ -588,7 +592,7 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
     """
 
     # outdir
-    sanity_checks_dir = os.path.join(outdir, 'Algorithm', 'Sanity_Checks')
+    sanity_checks_dir = os.path.join(outdir, 'Algorithm/Mismatch', 'Sanity_Checks')
 
     # create folder
     os.makedirs(sanity_checks_dir, exist_ok=True)
@@ -723,8 +727,6 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
     plt.savefig(os.path.join(sanity_checks_dir, filename))
     plt.close()
 
-    print("Plots saved to:", os.path.join(outdir, 'Algorithm'))
-
     return
 
 def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size, k, compare_TD_FD, sanity_check_mm):
@@ -826,7 +828,7 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
             whiten_whiten_h_NR = sl.solve_toeplitz(acf, NR_data, check_finite=False)
             h_NR_h_NR_sqrt     = np.sqrt(abs(np.dot(NR_data, whiten_whiten_h_NR)))
 
-            if mismatch_print_flag: print(f"<NR|NR>**0.5={h_NR_h_NR_sqrt:.1f}")
+            if mismatch_print_flag: print(f"<NR|NR>**0.5={h_NR_h_NR_sqrt:.3f}")
 
         except Exception as e:
             print(f"Error in NR scalar product for {NR_quant}: {e}")
@@ -854,38 +856,23 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
                 h_wf_h_wf_sqrt     = np.sqrt(abs(np.dot(wf_quant[NR_quant], whiten_whiten_h_wf)))
                 h_wf_h_NR          = np.dot(wf_quant[NR_quant], whiten_whiten_h_NR)
 
-                # Match and mismatch computations
-                TD_match    = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
+                # Match computation
+                TD_match    = abs(h_wf_h_NR) / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
+
+                # Avoid numerical overflow correction
+                TD_match    = np.minimum(1 - abs(1 - TD_match), TD_match)
+
+                # Mismatch computation
                 TD_mismatch = 1 - TD_match
 
                 if mismatch_print_flag:
-                    print(f"<h|h>**0.5={h_wf_h_wf_sqrt:.1f}")
-                    print(f"<h|NR>={h_wf_h_NR:.1f}")
+                    print(f"<h|h>**0.5={h_wf_h_wf_sqrt:.3f}")
+                    print(f"<h|NR>={h_wf_h_NR:.3f}")
 
                 if(perc==50): print(f"* Time-domain mismatch (h {NR_quant}): {TD_mismatch}")
 
                 with open(outFile_path, 'a') as outFile_mismatch:
-                    outFile_mismatch.write(f'{perc}\t{NR_quant}\t{TD_mismatch}\n')
-
-                if compare_TD_FD:
-
-                    mismatch_filename_fd = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}.txt"
-                    outFile_path_fd      = os.path.join(outdir, 'Algorithm/Mismatch', mismatch_filename_fd)
-
-                    with open(outFile_path_fd, 'w') as outFile_mismatch_fd:
-                        outFile_mismatch_fd.write('#CI\tStrain_data\tFD_Mismatch\n')
-
-                    psd   = convert_asd_to_pycbc_psd(asd_file, f_min, f_max, delta_f=2*f_max/len(acf))
-                    h_TS  = TimeSeries(wf_quant[NR_quant], delta_t=1/(2*f_max))
-                    NR_TS = TimeSeries(NR_data, delta_t=1/(2*f_max))
-
-                    FD_match_m = float(compute_FD_match(h_TS, NR_TS, psd=psd, low_frequency_cutoff=f_min, high_frequency_cutoff=f_max)[0])
-                    FD_mismatch = 1 - FD_match_m
-
-                    print(f"* Frequency-domain mismatch={FD_mismatch}")
-
-                    with open(outFile_path_fd, 'a') as outFile_mismatch_fd:
-                        outFile_mismatch_fd.write(f'{perc}\t{NR_quant}\t{FD_mismatch}\n')
+                    outFile_mismatch.write(f'{perc}\t{NR_quant}\t{TD_mismatch}\n')    
 
             except Exception as e:
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
@@ -955,7 +942,7 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
     """
     Compute the optimal SNR of the model waveform.
     """
-    print(f"* Optimal SNR computation for plus and cross polarizations assuming: M={M}, D_L={dL}.")
+    print(f"\n* Optimal SNR computation for plus and cross polarizations assuming: M={M}, D_L={dL}.")
 
     # File paths for saving results
     optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
@@ -989,24 +976,18 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
 
                 if(perc==50): print(f"* Optimal TD SNR (h {NR_quant}): {optimal_SNR_TD}")
 
-                if compare_TD_FD:
-                    h_TS = TimeSeries(wf_int, delta_t=1/(2*f_max))
-                    optimal_SNR_FD = compute_FD_optimal_SNR(asd_file, h_TS, len(acf), f_min, f_max)
-
-                    print("Optimal FD SNR: ", optimal_SNR_FD)
-
-                    with open(outFile_path_fd, 'a') as outFile_SNR_fd:
-                        outFile_SNR_fd.write(f'{perc}\t{NR_quant}\t{optimal_SNR_FD}\n')
-
             except Exception as e:
                 print(f"Error processing optimal SNR for {perc}% CI and {NR_quant}: {e}")
                 continue
 
-def compute_optimal_SNR_zeros(NR_sim, results, inference_model, outdir, method, acf, acf_tot, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, compare_TD_FD):
+def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, method, acf, acf_tot, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, compare_TD_FD, downsampling_factor=10):
     """
     Compute the optimal SNR of the model waveform.
+    
+    Parameters:
+        downsampling_factor (int): The factor by which the waveform will be downsampled. Default is 10.
     """
-    print("\nProcessing optimal SNR computation for plus and cross polarizations.\n")
+    print("\nProcessing optimal SNR computation (with TD/FD check) for plus and cross polarizations.\n")
 
     # File paths for saving results
     optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
@@ -1014,46 +995,44 @@ def compute_optimal_SNR_zeros(NR_sim, results, inference_model, outdir, method, 
     outFile_path = os.path.join(outdir, 'Algorithm/Mismatch', optimal_SNR_filename)
     outFile_path_fd = os.path.join(outdir, 'Algorithm/Mismatch', optimal_SNR_filename_fd)
 
+    # Open output files to write results
     with open(outFile_path, 'w') as outFile_SNR, open(outFile_path_fd, 'w') as outFile_SNR_fd:
         outFile_SNR.write('#CI\tStrain_data\tOptimal_SNR\n')
         outFile_SNR_fd.write('#CI\tStrain_data\tOptimal_SNR_FD\n')
 
+    # Calculate NR (Noise Reduction) values
     NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
     NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
     NR_dict = {'real': NR_r, 'imag': NR_i}
 
+    # Loop through the real and imaginary NR data
     for NR_quant, NR_data in NR_dict.items():
-
         for perc in [5, 50, 95]:
             try:
+                # Extract the percentiles of the real and imaginary parts of the model waveform
                 wf_r = np.percentile([np.real(np.array(inference_model.model(p))) for p in results], [perc], axis=0)[0]
                 wf_i = np.percentile([np.imag(np.array(inference_model.model(p))) for p in results], [perc], axis=0)[0]
 
+                # Scale the waveforms according to physical parameters
                 wf_r *= (C_md * M) / dL
                 wf_i *= (C_md * M) / dL
+
+                # Interpolate the waveform based on the start and end times
                 wf_int = interpolate_waveform(t_start_g, t_end_g, M, wf_lNR=wf_r if NR_quant == "real" else wf_i, acf=acf_tot)
 
+                # Pad the downsampled waveform to match the length of acf_tot if necessary
                 if len(wf_int) < len(acf_tot):
-                        pad_width = len(acf_tot) - len(wf_int)
-                        wf_int = np.pad(wf_int, (0, pad_width))
-                        #print("padded")
+                    pad_width = len(acf_tot) - len(wf_int)
+                    wf_int = np.pad(wf_int, (0, pad_width))
 
-                #print(len(wf_int), len(acf), len(acf_tot))
-
-                optimal_SNR_TD = np.sqrt(abs(np.dot(wf_int, sl.solve_toeplitz(acf_tot, wf_int, check_finite=False))))
-
-                with open(outFile_path, 'a') as outFile_SNR:
-                    outFile_SNR.write(f'{perc}\t{NR_quant}\t{optimal_SNR_TD}\n')
-
-                #print(len(acf_tot))
+                # Create a TimeSeries object for FD (Frequency Domain) calculation
                 h_TS = TimeSeries(wf_int, delta_t=1/(2*f_max))
+
+                # Compute the optimal SNR in the frequency domain (FD)
                 optimal_SNR_FD = compute_FD_optimal_SNR(asd_file, h_TS, len(acf_tot), f_min, f_max)
 
-                print("Optimal TD SNR: ", optimal_SNR_TD)
-                print("Optimal FD SNR: ", optimal_SNR_FD)
-
-                #with open(outFile_path_fd, 'a') as outFile_SNR_fd:
-                #outFile_SNR_fd.write(f'{perc}\t{NR_quant}\t{optimal_SNR_FD}\n')
+                # Print the results for the optimal SNR in FD
+                print(f"Optimal FD SNR for perc {perc}, {NR_quant} part: {optimal_SNR_FD}")
 
             except Exception as e:
                 print(f"Error processing optimal SNR for {perc}% CI and {NR_quant}: {e}")
@@ -1717,7 +1696,7 @@ def plot_multiple_psd(psd_data, f_min, f_max, outdir, direction, window):
     try:
         # Determine subfolder based on direction
         subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-        save_path = os.path.join(outdir, "Algorithm", subfolder)
+        save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
         os.makedirs(save_path, exist_ok=True)
 
         # Set x-axis range based on direction
@@ -1779,7 +1758,7 @@ def plot_psd_and_acf(psd_data, acf_data, asd_filepath, f_min, f_max, outdir, dir
 
         # Determine subfolder based on smoothing direction
         subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-        save_path = os.path.join(outdir, "Algorithm", subfolder)
+        save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
 
         # Clear the directory if it exists, otherwise create it
         os.makedirs(save_path, exist_ok=True)
@@ -1850,7 +1829,8 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_
         psd_data (dict): Dictionary where keys are labels (str) and values are PSD arrays (np.ndarray).
         f_min (float): Minimum frequency.
         f_max (float): Maximum frequency.
-        window_size (float): The smoothing window size.
+        window_size_DX (float): The smoothing window size on the left of f_min.
+        window_size_SX (float): The smoothing window size on the right of f_max.
         outdir (str): Output directory for saving the plot.
         direction (str): 'below', 'above', or 'below-and-above' to distinguish between smoothing directions.
 
@@ -1858,9 +1838,6 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_
         None
     """
     try:
-        # Define fixed colors
-        colbBlue = "#4477AA"  # Base color for PSD
-        colbRed = "#EE6677"   # Alternative color if needed
 
         # Determine subfolder based on smoothing direction
         subfolder = {
@@ -1869,7 +1846,7 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_
             "below-and-above": "Both_edges_smoothing"
         }.get(direction, "Unknown_smoothing")
 
-        save_path = os.path.join(outdir, "Algorithm", subfolder)
+        save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
         os.makedirs(save_path, exist_ok=True)
 
         # Set x-axis limits for zoomed regions
@@ -1892,15 +1869,19 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_
             y_min1, y_max1 = PSD_smoothed[idx_min1], PSD_smoothed[idx_max1]
             y_min2, y_max2 = PSD_smoothed[idx_min2], PSD_smoothed[idx_max2]
 
-            # Re-order y-lims
+            # Re-order y-lims for valid ranges
             y_min1, y_max1 = min(y_min1, y_max1), max(y_min1, y_max1)
             y_min2, y_max2 = min(y_min2, y_max2), max(y_min2, y_max2)
+
+            # Prevent identical y-limits for the second subplot (f_max)
+            if y_min2 == y_max2:
+                y_max2 += 1e-5  # Add a small offset to create a valid range
 
             # Plot for both subplots with alpha variation
             axs[0].plot(freq, PSD_smoothed, label=label, linewidth=1.5, color=colbBlue, alpha=alpha)
             axs[1].plot(freq, PSD_smoothed, label=label, linewidth=1.5, color=colbRed, alpha=alpha)
 
-        # Adjust subplot 1 (f_min)
+        # Adjust subplot 1 (near f_min)
         axs[0].set_xlabel("Frequency [Hz]")
         axs[0].set_ylabel("PSD [Hz^-1]")
         axs[0].set_title(f"Smoothed PSD near f_min ({direction.capitalize()})")
@@ -1910,17 +1891,20 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_
         axs[0].set_ylim(y_min1 * 0.5, y_max1 * 2)
         axs[0].grid(True)
 
-        # Adjust subplot 2 (f_max)
+        # Adjust subplot 2 (near f_max)
         axs[1].set_xlabel("Frequency [Hz]")
         axs[1].set_ylabel("PSD [Hz^-1]")
         axs[1].set_title(f"Smoothed PSD near f_max ({direction.capitalize()})")
         axs[1].set_yscale("log")
+
+        # Prevent identical x-limits for the second subplot (f_max)
+        if x_min2 == x_max2:
+            x_max2 += 1e-5  # Add a small offset to create a valid range
+
+        # Set x-limits and y-limits for the second subplot
         axs[1].set_xlim(x_min2, x_max2)
         axs[1].set_ylim(y_min2, y_max2)
-        #axs[1].set_ylim(1e-46, 1e-41)
         axs[1].grid(True)
-
-        # TO IMPROVE: fix the limits of the axes.
 
         # Adjust layout and save the plot
         plt.tight_layout()
@@ -1928,7 +1912,6 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_
         path = os.path.join(save_path, filename)
         plt.savefig(path)
         plt.close(fig)
-        print(f"\nSaved PSD plots near f_min and f_max to {path}.\n")
 
     except Exception as e:
         print(f"Failed to generate PSD plots near f_min and f_max ({direction}): {e}")
@@ -1937,7 +1920,7 @@ def plot_acf_interpolated(t_array, t_trunc, ACF_smoothed, truncated_acf, outdir,
 
     # Determine subfolder based on direction
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
 
     # Create the plot
@@ -1964,7 +1947,7 @@ def plot_mismatch_by_window_DX(mismatch_data, outdir, direction, M, dL, N_fft):
     components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     for N_FFT in N_fft:
@@ -1994,7 +1977,7 @@ def plot_mismatch_by_window_SX(mismatch_data, outdir, direction, M, dL, N_fft):
     components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     for N_FFT in N_fft:
@@ -2024,7 +2007,7 @@ def plot_optimal_SNR_by_window_DX(optimal_SNR_data, outdir, direction, M, dL, N_
     components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     for N_FFT in N_fft:
@@ -2054,7 +2037,7 @@ def plot_optimal_SNR_by_window_SX(optimal_SNR_data, outdir, direction, M, dL, N_
     components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     for N_FFT in N_fft:
@@ -2082,7 +2065,7 @@ def plot_condition_number_by_window_DX(condition_numbers, outdir, direction, M, 
     Plot condition number against window_size_DX.
     """
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     for N_FFT in N_fft:
@@ -2108,7 +2091,7 @@ def plot_condition_number_by_window_SX(condition_numbers, outdir, direction, M, 
     Plot condition number against window_size_SX.
     """
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     for N_FFT in N_fft:
@@ -2136,7 +2119,7 @@ def plot_mismatch_by_k(mismatch_data, outdir, direction, M, dL, N_fft):
     components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in mismatch_data.keys()))
@@ -2176,7 +2159,7 @@ def plot_optimal_SNR_by_k(optimal_SNR_data, outdir, direction, M, dL, N_fft):
     components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in optimal_SNR_data.keys()))
@@ -2214,7 +2197,7 @@ def plot_condition_number_by_k(condition_numbers, outdir, direction, M, dL, N_ff
     Plot the condition number of the ACF Toeplitz matrix by varying k, keeping window sizes, saturation_DX, and saturation_SX fixed.
     """
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in condition_numbers.keys()))
@@ -2252,7 +2235,7 @@ def plot_mismatch_by_saturation_DX(mismatch_data, outdir, direction, M, dL, N_ff
     components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in mismatch_data.keys()))
@@ -2292,7 +2275,7 @@ def plot_optimal_SNR_by_saturation_DX(optimal_SNR_data, outdir, direction, M, dL
     components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in optimal_SNR_data.keys()))
@@ -2330,7 +2313,7 @@ def plot_condition_number_by_saturation_DX(condition_numbers, outdir, direction,
     Plot the condition number of the ACF Toeplitz matrix by varying saturation_DX, keeping window sizes, k, and saturation_SX fixed.
     """
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in condition_numbers.keys()))
@@ -2368,7 +2351,7 @@ def plot_mismatch_by_saturation_SX(mismatch_data, outdir, direction, M, dL, N_ff
     components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in mismatch_data.keys()))
@@ -2408,7 +2391,7 @@ def plot_optimal_SNR_by_saturation_SX(optimal_SNR_data, outdir, direction, M, dL
     components = ['real', 'imag']
     percentiles = [50]
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in optimal_SNR_data.keys()))
@@ -2446,7 +2429,7 @@ def plot_condition_number_by_saturation_SX(condition_numbers, outdir, direction,
     Plot the condition number of the ACF Toeplitz matrix by varying saturation_SX, keeping window sizes, k, and saturation_DX fixed.
     """
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
     
     window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in condition_numbers.keys()))
@@ -2526,7 +2509,7 @@ def plot_condition_numbers(outdir, condition_numbers, thresholds=(1e3, 1e6)):
     os.makedirs(outdir, exist_ok=True)
     plot_file_path = os.path.join(outdir, "Algorithm/Condition_Numbers_Plot.pdf")
     plt.savefig(plot_file_path)
-    print(f"Condition number plot saved to {plot_file_path}")
+    #print(f"Condition number plot saved to {plot_file_path}")
 
 def plot_mismatch_optimal_SNR_condition_number_window_parameters(mismatch_data, optimal_SNR_data, condition_numbers, outdir, direction, M, dL, N_FFT):
     """
@@ -2595,7 +2578,7 @@ def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX
     """
 
     subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm", subfolder)
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
     os.makedirs(save_path, exist_ok=True)
 
     for (window_DX, window_SX, k, satDX, satSX) in product(
