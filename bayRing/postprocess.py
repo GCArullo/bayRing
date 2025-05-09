@@ -395,10 +395,11 @@ def compare_with_GR_QNMs(results_object, qnm_cached, NR_sim, outdir):
 
     return
 
-def compute_FD_optimal_SNR(asd_file, h, n, f_min, f_max):
+def compute_pycbc_optimal_SNR(asd_file, h, n, f_min, f_max, delta_f):
 
     # Ensure PSD matches the waveform's `delta_f`
-    delta_f = 2*f_max/n
+    #delta_f = 2*f_max/n
+    n= 2*f_max/delta_f
     psd     = from_txt(
                         filename        = asd_file,
                         length          = n,
@@ -408,7 +409,7 @@ def compute_FD_optimal_SNR(asd_file, h, n, f_min, f_max):
                     )
 
     h_tilde = h.to_frequencyseries(delta_f=delta_f)
-    fd_snr  = sigma(h_tilde, psd=psd, low_frequency_cutoff=f_min)
+    fd_snr  = sigma(h_tilde, psd=psd, low_frequency_cutoff=f_min, high_frequency_cutoff=f_max)
 
     return fd_snr
 
@@ -980,7 +981,7 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
                 print(f"Error processing optimal SNR for {perc}% CI and {NR_quant}: {e}")
                 continue
 
-def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, method, acf, acf_tot, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, compare_TD_FD, downsampling_factor=10):
+def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, method, acf, acf_tot, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, delta_f, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX):
     """
     Compute the optimal SNR of the model waveform.
     
@@ -1025,13 +1026,19 @@ def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, 
                     pad_width = len(acf_tot) - len(wf_int)
                     wf_int = np.pad(wf_int, (0, pad_width))
 
-                # Create a TimeSeries object for FD (Frequency Domain) calculation
+                # Time series
+                T = 1/delta_f
                 h_TS = TimeSeries(wf_int, delta_t=1/(2*f_max))
 
-                # Compute the optimal SNR in the frequency domain (FD)
-                optimal_SNR_FD = compute_FD_optimal_SNR(asd_file, h_TS, len(acf_tot), f_min, f_max)
+                h_TS.start_time = t_start_g * C_mt * M
 
-                # Print the results for the optimal SNR in FD
+                # Compute the optimal SNR in the frequency domain (FD)
+                optimal_SNR_FD = compute_pycbc_optimal_SNR(asd_file, h_TS, len(acf_tot), f_min, f_max, delta_f)
+
+                # Print the results for the optimal SNR in FD (and TD, but untill a certain point, or computations can be heavy)
+                if T<0.5:
+                    optimal_SNR_TD = np.sqrt(abs(np.dot(wf_int, sl.solve_toeplitz(acf_tot, wf_int, check_finite=False))))
+                    print(f"Optimal TD SNR for perc {perc}, {NR_quant} part: {optimal_SNR_TD}")
                 print(f"Optimal FD SNR for perc {perc}, {NR_quant} part: {optimal_SNR_FD}")
 
             except Exception as e:
@@ -1931,8 +1938,8 @@ def plot_acf_interpolated(t_array, t_trunc, ACF_smoothed, truncated_acf, outdir,
     plt.plot(t_trunc,truncated_acf,label="Truncated ACF",linestyle="dotted", color=colbRed)
     plt.legend()
     plt.xlabel("t [s]")
-    plt.xlim(t_trunc[0],t_trunc[-1]*1.5)
-    plt.ylim(min(ACF_smoothed)*0.8, max(ACF_smoothed)*1.2)
+    plt.xlim(t_trunc[0],t_trunc[-1])
+    plt.ylim(min(ACF_smoothed)*0.99999, max(ACF_smoothed)*1.00001)
 
     # Save the plot
     filename = f"Truncated_ACF_wDX={round(window_size_DX,1)}Hz_wSX={round(window_size_SX,1)}Hz_k={round(k,3)}_sat_DX={round(saturation_DX,0)}_sat_SX={round(saturation_SX,0)}.pdf"

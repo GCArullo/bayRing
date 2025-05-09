@@ -136,7 +136,7 @@ class WaveformModel(cpnest.model.Model):
         else                                  : noncircular_parameters = {}
 
         KerrBinary_params['Mi'], KerrBinary_params['eta'], KerrBinary_params['chis'], KerrBinary_params['chia'] = pyr_utils.compute_KerrBinary_binary_quantities(self.metadata['m1'], self.metadata['m2'], self.metadata['chi1'], self.metadata['chi2'])  
-
+        
         phi_value = utils.get_param_override(fixed_params,params,'phi')
 
         available_modes_with_given_lm = utils.filter_dict_by_key(pyr_utils.available_modes_dict_KerrBinary[self.KerrBinary_version], (self.l_NR,self.m_NR))

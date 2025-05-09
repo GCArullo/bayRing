@@ -1,5 +1,5 @@
 # General python imports
-import h5py, numpy as np, os, pandas as pd
+import h5py, numpy as np, os, pandas as pd, subprocess
 from scipy import interpolate
 
 import sxs
@@ -13,6 +13,25 @@ import pyRing.utils           as pyRing_utils
 import pyRing.waveform        as wf
 
 twopi = 2.*np.pi
+
+def get_sxs_version():
+    """
+    Get the installed version of the sxs package.
+
+    Returns
+    -------
+    str
+        The installed version of sxs.
+    """
+    try:
+        # Use pip to get the version of sxs installed
+        version_output = subprocess.check_output(['pip', 'show', 'sxs'], text=True)
+        for line in version_output.split('\n'):
+            if line.startswith('Version:'):
+                return line.split(' ')[1]
+    except subprocess.CalledProcessError:
+        print("Error while checking sxs version.")
+        return None
 
 def read_fake_NR(NR_catalog, fake_NR_modes):
 
@@ -565,6 +584,7 @@ class NR_simulation():
                  l                                              , 
                  m                                              , 
                  outdir                                         , 
+                 sxs_installed_version                          ,
                  waveform_type  = 'strain'                      ,
                  download       = False                         , 
                  NR_error       = 'align-with-mismatch-res-only', 
@@ -592,6 +612,7 @@ class NR_simulation():
         self.NR_dir                   = NR_dir
         self.additional_NR_properties = additional_NR_properties
         self.outdir                   = outdir
+        self.sxs_installed_version    = sxs_installed_version
 
         self.fake_NR_modes            = injection_modes_list
         self.injection_noise          = injection_noise
@@ -731,6 +752,7 @@ class NR_simulation():
         
             self.download = download
             self.q, self.chi1, self.chi2, self.tilt1, self.tilt2, self.ecc, self.Mf, self.af = self.read_SXS_metadata()
+            
             try:
                 self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = self.load_SXS_addn_metadata(csv_path=self.additional_NR_properties, ID_str=self.NR_ID)
             except:
@@ -1270,7 +1292,7 @@ class NR_simulation():
 
         """
 
-        Read the metadata of the SXS waveform.
+        Read the metadata of the SXS waveform (with latest version released on 25th April 2025).
 
         Parameters
         ----------
@@ -1299,8 +1321,14 @@ class NR_simulation():
 
         """
         
-        metadata      = sxs.load("SXS:BBH:{}/Lev/metadata.json".format(self.NR_ID), download=self.download)
-        
+        sxs_uploaded_cat_version = "2025.0.10"
+
+        if self.sxs_installed_version < sxs_uploaded_cat_version: 
+            metadata    = sxs.load("SXS:BBH:{}/Lev/metadata.json".format(self.NR_ID), download=self.download)
+        else:
+            simulations = sxs.load("simulations")
+            metadata    = simulations["SXS:BBH:{}".format(self.NR_ID)]
+
         tilt1, tilt2  = 0.0, 0.0
 
         q, Mf            = metadata['reference_mass_ratio'], metadata['remnant_mass']
@@ -1553,9 +1581,15 @@ class NR_simulation():
             Imaginary part of the (l,m) mode.
 
         """
-        
-        waveform = sxs.load("SXS:BBH:{}/Lev{}/rhOverM_Asymptotic_GeometricUnits_CoM.h5".format(self.NR_ID, LevRes), extrapolation_order=ExtOrd, download=self.download)
-        
+
+        sxs_updated_version = "2025.0.10"
+
+        if self.sxs_installed_version < sxs_updated_version:
+            waveform = sxs.load("SXS:BBH:{}/Lev{}/rhOverM_Asymptotic_GeometricUnits_CoM.h5".format(self.NR_ID, LevRes), extrapolation_order=ExtOrd, download=self.download)
+        else:
+            ExtOrd = "N"+str(ExtOrd)
+            waveform = sxs.load("SXS:BBH:{}/Lev{}".format(self.NR_ID, LevRes), extrapolation_order=ExtOrd, download=self.download).h
+
         time        = waveform.t
         mode_index  = waveform.index(self.l, self.m)
         waveform_lm = waveform[:, mode_index]

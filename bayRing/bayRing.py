@@ -95,6 +95,7 @@ def main():
                                              parameters['NR-data']['l-NR']                          , 
                                              parameters['NR-data']['m']                             , 
                                              parameters['I/O']['outdir']                            ,
+                                             parameters['NR-data']['sxs_installed_version']         , 
                                              waveform_type  = parameters['NR-data']['waveform-type'], 
                                              download       = parameters['NR-data']['download']     , 
                                              NR_error       = parameters['NR-data']['error']        , 
@@ -237,7 +238,7 @@ def main():
     apply_window, compare_TD_FD, clear_directory, C1_flag, mismatch_print_flag, mismatch_section_plot_flag = wf_utils.extract_flags(parameters['Flags'])
 
     # Load PSD parameters
-    f_min, f_max, dt, _, N_points, n_FFT_points, asd_path, n_iterations_C1, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values, direction = wf_utils.extract_and_compute_psd_parameters(parameters['Mismatch-PSD-settings'], mismatch_print_flag)
+    f_min, f_max, dt, delta_f, N_points, n_FFT_points, asd_path, n_iterations_C1, window_sizes_DX, window_sizes_SX, steepness_values, saturation_DX_values, saturation_SX_values, direction = wf_utils.extract_and_compute_psd_parameters(parameters['Mismatch-PSD-settings'], mismatch_print_flag)
 
     # Choose if iterate or not on N_FFT
     N_FFT = [N_points] if n_FFT_points == 1 else list(map(int, np.logspace(np.log10(NR_length), np.log10(2*N_points), n_FFT_points)))
@@ -377,11 +378,10 @@ def main():
                         N_fft,
                         M, dL,
                         t_start_g_true, t_end_g,
-                        f_min, f_max,
+                        f_min, f_max, delta_f,
                         asd_path,
                         window_size_DX, window_size_SX, k,
-                        saturation_DX, saturation_SX,
-                        compare_TD_FD
+                        saturation_DX, saturation_SX
                     )
 
                 # Plot mismatch sanity checks
