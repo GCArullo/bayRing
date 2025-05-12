@@ -89,24 +89,25 @@ def read_config(Config):
 
         'NR-data':
         {
-        'download'         : 1,
-        'dir'              : '',
-        'catalog'          : 'SXS',
-        'ID'               : '0305',
-        'extrap-order'     : 2,
-        'res-level'        : -1,
-        'res-nx'           : 0,   
-        'res-nl'           : 0,  
-        'pert-order'       : 'lin', 
-        'l-NR'             : 2,
-        'm'                : 2,
-        'error'            : 'align-with-mismatch-res-only',
-        'error-t-min'      : 3e-1,
-        'error-t-max'      : 4e-3,
-        'add-const'        : '0.0,0.0',
-        'properties-file'  : '',
-        't-peak-22'        : 0.0,
-        'waveform-type'    : 'strain',
+        'download'             : 1,
+        'dir'                  : '',
+        'catalog'              : 'SXS',
+        'sxs_installed_version': '2025.0.10',
+        'ID'                   : '0305',
+        'extrap-order'         : 2,
+        'res-level'            : -1,
+        'res-nx'               : 0,   
+        'res-nl'               : 0,  
+        'pert-order'           : 'lin', 
+        'l-NR'                 : 2,
+        'm'                    : 2,
+        'error'                : 'align-with-mismatch-res-only',
+        'error-t-min'          : 3e-1,
+        'error-t-max'          : 4e-3,
+        'add-const'            : '0.0,0.0',
+        'properties-file'      : '',
+        't-peak-22'            : 0.0,
+        'waveform-type'        : 'strain',
         },
 
         'Injection-data':
@@ -287,54 +288,56 @@ A dot is present at the end of each description line and is not to be intended a
     * Parameters to be passed to the [NR-data] section. *
     *****************************************************
 
-        download         Boolean to ask for the download of the requested SXS NR simulation.                                 Default 1.
+        download                Boolean to ask for the download of the requested SXS NR simulation.                                 Default 1.
         
-        dir              Absolute path of NR local data.                                                                     Default: ''.
+        dir                     Absolute path of NR local data.                                                                     Default: ''.
         
-        catalog          NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'fake_NR']. Default: 'SXS'.
+        catalog                 NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'fake_NR']. Default: 'SXS'.
         
-        ID               Simulation ID to be considered. Example for SXS: 0305. Example for Teukolsky: \
-                         `a_0.7_A_0.141_w_1.4_ingoing_ang_15`.                                                               Default: 0305.
+        sxs_installed_version   Version of the sxs package.                                                                         Default: "2025.0.10".
+
+        ID                      Simulation ID to be considered. Example for SXS: 0305. Example for Teukolsky: \
+                                `a_0.7_A_0.141_w_1.4_ingoing_ang_15`.                                                               Default: 0305.
         
-        extrap-order     Extrapolation order of the `SXS` simulations. Smaller N is better for ringdown \
-              (data.black-holes.org/waveforms/index.html). Available options: ['2', '3', '4'].                               Default: 2.
+        extrap-order            Extrapolation order of the `SXS` simulations. Smaller N is better for ringdown \
+                     (data.black-holes.org/waveforms/index.html). Available options: ['2', '3', '4'].                               Default: 2.
         
-        res-level        Resolution level of the simulation. For `SXS`: -1 selects the maximum available resolution. \
-              Available values for Teukosly data: [1,...,9] (lowest to highest). Fixes `res-nx` and `res-nl`.                Default: -1.
+        res-level               Resolution level of the simulation. For `SXS`: -1 selects the maximum available resolution. \
+                     Available values for Teukosly data: [1,...,9] (lowest to highest). Fixes `res-nx` and `res-nl`.                Default: -1.
         
-        res-nx           Number of collocation points in the radial direction [only for Teukolsky data]. \
-            Overwrites `res-level`.                                                                                          Default: 0. 
+        res-nx                  Number of collocation points in the radial direction [only for Teukolsky data]. \
+                   Overwrites `res-level`.                                                                                          Default: 0. 
         
-        res-nl           Number of collocation points in the angular direction [only for Teukolsky data]. \
-            Overwrites `res-level`.                                                                                          Default: 0.
+        res-nl                  Number of collocation points in the angular direction [only for Teukolsky data]. \
+                   Overwrites `res-level`.                                                                                          Default: 0.
         
-        pert-order       Perturbation order to consider in Teukolsky data. Available options: ['lin', 'scd'].                Default: `lin`.
+        pert-order              Perturbation order to consider in Teukolsky data. Available options: ['lin', 'scd'].                Default: `lin`.
         
-        l-NR             Polar NR spherical index to be fitted, possibly different than QNM ones, \
-            since mixing between different l happens.                                                                        Default: 2.
+        l-NR                    Polar NR spherical index to be fitted, possibly different than QNM ones, \
+                   since mixing between different l happens.                                                                        Default: 2.
         
-        m                Angular spherical index to be fitted (same for IMR and QNMs), since only modes with same m do mix.  Default: 2.
+        m                       Angular spherical index to be fitted (same for IMR and QNMs), since only modes with same m do mix.  Default: 2.
         
-        error            Method to compute the NR error. Available options for `SXS`: \
-                         ['constant-X', 'align-with-mismatch-all', 'align-with-mismatch-res-only', 'align-at-peak'], \
-                         for `Teukolsky`: ['constant-X', 'resolution'] where X is the constant value selected by the user, \
-                         for `RIT`: ['constant-X', 'late-time-const-error']. For 'fake_NR': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
-                         deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-res-only'.
+        error                   Method to compute the NR error. Available options for `SXS`: \
+                                ['constant-X', 'align-with-mismatch-all', 'align-with-mismatch-res-only', 'align-at-peak'], \
+                                for `Teukolsky`: ['constant-X', 'resolution'] where X is the constant value selected by the user, \
+                                for `RIT`: ['constant-X', 'late-time-const-error']. For 'fake_NR': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
+                                deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-res-only'.
         
-        error-t-min      Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_min_mm = t_peak * (1-`error-t-min`). Default: 3e-1.
+        error-t-min             Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_min_mm = t_peak * (1-`error-t-min`). Default: 3e-1.
         
-        error-t-max      Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_max_mm = t_peak * (1-`error-t-max`). Default: 4e-3.
+        error-t-max             Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_max_mm = t_peak * (1-`error-t-max`). Default: 4e-3.
         
-        add-const        Parameter of the complex constant to be added to the fit template. Required to account for spurious \
-                         effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.
+        add-const               Parameter of the complex constant to be added to the fit template. Required to account for spurious \
+                                effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.
         
-        properties-file  Path to the file containing additional properties of the NR simulation in `.csv` format. \
-                         Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
+        properties-file         Path to the file containing additional properties of the NR simulation in `.csv` format. \
+                                Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
         
-        t-peak-22        Time of the peak of the 22 mode. Used as reference time in KerrBinary model. Must be passed when \
-                         fitting HMs with KerrBinary.                                                                        Default: 0.0.                         
+        t-peak-22               Time of the peak of the 22 mode. Used as reference time in KerrBinary model. Must be passed when \
+                                fitting HMs with KerrBinary.                                                                        Default: 0.0.                         
         
-        waveform-type    Type of waveform to be used. Available options: ['strain', 'psi4'].                                 Default: 'strain'.
+        waveform-type           Type of waveform to be used. Available options: ['strain', 'psi4'].                                 Default: 'strain'.
 
     ************************************************************
     * Parameters to be passed to the [Injection-data] section. *

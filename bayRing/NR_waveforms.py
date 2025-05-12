@@ -759,17 +759,42 @@ class NR_simulation():
                 self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = None, None, None, None
 
             # Build NR waveform and time axis.
-            if(self.res_level==-1):
-                for res_level_x in [6,5,4,3,2,1]:
+            if self.res_level == -1:
+                # We add a maximum number of attempts to avoid the infinite loop
+
+                # Max attempts corresponding to the 6 resolution levels
+                max_attempts = 6
+
+                # Counter for the number of attempts
+                attempts = 0
+
+                # Loop through each resolution level from 6 down to 1
+                for res_level_x in [6, 5, 4, 3, 2, 1]:
                     try:
+
+                        # Attempt to read the waveform for the current resolution level
                         self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_SXS(self.extrap_order, res_level_x)
+                        
+                        # Set the resolution level if successful
                         self.res_level = res_level_x
+                        print("\n* Resolution found at level: {}\n".format(self.res_level))
+
+                        # Exit the loop if the level is valid and waveform is loaded
                         break
-                    except:
-                        pass
-                print("\n* Setting the resolution level to the maximum available: {}\n".format(self.res_level))
+                    except Exception as e:
+
+                        # If an error occurs (e.g., file not found or data issues), increment the attempt count
+                        attempts += 1
+                        print(f"Error in attempt {attempts} with resolution level {res_level_x}: {e}")
+                        
+                        # If we reach the maximum number of attempts, break the loop and stop trying
+                        if attempts >= max_attempts:
+                            print("\n* Unable to find a valid resolution level. Stopping attempts.")
+                            break
             else:
+                # If a valid resolution level is already set, load the waveform with that resolution level
                 self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level)
+
 
             counter = 1
             while(not(counter==0)):
