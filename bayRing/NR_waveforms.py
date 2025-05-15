@@ -1352,6 +1352,7 @@ class NR_simulation():
             metadata    = sxs.load("SXS:BBH:{}/Lev/metadata.json".format(self.NR_ID), download=self.download)
         else:
             simulations = sxs.load("simulations", local=True)
+            print("Loaded simulations in local.")
             metadata    = simulations["SXS:BBH:{}".format(self.NR_ID)]
 
         tilt1, tilt2  = 0.0, 0.0
