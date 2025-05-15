@@ -3,6 +3,7 @@ import h5py, numpy as np, os, pandas as pd, subprocess
 from scipy import interpolate
 
 import sxs
+#import sxscatalog
 try   : from cbhdb import simulation
 except: pass
 
@@ -1345,13 +1346,12 @@ class NR_simulation():
             Final dimensionless spin of the remnant black hole.
 
         """
-        
         sxs_uploaded_cat_version = "2025.0.10"
 
         if self.sxs_installed_version < sxs_uploaded_cat_version: 
             metadata    = sxs.load("SXS:BBH:{}/Lev/metadata.json".format(self.NR_ID), download=self.download)
         else:
-            simulations = sxs.load("simulations")
+            simulations = sxs.load("simulations", local=True)
             metadata    = simulations["SXS:BBH:{}".format(self.NR_ID)]
 
         tilt1, tilt2  = 0.0, 0.0
