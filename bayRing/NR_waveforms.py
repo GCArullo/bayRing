@@ -1351,7 +1351,7 @@ class NR_simulation():
         if self.sxs_installed_version < sxs_uploaded_cat_version: 
             metadata    = sxs.load("SXS:BBH:{}/Lev/metadata.json".format(self.NR_ID), download=self.download)
         else:
-            simulations = sxs.load("simulations", local=True)
+            simulations = sxs.load("simulations", local=True, download=False)
             print("Loaded simulations in local.")
             metadata    = simulations["SXS:BBH:{}".format(self.NR_ID)]
 
