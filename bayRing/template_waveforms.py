@@ -215,7 +215,7 @@ class WaveformModel(cpnest.model.Model):
         elif(self.TEOB_template=='nc'): ecc_par = 1
 
         TGR_parameters = {}
-        ringdown_model = wf.TEOBPM(self.t_start                 ,
+        ringdown_model = wf.TEOBPM(self.t_peak                  ,
                                    self.metadata['m1']          ,
                                    self.metadata['m2']          ,
                                    self.metadata['chi1']        ,
