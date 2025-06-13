@@ -88,6 +88,7 @@ def main():
                                              parameters['NR-data']['pert-order']                    , 
                                              parameters['NR-data']['dir']                           , 
                                              parameters['NR-data']['properties-file']               ,
+                                             parameters['NR-data']['fits-file']                     ,
                                              parameters['Injection-data']['modes-list']             , 
                                              parameters['Injection-data']['times']                  , 
                                              parameters['Injection-data']['noise']                  , 
@@ -106,9 +107,15 @@ def main():
                                              t_max_mismatch = parameters['NR-data']['error-t-max']  )
     error       = NR_sim.NR_cpx_err_cut
     NR_metadata = NR_waveforms.read_NR_metadata(NR_sim, parameters['NR-data']['catalog'])
-
     print_section('Simulation metadata')
     for key in NR_metadata.keys(): print('{}: {}'.format(key.ljust(len('omg_peak_22')), NR_metadata[key]))
+
+    if parameters['NR-data']['fits-file'] is not '':
+        print_section('FITS metadata')
+        fit_metadata = NR_waveforms.read_fits_metadata(NR_sim, parameters['NR-data']['catalog'], parameters['NR-data']['fits-file'])
+        for key in fit_metadata.keys(): print('{}: {}'.format(key.ljust(len('order_fits')), fit_metadata[key]))
+    else:
+        fit_metadata = None    
 
     # =================#
     # Load Kerr modes. #
@@ -127,7 +134,8 @@ def main():
                                                 parameters['Model']['template']                                            , 
                                                 parameters['Model']['N-DS-modes']                                          , 
                                                 Kerr_modes                                                                 , 
-                                                NR_metadata                                                                , 
+                                                NR_metadata                                                                ,
+                                                fit_metadata                                                               ,  
                                                 qnm_cached                                                                 , 
                                                 parameters['NR-data']['l-NR']                                              , 
                                                 parameters['NR-data']['m']                                                 , 
@@ -139,6 +147,7 @@ def main():
                                                 KerrBinary_amp_nc_version = parameters['Model']['KerrBinary-amplitudes-nc-version'],
                                                 TEOB_NR_fit               = parameters['Model']['TEOB-NR-fit']                 ,
                                                 TEOB_template             = parameters['Model']['TEOB-template']               ,
+                                                fit_type                  = parameters['Model']['fit-type']                    ,
                                                 )
 
     # ===============#

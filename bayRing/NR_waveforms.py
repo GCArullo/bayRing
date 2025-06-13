@@ -142,13 +142,14 @@ def convert_resolution_level_Teukolsky(res_level):
 
 class Waveform_rit(object):
 
-    def __init__(self, NR_data_path='', csv_path='', ID='', ell=2, m=2, resolution_level=100):
+    def __init__(self, NR_data_path='', csv_path='', fit_path='', ID='', ell=2, m=2, resolution_level=100):
 
         self.base             = NR_data_path
         self.metadata_path    = os.path.join(NR_data_path, 'Metadata')
         self.waveform_path    = os.path.join(NR_data_path, 'Data')
         self.psi4_path        = os.path.join(NR_data_path, 'Data/Psi4')
         self.csv_path         = csv_path 
+        self.fit_path         = fit_path
         self.ID               = ID 
         self.ell              = ell
         self.m                = m
@@ -175,7 +176,7 @@ class Waveform_rit(object):
                                         os.path.join(self.base, f'RIT_eBBH_{ID_str}-n{self.resolution_level}-ecc_Metadata.txt'    ),
                                         os.path.join(self.base, f'RIT:eBBH:{ID_str}-n{self.resolution_level}-ecc_Metadata.txt'    ),
                                      ]
-        
+
         possible_name_formats_list = possible_name_formats_list
         for name_format in possible_name_formats_list:
             try:
@@ -491,6 +492,48 @@ def read_NR_metadata(NR_sim, NR_catalog):
 
     return metadata
 
+def read_fits_metadata(NR_sim, NR_catalog, fit_path):
+
+    """
+
+    Read the fits metadata of the NR simulation.
+
+    Parameters
+    ----------
+
+    NR_sim : NRsim object
+        NRsim object containing the metadata of the NR simulation.
+
+    NR_catalog : str
+        Catalog of the NR simulation. Available options: ['SXS', 'cbhdb', 'charged_raw', 'RIT', 'Teukolsky']
+
+    Returns
+    -------
+
+    metadata : dict
+        Dictionary containing the fits metadata of the NR simulation.
+
+    """
+    
+    if(NR_catalog=='RIT'):
+        fit_data = pd.read_csv(fit_path)
+        metadata = {
+            'order_fits' : fit_data['order_fits'].values[0],
+            'c_2_A_0'    : fit_data['c_2_A_0'].values[0],
+            'c_2_A_1'    : fit_data['c_2_A_1'].values[0],
+            'c_3_A_0'    : fit_data['c_3_A_0'].values[0],
+            'c_3_A_1'    : fit_data['c_3_A_1'].values[0],
+            'c_2_p_0'    : fit_data['c_2_p_0'].values[0],
+            'c_2_p_1'    : fit_data['c_2_p_1'].values[0],
+            'c_3_p_0'    : fit_data['c_3_p_0'].values[0],
+            'c_3_p_1'    : fit_data['c_3_p_1'].values[0],
+            'c_4_p_0'    : fit_data['c_4_p_0'].values[0],
+            'c_4_p_1'    : fit_data['c_4_p_1'].values[0]
+        }
+        return metadata
+    else:
+        raise ValueError("Fits metadata are only available for RIT simulations.")
+
 class NR_simulation():
 
     """
@@ -557,7 +600,8 @@ class NR_simulation():
                  extrap_order                                   , 
                  perturbation_order                             , 
                  NR_dir                                         , 
-                 additional_NR_properties                       , 
+                 additional_NR_properties                       ,
+                 fits                                           , 
                  injection_modes_list                           , 
                  injection_times                                , 
                  injection_noise                                , 
@@ -591,6 +635,7 @@ class NR_simulation():
 
         self.NR_dir                   = NR_dir
         self.additional_NR_properties = additional_NR_properties
+        self.fits                     = fits
         self.outdir                   = outdir
 
         self.fake_NR_modes            = injection_modes_list
@@ -732,7 +777,7 @@ class NR_simulation():
             self.download = download
             self.q, self.chi1, self.chi2, self.tilt1, self.tilt2, self.ecc, self.Mf, self.af = self.read_SXS_metadata()
             try:
-                self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = self.load_SXS_addn_metadata(csv_path=self.additional_NR_properties, ID_str=self.NR_ID)
+                self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = self.load_SXS_addn_metadata(csv_path=self.additional_NR_properties, fit_path=self.fits, ID_str=self.NR_ID)
             except:
                 self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = None, None, None, None
 
@@ -1364,7 +1409,7 @@ class NR_simulation():
         """
 
                 
-        waveform_NR = Waveform_rit(NR_data_path=self.NR_dir, csv_path=self.additional_NR_properties, ID=self.NR_ID)
+        waveform_NR = Waveform_rit(NR_data_path=self.NR_dir, csv_path=self.additional_NR_properties, fit_path=self.fits, ID=self.NR_ID)
         
         # Read intrinsic parameters
         data        = waveform_NR.load_metadata()

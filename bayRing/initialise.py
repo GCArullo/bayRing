@@ -105,6 +105,7 @@ def read_config(Config):
         'error-t-max'      : 4e-3,
         'add-const'        : '0.0,0.0',
         'properties-file'  : '',
+        'fits-file'        : '',
         't-peak-22'        : 0.0,
         'waveform-type'    : 'strain',
         },
@@ -129,6 +130,7 @@ def read_config(Config):
         'KerrBinary-amplitudes-nc-version' : ''           ,
         'TEOB-NR-fit'                      : 0            ,
         'TEOB-template'                    : 'qc'         ,
+        'fit-type'                         : 'equal-mass' , 
         },
 
         'Inference':
@@ -257,6 +259,11 @@ def read_config(Config):
     elif(parameters['Model']['template']=='TEOBPM'      ):
         parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,321,310,311,440,441,430,431,420,421,410,411,550,551'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4  or parameters['NR-data']['l-NR']==5): raise ValueError("The TEOBPM template is only available for l=2,3,4,5")
+        if parameters['Model']['TEOB-NR-fit'] == 0:
+            keytype = type(parameters['Model']['fit-type'])
+            try:
+                parameters['Model']['fit-type'] = keytype(Config.get('Model', 'fit-type'))
+            except (KeyError, configparser.NoOptionError, TypeError): pass
 
     print('\n\n\nFIXME: print updated vars\n\n\n')
 
@@ -330,6 +337,8 @@ A dot is present at the end of each description line and is not to be intended a
         
         properties-file  Path to the file containing additional properties of the NR simulation in `.csv` format. \
                          Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
+
+        fits-file       Path to the file containing the fits of the NR simulation.                                           Default: ''.
         
         t-peak-22        Time of the peak of the 22 mode. Used as reference time in KerrBinary model. Must be passed when \
                          fitting HMs with KerrBinary.                                                                        Default: 0.0.                         
@@ -383,6 +392,8 @@ A dot is present at the end of each description line and is not to be intended a
         
         TEOB-template                    TEOB template to be used. Available options: ['qc', 'nc']. The 'qc' version is defined in  \
                                          arXiv:1904.09550, arXiv:2001.09082, while the 'nc' in II.C of arXiv:2305.19336.                                                  Default: 'qc'.
+
+        fit-type                         Type of fit to be used. Available options: ['non_spinning', 'equal_mass'].                                                       Default: None.
 
     *******************************************************
     * Parameters to be passed to the [Inference] section. *

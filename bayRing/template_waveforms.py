@@ -8,7 +8,7 @@ import bayRing.utils   as utils
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc'):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc', fit_type = None):
 
         self.t_NR                      = t_NR
         self.t_start                   = tM_start
@@ -16,6 +16,7 @@ class WaveformModel(cpnest.model.Model):
         self.wf_model                  = wf_model
         self.Kerr_modes                = Kerr_modes
         self.metadata                  = metadata
+        self.fit_metadata              = fit_metadata
         self.const_params              = const_params
         self.Mf, self.af               = self.metadata['Mf'], self.metadata['af']
         self.qnm_cached                = qnm_cached
@@ -28,6 +29,7 @@ class WaveformModel(cpnest.model.Model):
         self.KerrBinary_amp_nc_version = KerrBinary_amp_nc_version
         self.TEOB_NR_fit               = TEOB_NR_fit
         self.TEOB_template             = TEOB_template
+        self.fit_type                  = fit_type
 
         if not(const_params==None):
             self.const_r = [const_params[0]*np.cos(const_params[1])]
@@ -209,10 +211,65 @@ class WaveformModel(cpnest.model.Model):
             NR_fit_coeffs['af'] = self.af
 
         else                :
-            NR_fit_coeffs = None
+            try:
+                NR_fit_coeffs = {
+                                (self.l_NR,self.m_NR): {
+                                                        'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]       ,
+                                                        'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu      ,
+                                                        'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR,self.m_NR)]/nu ,
+                                                        'ecc'                 : self.metadata['ecc']                                             ,
+                                                        'emrg'                : self.metadata['Emrg']                                            ,
+                                                        'bmrg'                : self.metadata['bmrg']                                            ,
+                                                        'jmrg'                : self.metadata['Jmrg']                                            ,
+                                                        'order_fits'          : self.fit_metadata['order_fits']                                  ,
+                                                        'c_2_A_0'             : self.fit_metadata['c_2_A_0']                                     ,
+                                                        'c_2_A_1'             : self.fit_metadata['c_2_A_1']                                     ,
+                                                        'c_3_A_0'             : self.fit_metadata['c_3_A_0']                                     ,
+                                                        'c_3_A_1'             : self.fit_metadata['c_3_A_1']                                     ,  
+                                                        'c_2_phi_0'           : self.fit_metadata['c_2_p_0']                                     ,
+                                                        'c_2_phi_1'           : self.fit_metadata['c_2_p_1']                                     ,
+                                                        'c_3_phi_0'           : self.fit_metadata['c_3_p_0']                                     ,
+                                                        'c_3_phi_1'           : self.fit_metadata['c_3_p_1']                                     ,
+                                                        'c_4_phi_0'           : self.fit_metadata['c_4_p_0']                                     ,
+                                                        'c_4_phi_1'           : self.fit_metadata['c_4_p_1']                                     ,
+                                                        }
+                                }
+            except:
+                NR_fit_coeffs = {
+                                (self.l_NR,self.m_NR): {
+                                                        'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]       ,
+                                                        'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu      ,
+                                                        'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR,self.m_NR)]/nu ,
+                                                        'order_fit'           : None                                                            ,
+                                                        }
+                                }
+            
+            NR_fit_coeffs['Mf'] = self.Mf
+            NR_fit_coeffs['af'] = self.af
 
         if(  self.TEOB_template=='qc'): ecc_par = 0
         elif(self.TEOB_template=='nc'): ecc_par = 1
+
+        if(ecc_par==0):
+            if (self.fit_type=='non-spinning'): 
+                order_nu = 111
+                order_S_hat = 0
+            elif(self.fit_type=='equal-mass'): 
+                order_S_hat = 342
+                order_nu = 0
+            else:
+                order_S_hat = 0
+                order_nu = 0
+        elif(ecc_par==1):
+            if(self.fit_type=='non-spinning'): 
+                order_nu = 11111
+                order_S_hat = 0
+            elif(self.fit_type=='equal-mass'): 
+                order_S_hat = 33333
+                order_nu = 0
+            else: 
+                order_S_hat = 0
+                order_nu = 0
 
         TGR_parameters = {}
         ringdown_model = wf.TEOBPM(self.t_start                 ,
@@ -228,8 +285,9 @@ class WaveformModel(cpnest.model.Model):
                                    TGR_parameters               ,
                                    geom          = 1            ,
                                    ecc_par       = ecc_par      ,
+                                   order_nu      = order_nu     ,
+                                   order_S_hat   = order_S_hat    ,
                                    NR_fit_coeffs = NR_fit_coeffs)
-
         return ringdown_model
 
     def waveform(self, params, fixed_params):
