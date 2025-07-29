@@ -585,6 +585,7 @@ class NR_simulation():
                  m                                              , 
                  outdir                                         , 
                  sxs_installed_version                          ,
+                 sxs_local                                      ,   
                  waveform_type  = 'strain'                      ,
                  download       = False                         , 
                  NR_error       = 'align-with-mismatch-res-only', 
@@ -750,7 +751,8 @@ class NR_simulation():
 
         elif(self.NR_catalog=='SXS'):
         
-            self.download = download
+            self.download  = download
+            self.sxs_local = sxs_local
             self.q, self.chi1, self.chi2, self.tilt1, self.tilt2, self.ecc, self.Mf, self.af = self.read_SXS_metadata()
             
             try:
@@ -1347,10 +1349,14 @@ class NR_simulation():
         """
         sxs_uploaded_cat_version = "2025.0.10"
 
+        print("\n* SXS package version assumed: {}\n".format(self.sxs_installed_version))
+
+        #FIXME: passing the installed version from config is very error prone. Read it from user env.
+
         if self.sxs_installed_version < sxs_uploaded_cat_version: 
             metadata    = sxs.load("SXS:BBH:{}/Lev/metadata.json".format(self.NR_ID), download=self.download)
         else:
-            simulations = sxs.load("simulations", local = True, download = False)
+            simulations = sxs.load("simulations", local = self.sxs_local, download = self.download)
             metadata    = simulations["SXS:BBH:{}".format(self.NR_ID)]
 
         tilt1, tilt2  = 0.0, 0.0

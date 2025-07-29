@@ -95,7 +95,9 @@ def main():
                                              parameters['NR-data']['l-NR']                          , 
                                              parameters['NR-data']['m']                             , 
                                              parameters['I/O']['outdir']                            ,
-                                             parameters['NR-data']['sxs_installed_version']         , 
+                                             parameters['NR-data']['sxs-installed-version']         , 
+                                             parameters['NR-data']['sxs-local']                     ,   
+
                                              waveform_type  = parameters['NR-data']['waveform-type'], 
                                              download       = parameters['NR-data']['download']     , 
                                              NR_error       = parameters['NR-data']['error']        , 

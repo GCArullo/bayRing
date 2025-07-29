@@ -92,7 +92,8 @@ def read_config(Config):
         'download'             : 1,
         'dir'                  : '',
         'catalog'              : 'SXS',
-        'sxs_installed_version': '2025.0.10',
+        'sxs-installed-version': '2025.0.10',
+        'sxs-local'            : False,     
         'ID'                   : '0305',
         'extrap-order'         : 2,
         'res-level'            : -1,
@@ -294,7 +295,9 @@ A dot is present at the end of each description line and is not to be intended a
         
         catalog                 NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'fake_NR']. Default: 'SXS'.
         
-        sxs_installed_version   Version of the sxs package.                                                                         Default: "2025.0.10".
+        sxs-installed-version   Version of the sxs package.                                                                         Default: "2025.0.10".
+
+        sxs-local               Flag to use the local SXS simulations. If False, the SXS simulations are downloaded.              Default: False.
 
         ID                      Simulation ID to be considered. Example for SXS: 0305. Example for Teukolsky: \
                                 `a_0.7_A_0.141_w_1.4_ingoing_ang_15`.                                                               Default: 0305.
