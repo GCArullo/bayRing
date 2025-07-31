@@ -81,10 +81,11 @@ def read_config(Config):
 
         'I/O': 
         {
-        'run-type'         : 'full',
-        'screen-output'    : 0,
-        'show-plots'       : 0,
-        'outdir'           : './',
+        'run-type'                 : 'full',
+        'screen-output'            : 0,
+        'show-plots'               : 0,
+        'extract-damping-time-flag': 1,
+        'outdir'                   : './',
         },
 
         'NR-data':
@@ -277,13 +278,15 @@ A dot is present at the end of each description line and is not to be intended a
     * Parameters to be passed to the [I/O] section. *
     *************************************************
 
-        run-type         Type of run. Available options: ['full', 'post-processing', 'plot-NR-only'].                        Default: 'full'.
+        run-type                    Type of run. Available options: ['full', 'post-processing', 'plot-NR-only'].                        Default: 'full'.
         
-        screen-output    Boolean to divert stdout and stderr to files or to screen.                                          Default: 0.
+        screen-output               Boolean to divert stdout and stderr to files or to screen.                                          Default: 0.
         
-        show-plots       Boolean to show results plots.                                                                      Default: 0.
+        show-plots                  Boolean to show results plots.                                                                      Default: 0.
         
-        outdir           Path of the output directory.                                                                       Default: './'.
+        extract-damping-time-flag   Flag to extract the damping time from the amplitude when plotting the waveform comparison.          Default: 1.
+
+        outdir                      Path of the output directory.                                                                       Default: './'.
 
     *****************************************************
     * Parameters to be passed to the [NR-data] section. *

@@ -84,7 +84,7 @@ def main():
     NR_sim      = NR_waveforms.NR_simulation(parameters['NR-data']['catalog']                       , 
                                              parameters['NR-data']['ID']                            , 
                                              parameters['NR-data']['res-level']                     , 
-                                             parameters['NR-data']['extrap-order']                  , 
+                                             parameters['NR-data']['extrap-order']                  ,
                                              parameters['NR-data']['pert-order']                    , 
                                              parameters['NR-data']['dir']                           , 
                                              parameters['NR-data']['properties-file']               ,
@@ -167,9 +167,9 @@ def main():
     tail_flag = wf_model.wf_model=='Kerr' and wf_model.tail==1
     # Plot and terminate execution if plotting only.
     if(parameters['I/O']['run-type']=='plot-NR-only'): 
-        postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, tail_flag)
+        postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, tail_flag, parameters['I/O']['extract-damping-time-flag'])
         # In case a tail run is selected, do plots also without tail format
-        if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, False)
+        if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, False, parameters['I/O']['extract-damping-time-flag'])
         print('\n* NR-only plotting run-type selected. Exiting.\n')
         exit()
 
@@ -212,9 +212,9 @@ def main():
 
 
     try   : 
-        postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], tail_flag)
+        postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], tail_flag, parameters['I/O']['extract-damping-time-flag']) 
         # In case a tail run is selected, do plots also without tail format
-        if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], False    )
+        if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], False, parameters['I/O']['extract-damping-time-flag'])
     except Exception as e:
         print(f"Waveform reconstruction plot failed with error: {e}")
         traceback.print_exc()    

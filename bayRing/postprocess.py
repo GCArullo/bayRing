@@ -1045,7 +1045,7 @@ def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, 
                 print(f"Error processing optimal SNR for {perc}% CI and {NR_quant}: {e}")
                 continue
 
-def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdir, method, tail_flag):
+def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdir, method, tail_flag, extract_damping_time_flag):
 
     """
 
@@ -1184,12 +1184,24 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
         ax3.set_ylabel(r'$\mathrm{Im[%s]}$'%(label_data), fontsize=fontsize_labels)
         ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
 
-    if not(tail_flag): ax2.semilogy(t_NR - t_peak, NR_amp*np.e**((t_NR - t_peak)/tau_rd_fundamental), label=r'$\mathrm{NR}$', c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
-    else             : ax2.semilogy(t_NR - t_peak, NR_amp                                          , label=r'$\mathrm{NR}$', c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
-    ax2.axvline(tM_start,                                                                                                    c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
-    if(not(tail_flag)): ax2.axvline(0.0,                                                                                     c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
-    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): ax2.set_ylim([1e-1*amp_peak, 10*amp_peak])
-    elif(  tail_flag  and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): ax2.set_ylim([2*1e-4, 2*np.max(NR_amp)])
+    if not(tail_flag): 
+        if(extract_damping_time_flag): 
+            ax2.semilogy(t_NR - t_peak, NR_amp*np.e**((t_NR - t_peak)/tau_rd_fundamental), label=r'$\mathrm{NR}$', c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
+        else:
+            ax2.semilogy(t_NR - t_peak, NR_amp                                           , label=r'$\mathrm{NR}$', c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
+    else             : 
+        ax2.semilogy(    t_NR - t_peak, NR_amp                                           , label=r'$\mathrm{NR}$', c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
+    ax2.axvline(tM_start,                                                                                          c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
+    if(not(tail_flag)): ax2.axvline(0.0,                                                                           c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
+    
+    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): 
+        if(extract_damping_time_flag):
+            ax2.set_ylim([1e-1*amp_peak, 10*amp_peak])
+        else:
+            ax2.set_ylim([1e-3*amp_peak, 2*amp_peak ])
+    elif(  tail_flag  and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): 
+        ax2.set_ylim(    [2*1e-4, 2*np.max(NR_amp)])
+
     ax2.set_xlabel(r'$\mathrm{t - t_{peak} \, [M}]$', fontsize=fontsize_labels)
 
     ax4.plot(t_NR - t_peak, NR_f,                                                          c=color_NR,      lw=lw_std,     alpha=alpha_std, ls='-' )
@@ -1241,20 +1253,26 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
             
             if(perc==50):
                 if not(tail_flag):
-                    ax1.plot(t_cut - t_peak, wf_r,                                               c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
-                    ax3.plot(t_cut - t_peak, wf_i,                                               c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
-                    ax2.semilogy(t_cut - t_peak, wf_amp*np.e**((t_cut - t_peak)/tau_rd_fundamental), label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
+                    ax1.plot(t_cut - t_peak, wf_r,                                               c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-')
+                    ax3.plot(t_cut - t_peak, wf_i,                                               c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-')
+                    if(extract_damping_time_flag): 
+                        ax2.semilogy(t_cut - t_peak, wf_amp*np.e**((t_cut - t_peak)/tau_rd_fundamental), label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
+                    else:
+                        ax2.semilogy(t_cut - t_peak, wf_amp                                            , label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
                 else:
-                    ax2.semilogy(t_cut - t_peak, wf_amp                                         , label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
-                ax4.plot(    t_cut - t_peak, wf_f,                                                c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
+                    ax2.semilogy(    t_cut - t_peak, wf_amp                                            , label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
+                ax4.plot(            t_cut - t_peak, wf_f,                                                                                           c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
             else:
                 if not(tail_flag):
-                    ax1.plot(t_cut - t_peak, wf_r,                                                c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
-                    ax3.plot(t_cut - t_peak, wf_i,                                                c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
-                    ax2.semilogy(t_cut - t_peak, wf_amp*np.e**((t_cut - t_peak)/tau_rd_fundamental), c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
+                    ax1.plot(        t_cut - t_peak, wf_r                                                                                          , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--')
+                    ax3.plot(        t_cut - t_peak, wf_i                                                                                          , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--')
+                    if(extract_damping_time_flag): 
+                        ax2.semilogy(t_cut - t_peak, wf_amp*np.e**((t_cut - t_peak)/tau_rd_fundamental)                                            , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--')
+                    else:
+                        ax2.semilogy(t_cut - t_peak, wf_amp                                                                                        , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--')
                 else:
-                    ax2.semilogy(t_cut - t_peak, wf_amp                                         , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
-                ax4.plot(    t_cut - t_peak, wf_f,                                                c=color_model, lw=lw_std,           alpha=alpha_med, ls='--' )
+                    ax2.semilogy(    t_cut - t_peak, wf_amp                                                                                        , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--')
+                ax4.plot(            t_cut - t_peak, wf_f                                                                                          , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--')
 
 
         if(tail_flag):
