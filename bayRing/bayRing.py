@@ -111,9 +111,11 @@ def main():
     for key in NR_metadata.keys(): print('{}: {}'.format(key.ljust(len('omg_peak_22')), NR_metadata[key]))
 
     if parameters['NR-data']['fits-file'] is not '':
+        import pandas as pd
+        fit_data = pd.read_csv(parameters['NR-data']['fits-file'])
+        fit_metadata = fit_data.iloc[0].to_dict()
         print_section('FITS metadata')
-        fit_metadata = NR_waveforms.read_fits_metadata(NR_sim, parameters['NR-data']['catalog'], parameters['NR-data']['fits-file'])
-        for key in fit_metadata.keys(): print('{}: {}'.format(key.ljust(len('order_fits')), fit_metadata[key]))
+        for key in fit_metadata.keys(): print('{}: {}'.format(key.ljust(len('fit_type')), fit_metadata[key]))
     else:
         fit_metadata = None    
 

@@ -210,37 +210,31 @@ class WaveformModel(cpnest.model.Model):
             NR_fit_coeffs['Mf'] = self.Mf
             NR_fit_coeffs['af'] = self.af
 
-        else                :
+        else:
             try:
                 NR_fit_coeffs = {
-                                (self.l_NR,self.m_NR): {
-                                                        'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]       ,
-                                                        'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu      ,
-                                                        'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR,self.m_NR)]/nu ,
-                                                        'ecc'                 : self.metadata['ecc']                                             ,
-                                                        'emrg'                : self.metadata['Emrg']                                            ,
-                                                        'bmrg'                : self.metadata['bmrg']                                            ,
-                                                        'jmrg'                : self.metadata['Jmrg']                                            ,
-                                                        'order_fits'          : self.fit_metadata['order_fits']                                  ,
-                                                        'c_2_A_0'             : self.fit_metadata['c_2_A_0']                                     ,
-                                                        'c_2_A_1'             : self.fit_metadata['c_2_A_1']                                     ,
-                                                        'c_3_A_0'             : self.fit_metadata['c_3_A_0']                                     ,
-                                                        'c_3_A_1'             : self.fit_metadata['c_3_A_1']                                     ,  
-                                                        'c_2_phi_0'           : self.fit_metadata['c_2_p_0']                                     ,
-                                                        'c_2_phi_1'           : self.fit_metadata['c_2_p_1']                                     ,
-                                                        'c_3_phi_0'           : self.fit_metadata['c_3_p_0']                                     ,
-                                                        'c_3_phi_1'           : self.fit_metadata['c_3_p_1']                                     ,
-                                                        'c_4_phi_0'           : self.fit_metadata['c_4_p_0']                                     ,
-                                                        'c_4_phi_1'           : self.fit_metadata['c_4_p_1']                                     ,
-                                                        }
-                                }
+                    (self.l_NR, self.m_NR): {
+                        'omg_peak': self.metadata['omg_peak_{}{}'.format(self.l_NR, self.m_NR)],
+                        'A_peak_over_nu': self.metadata['A_peak_{}{}'.format(self.l_NR, self.m_NR)] / nu,
+                        'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR, self.m_NR)] / nu,
+                        'ecc': self.metadata['ecc'],
+                        'bmrg': self.metadata['bmrg'],
+                        'Jmrg': self.metadata['Jmrg'],
+                        'Emrg': self.metadata['Emrg'],
+                        'fit_type': self.fit_metadata['fit_type'],
+                        'fit_order': self.fit_metadata['fit_order'],
+                    }
+                }
+
+                fit_coeffs = {key: val for key, val in self.fit_metadata.items() if key.startswith(('c_2_', 'c_3_', 'c_4_'))}
+                NR_fit_coeffs[(self.l_NR, self.m_NR)].update(fit_coeffs)
             except:
                 NR_fit_coeffs = {
                                 (self.l_NR,self.m_NR): {
                                                         'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]       ,
                                                         'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu      ,
                                                         'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR,self.m_NR)]/nu ,
-                                                        'order_fit'           : None                                                            ,
+                                                        'fit_type'            : None                                                            ,
                                                         }
                                 }
             

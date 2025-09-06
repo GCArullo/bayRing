@@ -173,8 +173,16 @@ class Waveform_rit(object):
         ID_str = str(self.ID)
 
         possible_name_formats_list = [
-                                        os.path.join(self.base, f'RIT_eBBH_{ID_str}-n{self.resolution_level}-ecc_Metadata.txt'    ),
-                                        os.path.join(self.base, f'RIT:eBBH:{ID_str}-n{self.resolution_level}-ecc_Metadata.txt'    ),
+                                        os.path.join(self.base, f'RIT_eBBH_{ID_str}-n{self.resolution_level}-ecc_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT:eBBH:{ID_str}-n{self.resolution_level}-ecc_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT_BBH_{ID_str}-n{self.resolution_level}-id0_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT:BBH:{ID_str}-n{self.resolution_level}-id0_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT_BBH_{ID_str}-n{self.resolution_level}-id1_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT:BBH:{ID_str}-n{self.resolution_level}-id1_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT_BBH_{ID_str}-n{self.resolution_level}-id2_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT:BBH:{ID_str}-n{self.resolution_level}-id2_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT_BBH_{ID_str}-n{self.resolution_level}-id3_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT:BBH:{ID_str}-n{self.resolution_level}-id3_Metadata.txt')
                                      ]
 
         possible_name_formats_list = possible_name_formats_list
@@ -491,49 +499,7 @@ def read_NR_metadata(NR_sim, NR_catalog):
     else: raise ValueError("Invalid option for NR catalog: {}".format(NR_catalog))
 
     return metadata
-
-def read_fits_metadata(NR_sim, NR_catalog, fit_path):
-
-    """
-
-    Read the fits metadata of the NR simulation.
-
-    Parameters
-    ----------
-
-    NR_sim : NRsim object
-        NRsim object containing the metadata of the NR simulation.
-
-    NR_catalog : str
-        Catalog of the NR simulation. Available options: ['SXS', 'cbhdb', 'charged_raw', 'RIT', 'Teukolsky']
-
-    Returns
-    -------
-
-    metadata : dict
-        Dictionary containing the fits metadata of the NR simulation.
-
-    """
     
-    if(NR_catalog=='RIT'):
-        fit_data = pd.read_csv(fit_path)
-        metadata = {
-            'order_fits' : fit_data['order_fits'].values[0],
-            'c_2_A_0'    : fit_data['c_2_A_0'].values[0],
-            'c_2_A_1'    : fit_data['c_2_A_1'].values[0],
-            'c_3_A_0'    : fit_data['c_3_A_0'].values[0],
-            'c_3_A_1'    : fit_data['c_3_A_1'].values[0],
-            'c_2_p_0'    : fit_data['c_2_p_0'].values[0],
-            'c_2_p_1'    : fit_data['c_2_p_1'].values[0],
-            'c_3_p_0'    : fit_data['c_3_p_0'].values[0],
-            'c_3_p_1'    : fit_data['c_3_p_1'].values[0],
-            'c_4_p_0'    : fit_data['c_4_p_0'].values[0],
-            'c_4_p_1'    : fit_data['c_4_p_1'].values[0]
-        }
-        return metadata
-    else:
-        raise ValueError("Fits metadata are only available for RIT simulations.")
-
 class NR_simulation():
 
     """
