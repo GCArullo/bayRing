@@ -1,3 +1,6 @@
+import cmath
+import math
+import operator
 import sys
 import types
 from pathlib import Path
@@ -11,6 +14,71 @@ if str(ROOT_DIR) not in sys.path:
 
 class _FakeArray(list):
     """Minimal list-backed array used to satisfy numpy calls in lightweight tests."""
+
+    __array_priority__ = 1000
+
+    def _binary_op(self, other, op):
+        if isinstance(other, _FakeArray):
+            return _FakeArray(op(a, b) for a, b in zip(self, other))
+        if isinstance(other, Iterable) and not isinstance(other, (str, bytes)):
+            return _FakeArray(op(a, b) for a, b in zip(self, other))
+        return _FakeArray(op(a, other) for a in self)
+
+    def _rbinary_op(self, other, op):
+        if isinstance(other, Iterable) and not isinstance(other, (str, bytes)):
+            return _FakeArray(op(a, b) for a, b in zip(other, self))
+        return _FakeArray(op(other, a) for a in self)
+
+    def __add__(self, other):
+        return self._binary_op(other, operator.add)
+
+    def __radd__(self, other):
+        return self._rbinary_op(other, operator.add)
+
+    def __sub__(self, other):
+        return self._binary_op(other, operator.sub)
+
+    def __rsub__(self, other):
+        return self._rbinary_op(other, operator.sub)
+
+    def __mul__(self, other):
+        return self._binary_op(other, operator.mul)
+
+    def __rmul__(self, other):
+        return self._rbinary_op(other, operator.mul)
+
+    def __truediv__(self, other):
+        return self._binary_op(other, operator.truediv)
+
+    def __rtruediv__(self, other):
+        return self._rbinary_op(other, operator.truediv)
+
+    def __pow__(self, power):
+        return self._binary_op(power, operator.pow)
+
+    def __rpow__(self, other):
+        return self._rbinary_op(other, operator.pow)
+
+    def __neg__(self):
+        return _FakeArray(-a for a in self)
+
+    def __gt__(self, other):
+        return self._binary_op(other, operator.gt)
+
+    def __lt__(self, other):
+        return self._binary_op(other, operator.lt)
+
+    def __ge__(self, other):
+        return self._binary_op(other, operator.ge)
+
+    def __le__(self, other):
+        return self._binary_op(other, operator.le)
+
+    def __eq__(self, other):
+        return self._binary_op(other, operator.eq)
+
+    def __ne__(self, other):
+        return self._binary_op(other, operator.ne)
 
     @property
     def shape(self):
@@ -28,6 +96,9 @@ class _FakeArray(list):
             for idx in item:
                 value = value[idx]
             return value
+
+        if isinstance(item, (list, tuple, _FakeArray)) and item and isinstance(item[0], bool):
+            return _FakeArray(value for value, keep in zip(self, item) if keep)
 
         result = super().__getitem__(item)
         if isinstance(item, slice):
@@ -52,6 +123,7 @@ class _FakeRandom:
 class _FakeNumpy(types.ModuleType):
     pi = 3.141592653589793
     newaxis = None
+    complex128 = complex
 
     def __init__(self, name: str):
         super().__init__(name)
@@ -72,6 +144,12 @@ class _FakeNumpy(types.ModuleType):
         values.append(value)
         return _FakeArray(values)
 
+    def zeros(self, length, dtype=float):
+        factory = 0
+        if dtype is complex:
+            factory = 0j
+        return _FakeArray(factory for _ in range(length))
+
     def linspace(self, start: float, stop: float, num: int):
         if num == 1:
             return _FakeArray([start])
@@ -80,6 +158,81 @@ class _FakeNumpy(types.ModuleType):
 
     def sum(self, values):
         return sum(values)
+
+    def max(self, values):
+        return max(values)
+
+    def abs(self, values):
+        if isinstance(values, _FakeArray):
+            return _FakeArray(abs(v) for v in values)
+        return abs(values)
+
+    def sqrt(self, values):
+        if isinstance(values, _FakeArray):
+            return _FakeArray(math.sqrt(v) for v in values)
+        return math.sqrt(values)
+
+    def angle(self, values):
+        if isinstance(values, _FakeArray):
+            return _FakeArray(math.atan2(v.imag if isinstance(v, complex) else 0.0, v.real if isinstance(v, complex) else v) for v in values)
+        if isinstance(values, complex):
+            return math.atan2(values.imag, values.real)
+        return 0.0
+
+    def unwrap(self, values):
+        if not values:
+            return _FakeArray([])
+        unwrapped = []
+        prev = None
+        for value in values:
+            current = value
+            if prev is not None:
+                while current - prev > math.pi:
+                    current -= 2 * math.pi
+                while current - prev < -math.pi:
+                    current += 2 * math.pi
+            unwrapped.append(current)
+            prev = current
+        return _FakeArray(unwrapped)
+
+    def logical_and(self, left, right):
+        return _FakeArray(bool(a and b) for a, b in zip(left, right))
+
+    def real(self, values):
+        if isinstance(values, _FakeArray):
+            return _FakeArray((v.real if isinstance(v, complex) else v) for v in values)
+        return values.real if isinstance(values, complex) else values
+
+    def imag(self, values):
+        if isinstance(values, _FakeArray):
+            return _FakeArray((v.imag if isinstance(v, complex) else 0.0) for v in values)
+        return values.imag if isinstance(values, complex) else 0.0
+
+    def exp(self, values):
+        if isinstance(values, _FakeArray):
+            return _FakeArray(cmath.exp(v) for v in values)
+        return cmath.exp(values)
+
+    def cos(self, values):
+        if isinstance(values, _FakeArray):
+            return _FakeArray(math.cos(v) for v in values)
+        return math.cos(values)
+
+    def sin(self, values):
+        if isinstance(values, _FakeArray):
+            return _FakeArray(math.sin(v) for v in values)
+        return math.sin(values)
+
+    def argmax(self, values):
+        return max(range(len(values)), key=lambda idx: values[idx])
+
+    def roll(self, values, shift):
+        seq = list(values)
+        shift = shift % len(seq) if seq else 0
+        return _FakeArray(seq[-shift:] + seq[:-shift])
+
+    def asarray(self, value):
+        return self.array(value)
 
     def column_stack(self, values):
         if not values:
@@ -153,6 +306,13 @@ if "cpnest" not in sys.modules:
     fake_cpnest_model = types.ModuleType("cpnest.model")
     fake_nest2pos = types.ModuleType("cpnest.nest2pos")
 
+    class _FakeModel:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def log_likelihood(self, *args, **kwargs):
+            return 0.0
+
     def _fake_draw_posterior(chain, weights):
         return {name: values for name, values in chain.items()}
 
@@ -163,6 +323,7 @@ if "cpnest" not in sys.modules:
     fake_nest2pos.compute_weights = _fake_compute_weights
 
     fake_cpnest.model = fake_cpnest_model
+    fake_cpnest_model.Model = _FakeModel
 
     sys.modules["cpnest"] = fake_cpnest
     sys.modules["cpnest.model"] = fake_cpnest_model
@@ -172,6 +333,7 @@ if "cpnest" not in sys.modules:
 if "pyRing" not in sys.modules:
     fake_pyRing = types.ModuleType("pyRing")
     fake_pyRing_utils = types.ModuleType("pyRing.utils")
+    fake_pyRing_waveform = types.ModuleType("pyRing.waveform")
 
     def _fake_print_section(message):
         return message
@@ -179,13 +341,29 @@ if "pyRing" not in sys.modules:
     def _fake_railing_check(samples, prior_bins, tolerance):
         return False, False
 
+    def _fake_compute_binary_quantities(m1, m2, chi1, chi2):
+        return 1.0, 0.25, 0.1, -0.1
+
+    fake_modes = {
+        "linear": {(2, 2): ["mode"]},
+        "quadratic": {(2, 2): ["quad"]},
+    }
+
     fake_pyRing_utils.print_section = _fake_print_section
     fake_pyRing_utils.railing_check = _fake_railing_check
+    fake_pyRing_utils.compute_KerrBinary_binary_quantities = _fake_compute_binary_quantities
+    fake_pyRing_utils.available_modes_dict_KerrBinary = {"London2018": fake_modes, "noncircular": fake_modes}
+
+    fake_pyRing_waveform.KerrBH = lambda *args, **kwargs: {"args": args, "kwargs": kwargs}
+    fake_pyRing_waveform.damped_sinusoid = lambda *args, **kwargs: 0j
+    fake_pyRing_waveform.KerrBinary = lambda *args, **kwargs: {"args": args, "kwargs": kwargs}
 
     fake_pyRing.utils = fake_pyRing_utils
+    fake_pyRing.waveform = fake_pyRing_waveform
 
     sys.modules["pyRing"] = fake_pyRing
     sys.modules["pyRing.utils"] = fake_pyRing_utils
+    sys.modules["pyRing.waveform"] = fake_pyRing_waveform
 
 
 if "scipy" not in sys.modules:
