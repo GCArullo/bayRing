@@ -142,6 +142,10 @@ def main():
                                                 KerrBinary_amp_nc_version = parameters['Model']['KerrBinary-amplitudes-nc-version'],
                                                 TEOB_NR_fit               = parameters['Model']['TEOB-NR-fit']                 ,
                                                 TEOB_template             = parameters['Model']['TEOB-template']               ,
+                                                quad_mode_flag            = parameters['Model']['quad-mode-flag']              ,
+                                                t_q_sigmoid               = parameters['Model']['t-q-sigmoid']                 ,
+                                                width_sigmoid             = parameters['Model']['width-sigmoid']               ,
+                                                psi_sigmoid               = parameters['Model']['psi-sigmoid']
                                                 )
 
     # ===============#

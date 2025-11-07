@@ -1353,10 +1353,12 @@ class NR_simulation():
 
         #FIXME: passing the installed version from config is very error prone. Read it from user env.
 
+        print(sxs.__version__)
+
         if self.sxs_installed_version < sxs_uploaded_cat_version: 
             metadata    = sxs.load("SXS:BBH:{}/Lev/metadata.json".format(self.NR_ID), download=self.download)
         else:
-            simulations = sxs.load("simulations", local = self.sxs_local, download = self.download)
+            simulations = sxs.load("simulations", local = True, download = False)
             metadata    = simulations["SXS:BBH:{}".format(self.NR_ID)]
 
         tilt1, tilt2  = 0.0, 0.0
@@ -1612,6 +1614,7 @@ class NR_simulation():
 
         """
 
+        #FIXME: extract user's sxs version
         sxs_updated_version = "2025.0.10"
 
         if self.sxs_installed_version < sxs_updated_version:

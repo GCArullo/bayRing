@@ -1136,9 +1136,9 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
         fontsize_labels = 23
         color_f_ring    = 'forestgreen'
 
-    if(not(tail_flag) and not(wf_data_type=='psi4') and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): tM_end = 150
+    if(not(tail_flag) and not(wf_data_type=='psi4') and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): tM_end = 80
     if(wf_data_type=='psi4'): 
-        tM_end = 150
+        tM_end = 120
         label_data = '\psi_{4,%s%s}'%(l,m)
     else:
         label_data = 'h_{%s%s}'%(l,m)

@@ -1,5 +1,0 @@
-pyRing
-branch: mismatch_fc_edits\n	 commit: 3833980f72bfd7326d43b888a8a3c413129f0d28
-Author: fcrescimbeni1\n francesco.crescimbeni@gmail.com\n
-
-Git diff:

@@ -8,7 +8,7 @@ import bayRing.utils   as utils
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc'):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc', quad_mode_flag=1, t_q_sigmoid=6.0, width_sigmoid=3.0, psi_sigmoid=0.4):
 
         self.t_NR                      = t_NR
         self.t_start                   = tM_start
@@ -28,6 +28,10 @@ class WaveformModel(cpnest.model.Model):
         self.KerrBinary_amp_nc_version = KerrBinary_amp_nc_version
         self.TEOB_NR_fit               = TEOB_NR_fit
         self.TEOB_template             = TEOB_template
+        self.quad_mode_flag            = quad_mode_flag
+        self.t_q_sigmoid               = t_q_sigmoid
+        self.width_sigmoid             = width_sigmoid
+        self.psi_sigmoid               = psi_sigmoid
 
         if not(const_params==None):
             self.const_r = [const_params[0]*np.cos(const_params[1])]
@@ -214,21 +218,30 @@ class WaveformModel(cpnest.model.Model):
         if(  self.TEOB_template=='qc'): ecc_par = 0
         elif(self.TEOB_template=='nc'): ecc_par = 1
 
+        quad_mode_flag = self.quad_mode_flag
+        t_q_sigmoid  = self.t_q_sigmoid
+        width_sigmoid= self.width_sigmoid
+        psi_sigmoid  = self.psi_sigmoid
+
         TGR_parameters = {}
-        ringdown_model = wf.TEOBPM(self.t_peak                  ,
-                                   self.metadata['m1']          ,
-                                   self.metadata['m2']          ,
-                                   self.metadata['chi1']        ,
-                                   self.metadata['chi2']        ,
-                                   merger_phases                ,
-                                   1.0                          , # distance     , dummy with geom=1
-                                   0.0                          , # inclination  , dummy with geom=1
-                                   0.0                          , # orbital phase, dummy with geom=1
-                                   modes                        ,
-                                   TGR_parameters               ,
-                                   geom          = 1            ,
-                                   ecc_par       = ecc_par      ,
-                                   NR_fit_coeffs = NR_fit_coeffs)
+        ringdown_model = wf.TEOBPM(self.t_peak                      ,
+                                   self.metadata['m1']              ,
+                                   self.metadata['m2']              ,
+                                   self.metadata['chi1']            ,
+                                   self.metadata['chi2']            ,
+                                   merger_phases                    ,
+                                   1.0                              , # distance     , dummy with geom=1
+                                   0.0                              , # inclination  , dummy with geom=1
+                                   0.0                              , # orbital phase, dummy with geom=1
+                                   modes                            ,
+                                   TGR_parameters                   ,
+                                   geom           = 1                ,
+                                   ecc_par        = ecc_par          ,
+                                   quad_mode_flag =  quad_mode_flag ,
+                                   t_q_sigmoid    =  t_q_sigmoid    ,
+                                   width_sigmoid  =  width_sigmoid  ,
+                                   psi_sigmoid    =  psi_sigmoid    ,
+                                   NR_fit_coeffs  = NR_fit_coeffs)
 
         return ringdown_model
 

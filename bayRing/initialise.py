@@ -94,7 +94,7 @@ def read_config(Config):
         'dir'                  : '',
         'catalog'              : 'SXS',
         'sxs-installed-version': '2025.0.10',
-        'sxs-local'            : False,     
+        'sxs-local'            : True,     
         'ID'                   : '0305',
         'extrap-order'         : 2,
         'res-level'            : -1,
@@ -132,6 +132,10 @@ def read_config(Config):
         'KerrBinary-amplitudes-nc-version' : ''           ,
         'TEOB-NR-fit'                      : 0            ,
         'TEOB-template'                    : 'qc'         ,
+        'quad-mode-flag'                   : 1            ,
+        't-q-sigmoid'                      : 6.0          ,
+        'width-sigmoid'                    : 3.0          ,        
+        'psi-sigmoid'                      : 0.4          ,      
         },
 
         'Inference':
@@ -393,6 +397,8 @@ A dot is present at the end of each description line and is not to be intended a
         TEOB-template                    TEOB template to be used. Available options: ['qc', 'nc']. The 'qc' version is defined in  \
                                          arXiv:1904.09550, arXiv:2001.09082, while the 'nc' in II.C of arXiv:2305.19336.                                                  Default: 'qc'.
 
+        quad_mode_flag                   Flag to include quadrupolar modes in the model when using the TEOB-nc template. \                                 
+                                         
     *******************************************************
     * Parameters to be passed to the [Inference] section. *
     *******************************************************
