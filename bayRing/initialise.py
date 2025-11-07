@@ -132,10 +132,7 @@ def read_config(Config):
         'KerrBinary-amplitudes-nc-version' : ''           ,
         'TEOB-NR-fit'                      : 0            ,
         'TEOB-template'                    : 'qc'         ,
-        'quad-mode-flag'                   : 1            ,
-        't-q-sigmoid'                      : 6.0          ,
-        'width-sigmoid'                    : 3.0          ,        
-        'psi-sigmoid'                      : 0.4          ,      
+        'quad-mode-flag'                   : 1            ,    
         },
 
         'Inference':
