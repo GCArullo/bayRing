@@ -1353,7 +1353,7 @@ class NR_simulation():
 
         #FIXME: passing the installed version from config is very error prone. Read it from user env.
 
-        print(sxs.__version__)
+        print("Installed SXS version: ", sxs.__version__)
 
         if self.sxs_installed_version < sxs_uploaded_cat_version: 
             metadata    = sxs.load("SXS:BBH:{}/Lev/metadata.json".format(self.NR_ID), download=self.download)

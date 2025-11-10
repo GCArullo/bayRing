@@ -173,81 +173,98 @@ class WaveformModel(cpnest.model.Model):
 
     def TEOBPM_waveform(self, params, fixed_params):
 
+        # Helper function to safely get a parameter
+        def get_param(params, name, default):
+            try:
+                return params[name]
+            except (KeyError, ValueError, IndexError, TypeError):
+                return default
+
         TGR_parameters = {}
-        
-        modes          = [(self.l_NR,self.m_NR)]
-        merger_phases  = {(self.l_NR,self.m_NR): params['phi_mrg_{}{}'.format(self.l_NR,self.m_NR)]}
+        modes = [(self.l_NR, self.m_NR)]
+        merger_phases = {(self.l_NR, self.m_NR): params[f'phi_mrg_{self.l_NR}{self.m_NR}']}
 
         # ------------------------------------------
-        # Sigmoid params
+        # Sigmoid parameters (robust access)
         # ------------------------------------------
-        t_q_sigmoid   = params['t_q_sigmoid_{}{}'.format(self.l_NR,self.m_NR)]
-        width_sigmoid = params['width_sigmoid_{}{}'.format(self.l_NR,self.m_NR)]
-        amp_sigmoid   = params['amp_sigmoid_{}{}'.format(self.l_NR,self.m_NR)]
-        psi_sigmoid   = params['psi_sigmoid_{}{}'.format(self.l_NR,self.m_NR)]
+        if self.quad_mode_flag == 1:
+            t_q_sigmoid   = get_param(params, f't_q_sigmoid_{self.l_NR}{self.m_NR}', 0.0)
+            width_sigmoid = get_param(params, f'width_sigmoid_{self.l_NR}{self.m_NR}', 1.0)
+            amp_sigmoid   = get_param(params, f'amp_sigmoid_{self.l_NR}{self.m_NR}', 0.0)
+            psi_sigmoid   = get_param(params, f'psi_sigmoid_{self.l_NR}{self.m_NR}', np.pi)
+        else:
+            # quad_mode_flag == 0 → disable sigmoid entirely
+            t_q_sigmoid   = 0.0
+            width_sigmoid = 1.0
+            amp_sigmoid   = 0.0
+            psi_sigmoid   = np.pi
 
-        nu = (self.metadata['m1']*self.metadata['m2'])/(self.metadata['m1']+self.metadata['m2'])**2
+        nu = (self.metadata['m1'] * self.metadata['m2']) / (self.metadata['m1'] + self.metadata['m2'])**2
 
-        if(self.TEOB_NR_fit):
-            
-            if(self.TEOB_template=='qc'):
+        # ------------------------------------------
+        # TEOB_NR fit coefficients
+        # ------------------------------------------
+        if self.TEOB_NR_fit:
+
+            if self.TEOB_template == 'qc':
                 NR_fit_coeffs = {
-                                (self.l_NR,self.m_NR): {
-                                                        'c3A'           : params['c3A_{}{}'.format(self.l_NR,self.m_NR)],
-                                                        'c3p'           : params['c3p_{}{}'.format(self.l_NR,self.m_NR)],
-                                                        'c4p'           : params['c4p_{}{}'.format(self.l_NR,self.m_NR)],
-                                                        }
-                                }
-            elif(self.TEOB_template=='nc'):
+                    (self.l_NR, self.m_NR): {
+                        'c3A': params[f'c3A_{self.l_NR}{self.m_NR}'],
+                        'c3p': params[f'c3p_{self.l_NR}{self.m_NR}'],
+                        'c4p': params[f'c4p_{self.l_NR}{self.m_NR}'],
+                    }
+                }
+            elif self.TEOB_template == 'nc':
                 NR_fit_coeffs = {
-                                (self.l_NR,self.m_NR): {
-                                                        'c2A'                 : params['c2A_{}{}'.format(self.l_NR,self.m_NR)],
-                                                        'c3A'                 : params['c3A_{}{}'.format(self.l_NR,self.m_NR)],
-                                                        'c2p'                 : params['c2p_{}{}'.format(self.l_NR,self.m_NR)],
-                                                        'c3p'                 : params['c3p_{}{}'.format(self.l_NR,self.m_NR)],
-                                                        'c4p'                 : params['c4p_{}{}'.format(self.l_NR,self.m_NR)],
-                                                        'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)],
-                                                        'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu,
-                                                        'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR,self.m_NR)]/nu,
-                                                        }
-                                }
+                    (self.l_NR, self.m_NR): {
+                        'c2A': params[f'c2A_{self.l_NR}{self.m_NR}'],
+                        'c3A': params[f'c3A_{self.l_NR}{self.m_NR}'],
+                        'c2p': params[f'c2p_{self.l_NR}{self.m_NR}'],
+                        'c3p': params[f'c3p_{self.l_NR}{self.m_NR}'],
+                        'c4p': params[f'c4p_{self.l_NR}{self.m_NR}'],
+                        'omg_peak': self.metadata[f'omg_peak_{self.l_NR}{self.m_NR}'],
+                        'A_peak_over_nu': self.metadata[f'A_peak_{self.l_NR}{self.m_NR}'] / nu,
+                        'A_peakdotdot_over_nu': self.metadata[f'A_peak{self.l_NR}{self.m_NR}dotdot'] / nu,
+                    }
+                }
             else:
-                raise ValueError("Unknown TEOB template selected: {}".format(self.TEOB_template))
-            
+                raise ValueError(f"Unknown TEOB template selected: {self.TEOB_template}")
+
             NR_fit_coeffs['Mf'] = self.Mf
             NR_fit_coeffs['af'] = self.af
 
         else:
             NR_fit_coeffs = None
 
-        if(self.TEOB_template=='qc'): ecc_par = 0
-        elif(self.TEOB_template=='nc'): ecc_par = 1
+        ecc_par = 0 if self.TEOB_template == 'qc' else 1
 
-        quad_mode_flag = self.quad_mode_flag
-
-        TGR_parameters = {}
-        ringdown_model = wf.TEOBPM(self.t_peak                   ,
-                                self.metadata['m1']              ,
-                                self.metadata['m2']              ,
-                                self.metadata['chi1']            ,
-                                self.metadata['chi2']            ,
-                                merger_phases                    ,
-                                t_q_sigmoid                      ,
-                                width_sigmoid                    ,
-                                amp_sigmoid                      ,
-                                psi_sigmoid                      ,
-                                1.0                              , # distance
-                                0.0                              , # inclination
-                                0.0                              , # orbital phase
-                                modes                            ,
-                                TGR_parameters                   ,
-                                geom           = 1               ,
-                                ecc_par        = ecc_par         ,
-                                quad_mode_flag = quad_mode_flag  ,
-                                NR_fit_coeffs  = NR_fit_coeffs)
+        # ------------------------------------------
+        # Build the ringdown model
+        # ------------------------------------------
+        ringdown_model = wf.TEOBPM(
+            self.t_peak,
+            self.metadata['m1'],
+            self.metadata['m2'],
+            self.metadata['chi1'],
+            self.metadata['chi2'],
+            merger_phases,
+            t_q_sigmoid,
+            width_sigmoid,
+            amp_sigmoid,
+            psi_sigmoid,
+            1.0,  # distance
+            0.0,  # inclination
+            0.0,  # orbital phase
+            modes,
+            TGR_parameters,
+            geom=1,
+            ecc_par=ecc_par,
+            quad_mode_flag=self.quad_mode_flag,
+            NR_fit_coeffs=NR_fit_coeffs
+        )
 
         return ringdown_model
-
+    
     def waveform(self, params, fixed_params):
 
         if (self.wf_model=='Kerr'):
