@@ -84,13 +84,18 @@ def read_default_bounds(wf_model, TEOB_template=''):
                                 'phi_tail' : [0.0, twopi]       ,
                                 'p_tail'   : [-20.0,  20.0]     }
     
-    default_bounds_TEOBPM    = {'phi_mrg'      : [0.0  , twopi]       ,
-                                't_q_sigmoid'  : [-4, 10]               ,
-                                'width_sigmoid': [0.5, 40]            ,
-                                'amp_sigmoid'  : [-5, 5]              ,
-                                'c3A'          : [-10.0, 10.0 ]       ,
-                                'c3p'          : [-10.0, 10.0 ]       ,
-                                'c4p'          : [-10.0, 10.0 ]       ,
+    default_bounds_TEOBPM    = {'phi_mrg'           : [0.0  , twopi]       ,
+                                't_q_sigmoid'       : [-40,20]             ,
+                                'width_q_sigmoid'   : [0.5, 40]            ,
+                                't_o_sigmoid'       : [-40,20]             ,
+                                'width_o_sigmoid'   : [0.5, 40]            ,
+                                'amp_441_value'     : [-10, 5]             ,
+                                'phi_441_value'     : [0.0, twopi ]        ,
+                                'amp_220q_value'    : [-10, 5]             ,
+                                'phi_220q_value'    : [0.0, twopi ]        ,
+                                'c3A'               : [-10.0, 10.0 ]       ,
+                                'c3p'               : [-10.0, 10.0 ]       ,
+                                'c4p'               : [-10.0, 10.0 ]       ,
                                 }
     if not(TEOB_template=='qc'):
         default_bounds_TEOBPM['c2A']          = [-10.0, 10.0]
@@ -413,24 +418,46 @@ def Dynamic_InferenceModel(base):
                         self.names.append(name)
                         self.bounds.append(single_bounds)
 
-            elif(self.wf_model.wf_model=='TEOBPM'):
+            elif(self.wf_model.wf_model == 'TEOBPM'):
 
                 default_bounds_TEOBPM = read_default_bounds(self.wf_model.wf_model, TEOB_template=self.TEOB_template)
 
-                sigmoid_params = ['t_q_sigmoid', 'width_sigmoid', 'amp_sigmoid']
+                sigmoid_params_q = ['t_q_sigmoid', 'width_q_sigmoid']
+                sigmoid_params_o = ['t_o_sigmoid', 'width_o_sigmoid']
+                params_441     = ['amp_441_value', 'phi_441_value']
+                params_220q    = ['amp_220q_value', 'phi_220q_value']
 
                 for name in default_bounds_TEOBPM.keys():
 
-                    quad_mode_flag = Config.getint("Model", "quad_mode_flag")
+                    quad_mode_flag = Config.getint("Model", "quad-mode-flag")
+                    overtone_flag  = Config.getint("Model", "overtone-flag")
+                    sigmoid_flag   = Config.getint("Model", "sigmoid-flag")
 
-                    # Sigmoid parameters must be fully removed if quadratic mode disabled
-                    if quad_mode_flag == 0 and name in sigmoid_params:
+                    # Determine which special parameters are allowed based on the flags
+                    if quad_mode_flag == 1 and overtone_flag == 1:
+                        allowed_params = params_220q + params_441
+                        if sigmoid_flag == 1:
+                            allowed_params += sigmoid_params_q + sigmoid_params_o
+                    elif quad_mode_flag == 1:
+                        allowed_params = params_220q
+                        if sigmoid_flag == 1:
+                            allowed_params += sigmoid_params_q
+                    elif overtone_flag == 1:
+                        allowed_params = params_441
+                        if sigmoid_flag == 1:
+                            allowed_params += sigmoid_params_o
+                    else:
+                        allowed_params = []  # both flags OFF → only baseline parameters
+
+                    # Skip this parameter if it is a special parameter not allowed by the flags
+                    if name in (sigmoid_params_q + sigmoid_params_o + params_220q + params_441) and name not in allowed_params:
                         continue
 
-                    # When TEOB_NR_fit=False: allow only phi_mrg + sigmoid params (if enabled)
-                    if (not self.TEOB_NR_fit) and (name not in ['phi_mrg'] + (sigmoid_params if self.wf_model.quad_mode_flag == 1 else [])):
+                    # When TEOB_NR_fit = False, allow only phi_mrg + allowed_params
+                    if not self.TEOB_NR_fit and (name not in ['phi_mrg'] + allowed_params):
                         continue
 
+                    # Construct the full parameter name
                     fullname = '{}_{}{}'.format(name, self.wf_model.l_NR, self.wf_model.m_NR)
 
                     try:

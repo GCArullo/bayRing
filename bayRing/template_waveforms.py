@@ -8,7 +8,7 @@ import bayRing.utils   as utils
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc', quad_mode_flag=1):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc', quad_mode_flag=1, overtone_flag=1, sigmoid_flag=0):
 
         self.t_NR                      = t_NR
         self.t_start                   = tM_start
@@ -29,6 +29,8 @@ class WaveformModel(cpnest.model.Model):
         self.TEOB_NR_fit               = TEOB_NR_fit
         self.TEOB_template             = TEOB_template
         self.quad_mode_flag            = quad_mode_flag
+        self.overtone_flag             = overtone_flag
+        self.sigmoid_flag              = sigmoid_flag
 
         if not(const_params==None):
             self.const_r = [const_params[0]*np.cos(const_params[1])]
@@ -187,17 +189,43 @@ class WaveformModel(cpnest.model.Model):
         # ------------------------------------------
         # Sigmoid parameters (robust access)
         # ------------------------------------------
-        if self.quad_mode_flag == 1:
+        if self.quad_mode_flag == 1 and self.overtone_flag == 1:
             t_q_sigmoid   = get_param(params, f't_q_sigmoid_{self.l_NR}{self.m_NR}', 0.0)
-            width_sigmoid = get_param(params, f'width_sigmoid_{self.l_NR}{self.m_NR}', 1.0)
-            amp_sigmoid   = get_param(params, f'amp_sigmoid_{self.l_NR}{self.m_NR}', 0.0)
-            psi_sigmoid   = get_param(params, f'psi_sigmoid_{self.l_NR}{self.m_NR}', np.pi)
+            width_q_sigmoid = get_param(params, f'width_q_sigmoid_{self.l_NR}{self.m_NR}', 1.0)
+            t_o_sigmoid   = get_param(params, f't_o_sigmoid_{self.l_NR}{self.m_NR}', 0.0)
+            width_o_sigmoid = get_param(params, f'width_o_sigmoid_{self.l_NR}{self.m_NR}', 1.0)
+            amp_441_value  = get_param(params, f'amp_441_value_{self.l_NR}{self.m_NR}', 0.0)
+            phi_441_value  = get_param(params, f'phi_441_value_{self.l_NR}{self.m_NR}', 0.0)
+            amp_220q_value  = get_param(params, f'amp_220q_value_{self.l_NR}{self.m_NR}', 0.0)
+            phi_220q_value  = get_param(params, f'phi_220q_value_{self.l_NR}{self.m_NR}', 0.0)
+        elif self.quad_mode_flag == 1 and self.overtone_flag == 0:
+            t_q_sigmoid   = get_param(params, f't_q_sigmoid_{self.l_NR}{self.m_NR}', 0.0)
+            width_q_sigmoid = get_param(params, f'width_q_sigmoid_{self.l_NR}{self.m_NR}', 1.0)
+            t_o_sigmoid     = 0.0
+            width_o_sigmoid = 1.0
+            amp_441_value  = 0.0
+            phi_441_value  = 0.0
+            amp_220q_value = get_param(params, f'amp_220q_value_{self.l_NR}{self.m_NR}', 0.0)
+            phi_220q_value = get_param(params, f'phi_220q_value_{self.l_NR}{self.m_NR}', 0.0)
+        elif self.quad_mode_flag == 0 and self.overtone_flag == 1:
+            t_q_sigmoid     = 0.0
+            width_q_sigmoid = 1.0
+            t_o_sigmoid     = get_param(params, f't_o_sigmoid_{self.l_NR}{self.m_NR}', 0.0)
+            width_o_sigmoid = get_param(params, f'width_o_sigmoid_{self.l_NR}{self.m_NR}', 1.0)
+            amp_441_value   = get_param(params, f'amp_441_value_{self.l_NR}{self.m_NR}', 0.0)
+            phi_441_value   = get_param(params, f'phi_441_value_{self.l_NR}{self.m_NR}', 0.0)
+            amp_220q_value  = 0.0
+            phi_220q_value  = 0.0
         else:
-            # quad_mode_flag == 0 → disable sigmoid entirely
-            t_q_sigmoid   = 0.0
-            width_sigmoid = 1.0
-            amp_sigmoid   = 0.0
-            psi_sigmoid   = np.pi
+            # quad_mode_flag == 0 and overtone_flag == 0
+            t_q_sigmoid     = 0.0
+            width_q_sigmoid = 1.0
+            t_o_sigmoid     = 0.0
+            width_o_sigmoid = 1.0
+            amp_441_value   = 0.0
+            phi_441_value   = 0.0
+            amp_220q_value  = 0.0
+            phi_220q_value  = 0.0
 
         nu = (self.metadata['m1'] * self.metadata['m2']) / (self.metadata['m1'] + self.metadata['m2'])**2
 
@@ -249,9 +277,13 @@ class WaveformModel(cpnest.model.Model):
             self.metadata['chi2'],
             merger_phases,
             t_q_sigmoid,
-            width_sigmoid,
-            amp_sigmoid,
-            psi_sigmoid,
+            width_q_sigmoid,
+            t_o_sigmoid,
+            width_o_sigmoid,
+            amp_441_value,
+            phi_441_value,
+            amp_220q_value,
+            phi_220q_value,
             1.0,  # distance
             0.0,  # inclination
             0.0,  # orbital phase
@@ -260,6 +292,8 @@ class WaveformModel(cpnest.model.Model):
             geom=1,
             ecc_par=ecc_par,
             quad_mode_flag=self.quad_mode_flag,
+            overtone_flag=self.overtone_flag,
+            sigmoid_flag=self.sigmoid_flag,
             NR_fit_coeffs=NR_fit_coeffs
         )
 

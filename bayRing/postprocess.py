@@ -1399,6 +1399,13 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     plt.tight_layout(rect=[0,0,1,0.95])
     plt.subplots_adjust(hspace=0, wspace=0.3)
 
+    # Save Real(h) residuals to file
+    residuals_re = wf_r - NR_r_cut
+    outfile = os.path.join(outdir, 'Plots/Comparisons/Residuals_Re_h.txt')
+    np.savetxt(outfile, np.column_stack((t_cut - t_peak, residuals_re)), 
+            header='t_minus_tpeak[M]   Residual_Re(h)')
+    print(f"Saved Real(h) residuals to: {outfile}")
+    
     plt.savefig(os.path.join(outdir, 'Plots/Comparisons/Residuals_reconstruction.pdf'), bbox_inches='tight')
 
     # Decay rate
