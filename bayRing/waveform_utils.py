@@ -389,7 +389,7 @@ def extract_and_compute_psd_parameters(psd_dict, mismatch_print_flag):
         f_min, f_max = np.min(freq_file), np.max(freq_file)
         f_sample     = 2 * f_max
         dt           = 1 / f_sample
-        T            = psd_dict["obs_time"]
+        T            = psd_dict["obs-time"]
 
         # Extract frequencies between f_min and f_max
         mask = (freq_file >= f_min) & (freq_file <= f_max)

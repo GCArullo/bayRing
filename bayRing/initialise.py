@@ -157,7 +157,7 @@ def read_config(Config):
         'Mismatch-PSD-settings':
         {
         'asd-path'              : ''               ,
-        'obs_time'              : 0.               ,
+        'obs-time'              : 0.               ,
         'direction'             : 'below-and-above',
         'window_DX'             : 0.8              ,
         'window_DX_max'         : 10.0             ,
@@ -465,7 +465,7 @@ A dot is present at the end of each description line and is not to be intended a
 
         asd-path            Path to the ASD file. Default: https://dcc.ligo.org/ligo-t1800044/public.
 
-        obs_time            Time of observation [s] related to the PSD (T=1/df). Default: 0 (as placeholder), and then computed in the code as 1/df.
+        obs-time            Time of observation [s] related to the PSD (T=1/df). If not provided, computed as T=1/df, where df is the minimum frequency resolution in the PSD frequency array.
         
         direction           Where to apply the smoothing in the PSD before doing the FFT. If 'below', it applies to low frequencies, if 'above' to high frequencies, if 'below-and-above' on both. Default: 'below-and-above'.
         
