@@ -91,8 +91,10 @@ def read_default_bounds(wf_model, TEOB_template=''):
                                 'width_o_sigmoid'   : [0.5, 40]            ,
                                 'amp_441_value'     : [-10, 5]             ,
                                 'phi_441_value'     : [0.0, twopi ]        ,
+                                'dphi_441_value'    : [-twopi, twopi ]     ,
                                 'amp_220q_value'    : [-10, 5]             ,
                                 'phi_220q_value'    : [0.0, twopi ]        ,
+                                'dphi_220q_value'   : [-twopi, twopi ]     ,
                                 'c3A'               : [-10.0, 10.0 ]       ,
                                 'c3p'               : [-10.0, 10.0 ]       ,
                                 'c4p'               : [-10.0, 10.0 ]       ,
@@ -424,8 +426,8 @@ def Dynamic_InferenceModel(base):
 
                 sigmoid_params_q = ['t_q_sigmoid', 'width_q_sigmoid']
                 sigmoid_params_o = ['t_o_sigmoid', 'width_o_sigmoid']
-                params_441     = ['amp_441_value', 'phi_441_value']
-                params_220q    = ['amp_220q_value', 'phi_220q_value']
+                params_441     = ['amp_441_value', 'phi_441_value', 'dphi_441_value']
+                params_220q    = ['amp_220q_value', 'phi_220q_value', 'dphi_220q_value']
 
                 for name in default_bounds_TEOBPM.keys():
 
