@@ -1,4 +1,5 @@
 # Standard python packages
+from tempfile import template
 import corner, h5py, matplotlib.pyplot as plt, numpy as np, os, qnm, scipy.linalg as sl, seaborn as sns, shutil, numba
 from scipy.interpolate           import interp1d
 from itertools import product
@@ -1092,8 +1093,21 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
 
     l,m = NR_sim.l, NR_sim.m
 
-    f_rd_fundamental    = template.qnm_cached[(2,l,m,0)]['f']
-    tau_rd_fundamental  = template.qnm_cached[(2,l,m,0)]['tau']
+    # --- Fundamental QNM (ensure cache is populated for this (l,m)) ---
+    key = (2, l, m, 0)
+
+    if not hasattr(template, "qnm_cached") or template.qnm_cached is None:
+        template.qnm_cached = {}
+
+    if key not in template.qnm_cached:
+        # Use the same convention as the overtone block below
+        omega0, _, _ = qnm.modes_cache(s=-2, l=l, m=m, n=0)(a=np.abs(metadata['af']))
+        f0 = (np.real(omega0) / metadata['Mf']) * (1.0 / twopi)
+        tau0 = (-1/np.imag(omega0) * metadata['Mf'])
+        template.qnm_cached[key] = {'f': f0, 'tau': tau0}
+
+    f_rd_fundamental   = template.qnm_cached[key]['f']
+    tau_rd_fundamental = template.qnm_cached[key]['tau']
 
     plot_overtones_flag = 0
     f_rd_overtones      = {}
