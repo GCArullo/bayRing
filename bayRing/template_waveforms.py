@@ -8,7 +8,7 @@ import bayRing.utils   as utils
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc', quad_mode_flag=1, overtone_flag=1, sigmoid_flag=0):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc', sigmoid_flag=0):
 
         self.t_NR                      = t_NR
         self.t_start                   = tM_start
@@ -28,8 +28,6 @@ class WaveformModel(cpnest.model.Model):
         self.KerrBinary_amp_nc_version = KerrBinary_amp_nc_version
         self.TEOB_NR_fit               = TEOB_NR_fit
         self.TEOB_template             = TEOB_template
-        self.quad_mode_flag            = quad_mode_flag
-        self.overtone_flag             = overtone_flag
         self.sigmoid_flag              = sigmoid_flag
 
         if not(const_params==None):
@@ -297,8 +295,6 @@ class WaveformModel(cpnest.model.Model):
             TGR_parameters,
             geom=1,
             ecc_par=ecc_par,
-            quad_mode_flag=self.quad_mode_flag,
-            overtone_flag=self.overtone_flag,
             sigmoid_flag=self.sigmoid_flag,
             NR_fit_coeffs=NR_fit_coeffs
         )
