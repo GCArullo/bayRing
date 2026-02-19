@@ -159,25 +159,25 @@ def read_config(Config):
 
         'Mismatch-PSD-settings':
         {
-        'asd-path'              : ''     ,
-        'obs_time'              : 0.     ,
-        'direction'             : 'below',
-        'window_DX'             : 0.8    ,
-        'window_DX_max'         : 10.0   ,
-        'window_SX'             : 0.8    ,
-        'window_SX_max'         : 10.0   ,
-        'n_window_DX'           : 1      ,
-        'n_window_SX'           : 1      ,
-        'steepness'             : 7.     ,
-        'steepness_max'         : 200.   ,
-        'n_steepness'           : 1      ,
-        'saturation_DX'         : 1.     ,
-        'saturation_DX_max'     : 5.     ,
-        'n_saturation_DX'       : 1      ,
-        'saturation_SX'         : 1.     ,
-        'saturation_SX_max'     : 5.     ,
-        'n_saturation_SX'       : 1      ,
-        'n_FFT_points'          : 1      ,
+        'asd-path'              : ''               ,
+        'obs-time'              : 0.               ,
+        'direction'             : 'below-and-above',
+        'window_DX'             : 0.8              ,
+        'window_DX_max'         : 10.0             ,
+        'window_SX'             : 0.8              ,
+        'window_SX_max'         : 10.0             ,
+        'n_window_DX'           : 1                ,
+        'n_window_SX'           : 1                ,
+        'steepness'             : 7.               ,
+        'steepness_max'         : 200.             ,
+        'n_steepness'           : 1                ,
+        'saturation_DX'         : 1.               ,
+        'saturation_DX_max'     : 5.               ,
+        'n_saturation_DX'       : 1                ,
+        'saturation_SX'         : 1.               ,
+        'saturation_SX_max'     : 5.               ,
+        'n_saturation_SX'       : 1                ,
+        'n_FFT_points'          : 1                ,
         'n_iterations_C1'       : 1      
         },
 
@@ -192,7 +192,7 @@ def read_config(Config):
 
         'Flags': 
         {
-        'apply_window'                 : 0,
+        'apply_window'                 : 1,
         'C1_flag'                      : 1,
         'clear_directory'              : 1,
         'compare_TD_FD'                : 0,
@@ -474,13 +474,13 @@ A dot is present at the end of each description line and is not to be intended a
 
         asd-path            Path to the ASD file. Default: https://dcc.ligo.org/ligo-t1800044/public.
 
-        obs_time            Time of observation [s] related to the PSD (T=1/df). Default: 0, and then computed in the code as 1/df.
+        obs-time            Time of observation [s] related to the PSD (T=1/df). If not provided, computed as T=1/df, where df is the minimum frequency resolution in the PSD frequency array.
         
-        direction           Where to apply the smoothing in the PSD before doing the FFT. If below, it applies to low frequencies, if above to high frequencies, if below-and-above on both. Default: below.
+        direction           Where to apply the smoothing in the PSD before doing the FFT. If 'below', it applies to low frequencies, if 'above' to high frequencies, if 'below-and-above' on both. Default: 'below-and-above'.
         
         n_FFT_points        Number of iterations for values of the points that are used to compute the PSD. Default: 1.
         
-        n_iterations_C1     Number of iteriations for the C1 algorithm. Default: 1.
+        n_iterations_C1     Number of iteriations for algorithm that transforms functions to their C^1 versions. Default: 1.
         
         window_DX           Minimum window size for smoothing on the right side. Default: 0.8.
         
@@ -517,34 +517,22 @@ A dot is present at the end of each description line and is not to be intended a
     *************************************************
 
         apply_window                Choose wheter to apply window at the edges of the PSD or not. 
-                                    - 1: Apply window with default parameters.
-                                    - 0: Do not apply.
-                                    Default: 0.
+                                    Default: 1.
 
         C1_flag                     Enables or disables C1 fixing on the PSD after smoothing application.
-                                    - 1: Enable C1 iterations.
-                                    - 0: Disable C1 iterations.
                                     Default: 1.
 
         clear_directory             Controls whether the output directory for the smoothing section is cleared before the run.
-                                    - 1: Clear the directory before execution.
-                                    - 0: Keep existing files.
                                     Default: 1.
 
         compare_TD_FD               Enables comparison between Time Domain (TD) and Frequency Domain (FD) mismatches.
-                                    - 1: Compute and compare both TD and FD mismatches.
-                                    - 0: Skip comparison.
                                     Default: 0.                     
 
         mismatch_print_flag         Determines whether to print mismatch information (e.g. the scalar products involved in the mismatch).
-                                    - 1: Print mismatch values.
-                                    - 0: Do not print mismatch values.
                                     Default: 0.
 
         mismatch_section_plot_flag  
                                     Determines whether to plot sanity check plots regarding the mismatch section (for instance, the windowed PSD vs the original one).
-                                    - 1: Generate and save mismatch section plots.
-                                    - 0: Do not generate plots.
                                     Default: 0.    
 
     ********************************************************************
