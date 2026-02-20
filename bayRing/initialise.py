@@ -469,7 +469,7 @@ A dot is present at the end of each description line and is not to be intended a
 
         asd-path            Path to the ASD file. Default: https://dcc.ligo.org/ligo-t1800044/public.
 
-        obs-time            Time of observation [s] related to the PSD (T=1/df). If not provided, computed as T=1/df, where df is the minimum frequency resolution in the PSD frequency array.
+        obs-time            Time of observation [s]. If not provided, default is computed as T=1/df, where df is the minimum frequency resolution in the PSD frequency array.
         
         direction           Where to apply the smoothing in the PSD before doing the FFT. If 'below', it applies to low frequencies, if 'above' to high frequencies, if 'below-and-above' on both. Default: 'below-and-above'.
         
