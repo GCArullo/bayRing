@@ -190,6 +190,11 @@ def main():
     if(  parameters['I/O']['run-type']=='full'           ): results_object = inference.run_inference(parameters, inference_model)
     elif(parameters['I/O']['run-type']=='post-processing'): results_object = postprocess.read_results_object_from_previous_inference(parameters)
     else                                                  : raise Exception("Unknown run type selected: {}. Exiting.".format(parameters['I/O']['run-type']))
+
+    if parameters['I/O']['run-type']=='full':
+        import pickle
+        with open(os.path.join(parameters['I/O']['outdir'], 'NR_sim.pkl'), 'wb') as f:
+            pickle.dump([NR_sim, [np.array(inference_model.model(p)) for p in results_object], wf_model], f)
         
     #=========================#
     # Postprocessing section. #

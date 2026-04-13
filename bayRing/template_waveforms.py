@@ -228,6 +228,12 @@ class WaveformModel(cpnest.model.Model):
 
                 fit_coeffs = {key: val for key, val in self.fit_metadata.items() if key.startswith(('c_2_', 'c_3_', 'c_4_'))}
                 NR_fit_coeffs[(self.l_NR, self.m_NR)].update(fit_coeffs)
+                for key in ['nu', 'ecc', 'bmrg', 'jmrg', 'emrg']:
+                    norm_scale_key, norm_shift_key = 'norm_{}_scale'.format(key), 'norm_{}_shift'.format(key)
+                    if norm_scale_key in self.fit_metadata:
+                        NR_fit_coeffs[norm_scale_key] = self.fit_metadata[norm_scale_key]
+                    if norm_shift_key in self.fit_metadata:
+                        NR_fit_coeffs[norm_shift_key] = self.fit_metadata[norm_shift_key]
             except:
                 NR_fit_coeffs = {
                                 (self.l_NR,self.m_NR): {
@@ -316,7 +322,7 @@ class WaveformModel(cpnest.model.Model):
             
             ringdown_model                = self.TEOBPM_waveform(params, fixed_params)
             _, _, _, self.wf_r, self.wf_i = ringdown_model.waveform(self.t_NR)
-
+            
         else:
             raise ValueError("Unknown template selected: {}".format(self.wf_model))
 

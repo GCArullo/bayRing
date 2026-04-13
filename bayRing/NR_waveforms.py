@@ -742,9 +742,9 @@ class NR_simulation():
         
             self.download = download
             self.q, self.chi1, self.chi2, self.tilt1, self.tilt2, self.ecc, self.Mf, self.af = self.read_SXS_metadata()
-            try:
-                self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = self.load_SXS_addn_metadata(csv_path=self.additional_NR_properties, fit_path=self.fits, ID_str=self.NR_ID)
-            except:
+            if self.additional_NR_properties is not None:
+                self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = self.load_SXS_addn_metadata(csv_path=self.additional_NR_properties, ID_str=self.NR_ID)
+            else:
                 self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = None, None, None, None
 
             # Build NR waveform and time axis.
@@ -760,16 +760,7 @@ class NR_simulation():
             else:
                 self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level)
 
-            counter = 1
-            while(not(counter==0)):
-                try              : 
-                    if(self.res_level-counter==0): raise ValueError("Only a single resolution available.")
-                    t_res, NR_r_res, NR_i_res = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level-counter)
-                    print('Resolution error constructed with resolution level {}'.format(self.res_level-counter))
-                    counter = 0
-                except ValueError: 
-                    counter += 1
-            t_extr, NR_r_extr, NR_i_extr = self.read_waveform_lm_from_SXS(self.extrap_order+1, self.res_level)
+            t_extr, NR_r_extr, NR_i_extr = None, None, None
 
         elif(self.NR_catalog=='RIT'):
         
@@ -1310,7 +1301,8 @@ class NR_simulation():
 
         """
         
-        metadata      = sxs.load("SXS:BBH:{}/Lev/metadata.json".format(self.NR_ID), download=self.download)
+        sim      = sxs.load("SXS:BBH:{}".format(self.NR_ID), download=self.download, auto_supersede=True)
+        metadata = sim.metadata
         
         tilt1, tilt2  = 0.0, 0.0
 
@@ -1565,7 +1557,8 @@ class NR_simulation():
 
         """
         
-        waveform = sxs.load("SXS:BBH:{}/Lev{}/rhOverM_Asymptotic_GeometricUnits_CoM.h5".format(self.NR_ID, LevRes), extrapolation_order=ExtOrd, download=self.download)
+        sim = sxs.load("SXS:BBH:{}/Lev{}".format(self.NR_ID, LevRes), download=self.download, extrapolation_order=ExtOrd, auto_supersede=True)
+        waveform = sim.h
         
         time        = waveform.t
         mode_index  = waveform.index(self.l, self.m)
