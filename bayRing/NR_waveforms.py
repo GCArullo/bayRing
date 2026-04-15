@@ -1358,7 +1358,7 @@ class NR_simulation():
         if self.sxs_installed_version < sxs_uploaded_cat_version: 
             metadata    = sxs.load("SXS:BBH:{}/Lev/metadata.json".format(self.NR_ID), download=self.download)
         else:
-            simulations = sxs.load("simulations", local = True, download = False)
+            simulations = sxs.load("simulations", local=True, download=False, cache=True)
             metadata    = simulations["SXS:BBH:{}".format(self.NR_ID)]
 
         tilt1, tilt2  = 0.0, 0.0
@@ -1621,7 +1621,7 @@ class NR_simulation():
             waveform = sxs.load("SXS:BBH:{}/Lev{}/rhOverM_Asymptotic_GeometricUnits_CoM.h5".format(self.NR_ID, LevRes), extrapolation_order=ExtOrd, download=self.download)
         else:
             ExtOrd = "N"+str(ExtOrd)
-            waveform = sxs.load("SXS:BBH:{}/Lev{}".format(self.NR_ID, LevRes), extrapolation_order=ExtOrd, download=self.download).h
+            waveform = sxs.load("SXS:BBH:{}/Lev{}".format(self.NR_ID, LevRes), extrapolation_order=ExtOrd, local=True, download=False, cache=True).h
 
         time        = waveform.t
         mode_index  = waveform.index(self.l, self.m)

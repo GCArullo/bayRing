@@ -142,7 +142,8 @@ def main():
                                                 KerrBinary_amp_nc_version = parameters['Model']['KerrBinary-amplitudes-nc-version'],
                                                 TEOB_NR_fit               = parameters['Model']['TEOB-NR-fit']                 ,
                                                 TEOB_template             = parameters['Model']['TEOB-template']               ,
-                                                sigmoid_flag              = parameters['Model']['sigmoid-flag']              
+                                                sigmoid_flag              = parameters['Model']['sigmoid-flag']                ,
+                                                quadratic_fits            = parameters['Model']['quadratic-fits']            
                                                 )
 
     # ===============#

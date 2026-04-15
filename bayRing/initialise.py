@@ -132,7 +132,8 @@ def read_config(Config):
         'KerrBinary-amplitudes-nc-version' : ''           ,
         'TEOB-NR-fit'                      : 0            ,
         'TEOB-template'                    : 'qc'         ,
-        'sigmoid-flag'                     : 0            ,    
+        'sigmoid-flag'                     : 0            ,
+        'quadratic-fits'                   : 0            ,
         },
 
         'Inference':
@@ -394,7 +395,8 @@ A dot is present at the end of each description line and is not to be intended a
         TEOB-template                    TEOB template to be used. Available options: ['qc', 'nc']. The 'qc' version is defined in  \
                                          arXiv:1904.09550, arXiv:2001.09082, while the 'nc' in II.C of arXiv:2305.19336.                                                  Default: 'qc'.
 
-        sigmoid-flag                     Flag to include sigmoid for each additional Kerr mode.                                                   
+        sigmoid-flag                     Flag to include sigmoid for each additional Kerr mode.
+        quadratic-fits                   Flag to include quadratic fits.                                                   
                                                                                                                                                                            Default: 0.                                
     
     *******************************************************

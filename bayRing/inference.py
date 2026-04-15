@@ -85,9 +85,9 @@ def read_default_bounds(wf_model, TEOB_template=''):
                                 'p_tail'   : [-20.0,  20.0]     }
     
     default_bounds_TEOBPM    = {'phi_mrg'           : [0.0  , twopi]       ,
-                                't_sigmoid'         : [-5,20]              ,
+                                't_sigmoid'         : [-5,40]              ,
                                 'width_sigmoid'     : [0.5, 40]            ,
-                                'ln_A'              : [-10, 5]             ,
+                                'ln_A'              : [-8, 5]              ,
                                 'phi'               : [0.0, twopi ]        ,
                                 'dphi'              : [0.0, twopi ]        ,
                                 'c3A'               : [-10.0, 10.0 ]       ,

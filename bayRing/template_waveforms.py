@@ -8,7 +8,7 @@ import bayRing.utils   as utils
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc', sigmoid_flag=0):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc', sigmoid_flag=0, quadratic_fits=0):
 
         self.t_NR                      = t_NR
         self.t_start                   = tM_start
@@ -29,6 +29,7 @@ class WaveformModel(cpnest.model.Model):
         self.TEOB_NR_fit               = TEOB_NR_fit
         self.TEOB_template             = TEOB_template
         self.sigmoid_flag              = sigmoid_flag
+        self.quadratic_fits            = quadratic_fits
 
         if not(const_params==None):
             self.const_r = [const_params[0]*np.cos(const_params[1])]
@@ -293,10 +294,11 @@ class WaveformModel(cpnest.model.Model):
             0.0,  # orbital phase
             modes,
             TGR_parameters,
-            geom=1,
-            ecc_par=ecc_par,
-            sigmoid_flag=self.sigmoid_flag,
-            NR_fit_coeffs=NR_fit_coeffs
+            geom            = 1,
+            ecc_par         = ecc_par,
+            sigmoid_flag    = self.sigmoid_flag,
+            quadratic_fits  = self.quadratic_fits,
+            NR_fit_coeffs   = NR_fit_coeffs
         )
 
         return ringdown_model
