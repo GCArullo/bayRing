@@ -30,7 +30,7 @@ def read_quad_modes(QQNM_modes, l_NR, m):
 
     """
 
-    quad_modes_list   = QQNM_modes[0].split(',')
+    quad_modes_list = QQNM_modes.split(',')
 
     quad_modes        = {'sum': [], 'diff': []}
     for i in range(len(quad_modes_list)):

@@ -1,5 +1,5 @@
 # General python imports
-import h5py, numpy as np, os, pandas as pd
+import h5py, numpy as np, os, pandas as pd, subprocess
 from scipy import interpolate
 
 import sxs
@@ -13,6 +13,25 @@ import pyRing.utils           as pyRing_utils
 import pyRing.waveform        as wf
 
 twopi = 2.*np.pi
+
+def get_sxs_version():
+    """
+    Get the installed version of the sxs package.
+
+    Returns
+    -------
+    str
+        The installed version of sxs.
+    """
+    try:
+        # Use pip to get the version of sxs installed
+        version_output = subprocess.check_output(['pip', 'show', 'sxs'], text=True)
+        for line in version_output.split('\n'):
+            if line.startswith('Version:'):
+                return line.split(' ')[1]
+    except subprocess.CalledProcessError:
+        print("Error while checking sxs version.")
+        return None
 
 def read_fake_NR(NR_catalog, fake_NR_modes):
 
@@ -740,27 +759,61 @@ class NR_simulation():
 
         elif(self.NR_catalog=='SXS'):
         
-            self.download = download
+            self.download  = download
             self.q, self.chi1, self.chi2, self.tilt1, self.tilt2, self.ecc, self.Mf, self.af = self.read_SXS_metadata()
+            
             if self.additional_NR_properties is not None:
                 self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = self.load_SXS_addn_metadata(csv_path=self.additional_NR_properties, ID_str=self.NR_ID)
             else:
                 self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = None, None, None, None
 
             # Build NR waveform and time axis.
-            if(self.res_level==-1):
-                for res_level_x in [6,5,4,3,2,1]:
+            if self.res_level == -1:
+                # We add a maximum number of attempts to avoid the infinite loop
+
+                # Max attempts corresponding to the 6 resolution levels
+                max_attempts = 6
+
+                # Counter for the number of attempts
+                attempts = 0
+
+                # Loop through each resolution level from 6 down to 1
+                for res_level_x in [6, 5, 4, 3, 2, 1]:
                     try:
+
+                        # Attempt to read the waveform for the current resolution level
                         self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_SXS(self.extrap_order, res_level_x)
+                        
+                        # Set the resolution level if successful
                         self.res_level = res_level_x
+                        print("\n* Resolution found at level: {}\n".format(self.res_level))
+
+                        # Exit the loop if the level is valid and waveform is loaded
                         break
-                    except:
-                        pass
-                print("\n* Setting the resolution level to the maximum available: {}\n".format(self.res_level))
+                    except Exception as e:
+
+                        # If an error occurs (e.g., file not found or data issues), increment the attempt count
+                        attempts += 1
+                        print(f"Error in attempt {attempts} with resolution level {res_level_x}: {e}")
+                        
+                        # If we reach the maximum number of attempts, break the loop and stop trying
+                        if attempts >= max_attempts:
+                            print("\n* Unable to find a valid resolution level. Stopping attempts.")
+                            break
             else:
+                # If a valid resolution level is already set, load the waveform with that resolution level
                 self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level)
 
-            t_extr, NR_r_extr, NR_i_extr = None, None, None
+            counter = 1
+            while(not(counter==0)):
+                try              : 
+                    if(self.res_level-counter==0): raise ValueError("Only a single resolution available.")
+                    t_res, NR_r_res, NR_i_res = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level-counter)
+                    print('Resolution error constructed with resolution level {}'.format(self.res_level-counter))
+                    counter = 0
+                except ValueError: 
+                    counter += 1
+            t_extr, NR_r_extr, NR_i_extr = self.read_waveform_lm_from_SXS(self.extrap_order+1, self.res_level)
 
         elif(self.NR_catalog=='RIT'):
         
@@ -959,7 +1012,6 @@ class NR_simulation():
                 NR_r_err_res, NR_i_err_res = np.abs(self.NR_r-NR_r_res), np.abs(self.NR_i-NR_i_res)
             
                 self.NR_err_cmplx          = NR_r_err_res + 1j * NR_i_err_res
-
 
         elif(self.NR_catalog=='charged_raw'):
             if('constant' in NR_error):
@@ -1272,7 +1324,7 @@ class NR_simulation():
 
         """
 
-        Read the metadata of the SXS waveform.
+        Read the metadata of the SXS waveform (with latest version released on 25th April 2025).
 
         Parameters
         ----------
