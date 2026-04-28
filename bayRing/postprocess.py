@@ -2719,13 +2719,14 @@ def run_mismatch_and_SNR_computation(NR_sim, results_object, inference_model, pa
         Collected data products for later postprocessing and plotting.
     """
 
-    # Initialize output dictionaries
     psd_data, acf_data, mismatch_data, optimal_SNR_data, condition_numbers_data = {}, {}, {}, {}, {}
 
     try:
         #---------------------------------------------#
         # Extract GW and PSD parameters
         #---------------------------------------------#
+        outdir = parameters['I/O']['outdir']
+        method = parameters['Inference']['method']
         M, dL, ra, dec, psi = wf_utils.extract_GW_parameters(parameters)
         t_start_g_true = parameters['Inference']['t-start']
         t_start_g, t_end_g, t_NR_s, NR_length = wf_utils.extract_NR_params(NR_sim, M)
@@ -2741,7 +2742,7 @@ def run_mismatch_and_SNR_computation(NR_sim, results_object, inference_model, pa
             parameters['Mismatch-PSD-settings'], mismatch_print_flag
         )
 
-        N_FFT = [N_points] if n_FFT_points == 1 else list(
+        n_fft_values = [N_points] if n_FFT_points == 1 else list(
             map(int, np.logspace(np.log10(NR_length), np.log10(2 * N_points), n_FFT_points))
         )
 
@@ -2749,102 +2750,87 @@ def run_mismatch_and_SNR_computation(NR_sim, results_object, inference_model, pa
         # Directory cleanup (optional)
         #---------------------------------------------#
         if clear_directory_flag == 1:
+            mismatch_dir = os.path.join(outdir, "Algorithm/Mismatch")
             for smoothing_path in ["Left_smoothing", "Right_smoothing", "Both_edges_smoothing"]:
-                algorithm_dir = os.path.join(parameters['I/O']['outdir'], "Algorithm/Mismatch", smoothing_path)
-                clear_directory(algorithm_dir)
+                clear_directory(os.path.join(mismatch_dir, smoothing_path))
 
         #---------------------------------------------#
         # Main iteration loop
         #---------------------------------------------#
-        for N_fft in N_FFT:
-            for window_size_DX in window_sizes_DX:
-                for window_size_SX in window_sizes_SX:
-                    for k in steepness_values:
-                        for saturation_DX in saturation_DX_values:
-                            for saturation_SX in saturation_SX_values:
-                                if (t_end - t_start) > 1 / (f_min + window_size_DX) and direction != 'above':
-                                    print("Please provide (t_end-t_start) < 1/(f_min+window_size_DX).")
-                                    print("Forbidden frequency:", f_min + window_size_DX)
-                                    return None
+        grid = product(
+            n_fft_values,
+            window_sizes_DX,
+            window_sizes_SX,
+            steepness_values,
+            saturation_DX_values,
+            saturation_SX_values,
+        )
 
-                                try:
+        for N_fft, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX in grid:
+            if (t_end - t_start) > 1 / (f_min + window_size_DX) and direction != 'above':
+                print("Please provide (t_end-t_start) < 1/(f_min+window_size_DX).")
+                print("Forbidden frequency:", f_min + window_size_DX)
+                return None
 
-                                    #---------------------------------------------#
-                                    # PSD / ACF computation
-                                    #---------------------------------------------#
-                                    if apply_window == 1:
-                                        print(f"* Applying window with parameters: w_DX={window_size_DX:.1f}Hz, w_SX={window_size_SX:.1f}Hz, "
-                                              f"k={k:.1f}, satDX={saturation_DX:.1f}, satSX={saturation_SX:.1f}, N_FFT={N_fft}")
-                                        PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_with_smoothing(
-                                            asd_path, f_min, f_max, N_fft,
-                                            window_size_DX, window_size_SX, k,
-                                            saturation_DX, saturation_SX,
-                                            direction, C1_flag, n_iterations_C1
-                                        )
-                                    else:
-                                        print("* Computing ACF from PSD without smoothing")
-                                        PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_no_window_at_edges(
-                                            asd_path, f_min, f_max, N_fft
-                                        )
+            window_args = (window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)
+            label = (
+                f"wDX={window_size_DX:.1f}Hz, wSX={window_size_SX:.1f}Hz, "
+                f"k={k:.1f}, satDX={saturation_DX:.1f}, satSX={saturation_SX:.1f}, N_FFT={N_fft}"
+            )
 
-                                    label = f"wDX={window_size_DX:.1f}Hz, wSX={window_size_SX:.1f}Hz, k={k:.1f}, " \
-                                            f"satDX={saturation_DX:.1f}, satSX={saturation_SX:.1f}, N_FFT={N_fft}"
-                                    psd_data[label] = PSD_smoothed
-                                    acf_data[label] = ACF_smoothed
+            try:
+                if apply_window == 1:
+                    print(f"* Applying window with parameters: w_DX={window_size_DX:.1f}Hz, w_SX={window_size_SX:.1f}Hz, "
+                          f"k={k:.1f}, satDX={saturation_DX:.1f}, satSX={saturation_SX:.1f}, N_FFT={N_fft}")
+                    PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_with_smoothing(
+                        asd_path, f_min, f_max, N_fft, *window_args,
+                        direction, C1_flag, n_iterations_C1
+                    )
+                else:
+                    print("* Computing ACF from PSD without smoothing")
+                    PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_no_window_at_edges(
+                        asd_path, f_min, f_max, N_fft
+                    )
 
-                                    #----------------------#
-                                    # Mismatch computation #
-                                    #----------------------#
+                psd_data[label] = PSD_smoothed
+                acf_data[label] = ACF_smoothed
 
-                                    t_ACF = np.linspace(0, N_fft * dt, len(ACF_smoothed))
-                                    ACF_truncated_NR = truncate_and_interpolate_acf(
-                                        t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s, mismatch_print_flag
-                                    )
+                t_ACF = np.linspace(0, N_fft * dt, len(ACF_smoothed))
+                ACF_truncated_NR = truncate_and_interpolate_acf(
+                    t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s, mismatch_print_flag
+                )
 
-                                    compute_mismatch_hplus_hcross(
-                                        NR_sim, results_object, inference_model,
-                                        parameters['I/O']['outdir'], parameters['Inference']['method'],
-                                        ACF_truncated_NR, N_fft, M, dL, t_start_g_true,
-                                        f_min, f_max, asd_path,
-                                        window_size_DX, window_size_SX, k,
-                                        saturation_DX, saturation_SX,
-                                        mismatch_print_flag, compare_TD_FD
-                                    )
-                                         
-                                    #----------------------------------#
-                                    # Optimal SNR and condition number #
-                                    #----------------------------------#
+                common_args = (
+                    NR_sim, results_object, inference_model, outdir, method,
+                    ACF_truncated_NR, N_fft, M, dL
+                )
 
-                                    compute_optimal_SNR(
-                                        NR_sim, results_object, inference_model,
-                                        parameters['I/O']['outdir'], parameters['Inference']['method'],
-                                        ACF_truncated_NR, N_fft, M, dL,
-                                        t_start_g_true, t_end_g,
-                                        f_min, f_max, asd_path,
-                                        window_size_DX, window_size_SX, k,
-                                        saturation_DX, saturation_SX, compare_TD_FD
-                                    )
+                compute_mismatch_hplus_hcross(
+                    *common_args, t_start_g_true, f_min, f_max, asd_path,
+                    *window_args, mismatch_print_flag, compare_TD_FD
+                )
 
-                                    condition_number = wf_utils.compute_condition_number(ACF_truncated_NR)
-                                    condition_numbers_data[(window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)] = condition_number
+                compute_optimal_SNR(
+                    *common_args, t_start_g_true, t_end_g, f_min, f_max, asd_path,
+                    *window_args, compare_TD_FD
+                )
 
-                                    if mismatch_section_plot_flag == 1:
-                                        plot_acf_interpolated(
-                                            t_ACF, t_NR_s, ACF_smoothed, ACF_truncated_NR,
-                                            parameters['I/O']['outdir'],
-                                            window_size_DX, window_size_SX, k,
-                                            saturation_DX, saturation_SX, direction
-                                        )
+                condition_numbers_data[window_args] = wf_utils.compute_condition_number(ACF_truncated_NR)
 
-                                except Exception as e:
-                                    print(f"* Mismatch computation failed for wDX={window_size_DX}, wSX={window_size_SX}, k={k}: {e}")
+                if mismatch_section_plot_flag == 1:
+                    plot_acf_interpolated(
+                        t_ACF, t_NR_s, ACF_smoothed, ACF_truncated_NR,
+                        outdir, *window_args, direction
+                    )
 
+            except Exception as e:
+                print(f"* Mismatch computation failed for wDX={window_size_DX}, wSX={window_size_SX}, k={k}: {e}")
 
         #---------------------------------------------#
         # Postprocessing plots
         #---------------------------------------------#
         if mismatch_section_plot_flag == 1:
-            plot_psd_and_acf(psd_data, acf_data, asd_path, f_min, f_max, parameters['I/O']['outdir'], direction)
+            plot_psd_and_acf(psd_data, acf_data, asd_path, f_min, f_max, outdir, direction)
 
     except Exception as e:
         print(f"\n* Mismatch computation failed. Check parameters and input data.\nError: {e}")
