@@ -29,9 +29,6 @@ twopi = 2.*np.pi
 C_mt=(lal.MSUN_SI * lal.G_SI) / (lal.C_SI**3) #s, converts a mass expressed in solar masses into a time in seconds
 C_md=(lal.MSUN_SI * lal.G_SI)/(1e6*lal.PC_SI*lal.C_SI**2) #adimensional, converts a mass expressed in solar masses to a distance in Megaparsec
 
-if __name__=='__main__':
-    main()
-
 def main():
 
     # ==================================================#
@@ -202,8 +199,12 @@ def main():
 
     if parameters['I/O']['run-type']=='full':
         import pickle
+        if(parameters['Inference']['method']=='Minimization'):
+            model_samples = [np.array(inference_model.model(results_object))]
+        else:
+            model_samples = [np.array(inference_model.model(p)) for p in results_object]
         with open(os.path.join(parameters['I/O']['outdir'], 'NR_sim.pkl'), 'wb') as f:
-            pickle.dump([NR_sim, [np.array(inference_model.model(p)) for p in results_object], wf_model], f)
+            pickle.dump([NR_sim, model_samples, wf_model], f)
         
     #=========================#
     # Postprocessing section. #
@@ -247,12 +248,16 @@ def main():
     postprocess.run_mismatch_and_SNR_computation(NR_sim, results_object, inference_model, parameters, wf_utils)
 
     # Attempt to generate the global corner plot
-    try:
-        postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
-    except Exception as e:
-        print(f"Corner plot failed with error: {e}")
-        traceback.print_exc()
+    if(parameters['Inference']['method']=='Nested-sampler'):
+        try:
+            postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
+        except Exception as e:
+            print(f"Corner plot failed with error: {e}")
+            traceback.print_exc()
 
     # Show plots if the option is enabled
     if parameters['I/O']['show-plots']:
         plt.show()
+
+if __name__=='__main__':
+    main()

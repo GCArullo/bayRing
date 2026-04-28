@@ -74,16 +74,17 @@ def read_parameter_bounds(Config, configparser, basename, fullname, default_boun
 
     return single_bounds
 
-def read_parameter_start_minimization(Config, configparser, fullname, bounds, nseeds):
+def read_parameter_start_minimization(Config, configparser, fullname, bounds, nseeds=1, rng=None):
     
     
     try:                                                                                                     start_value = Config.getfloat("Priors", fullname+'-start')
     except (KeyError, configparser.NoOptionError, configparser.NoSectionError, configparser.NoSectionError): 
-        start_values = np.random.uniform(bounds[0], bounds[1], nseeds)
-        results      = []
-        # Be careful, you should minimize across all parameters
-        for start_value in start_values:
-            l_s(self.fun, param_0, method = self.min_method)
+        if rng is None:
+            rng = np.random.default_rng()
+        start_values = rng.uniform(bounds[0], bounds[1], int(nseeds))
+        if int(nseeds)>1:
+            start_values[0] = 0.5*(bounds[0] + bounds[1])
+        start_value  = start_values[0] if int(nseeds)==1 else start_values
 
     print(('{} : {}'.format(fullname.ljust(max_parameter_name_len), start_value)))
 
@@ -404,6 +405,7 @@ def Dynamic_InferenceModel(base):
 
                 self.tail            = self.wf_model.tail
                 self.quadratic_modes = self.wf_model.quadratic_modes
+                self.tail_modes      = self.wf_model.tail_modes
 
                 default_bounds_Kerr = read_default_bounds('Kerr')   
                 for (l_ring, m_ring, n) in self.Kerr_modes:
@@ -503,9 +505,8 @@ def Dynamic_InferenceModel(base):
                                     self.names.append(fullname)
                                     self.bounds.append(single_bounds)
 
-            self.residuals_tt = []
-            self.grid_x       = []
-            self.grid_y       = []
+            else:
+                raise ValueError("Unknown template selected: {}".format(self.wf_model.wf_model))
 
             pyRing_utils.print_subsection('Fixed')
             pyRing_utils.print_fixed_parameters(self.fixed_params)
@@ -610,21 +611,55 @@ def Dynamic_InferenceModel(base):
         def log_likelihood_ToMin(self,x):
         
             x_dict  = dict(zip(self.names, x))
-            
-            if self.min_method == 'lm':
-                
-                fun_min = (np.real(self.data)-np.real(self.model(x_dict)))/np.real(self.error)+(np.imag(self.data)-np.imag(self.model(x_dict)))/np.imag(self.error)
-                
-            else:
+            model   = self.model(x_dict)
+            err     = 1e-16
+            res_r   = (np.real(self.data)-np.real(model))/(np.real(self.error)+err)
+            res_i   = (np.imag(self.data)-np.imag(model))/(np.imag(self.error)+err)
+            fun_min = np.concatenate((res_r, res_i))
+            constraint_residuals = self.minimization_constraint_residuals(x_dict)
+            if len(constraint_residuals)>0:
+                fun_min = np.concatenate((fun_min, constraint_residuals))
 
-                lh_r    = -0.5 * np.sum(((np.real(self.data)-np.real(self.model(x_dict)))/np.real(self.error))**2)
-                lh_i    = -0.5 * np.sum(((np.imag(self.data)-np.imag(self.model(x_dict)))/np.imag(self.error))**2)
-                self.residuals_tt.append(lh_r + lh_i)
-                self.grid_x.append(x[0])
-                self.grid_y.append(x[1])
-                fun_min = lh_r + lh_i
-            
             return fun_min
+
+        def minimization_constraint_residuals(self, x):
+
+            """
+
+            Return penalty residuals for non-rectangular priors used by the nested sampler.
+
+            `least_squares` enforces the rectangular parameter bounds directly; these residuals
+            make the minimization respect the additional ordering constraints implemented in
+            `log_prior`.
+
+            """
+
+            penalty_scale = 1e6
+            residuals = []
+
+            if('Damped-sinusoids' in self.wf_model.wf_model):
+                # Order the frequencies per given polarisation (same as m1>m2 in LAL).
+                for i in range(1, self.wf_model.N_ds_modes):
+                    try:
+                        f_i      = utils.get_param_override(self.fixed_params, x, 'f_{}'.format(i  ))
+                        f_prev_i = utils.get_param_override(self.fixed_params, x, 'f_{}'.format(i-1))
+                        violation = f_prev_i - f_i
+                        if violation > 0.0: residuals.append(penalty_scale*violation)
+                    except(KeyError):
+                        pass
+
+            if(('Kerr' in self.wf_model.wf_model) and self.wf_model.tail==1):
+                tail_modes = getattr(self, 'tail_modes', self.wf_model.tail_modes)
+                for (l_ring, m_ring) in tail_modes:
+                    try:
+                        p_tail_i    = utils.get_param_override(self.fixed_params, x, 'p_tail_{}{}'.format(l_ring            , m_ring            ))
+                        p_tail_base = utils.get_param_override(self.fixed_params, x, 'p_tail_{}{}'.format(self.wf_model.l_NR, self.wf_model.m_NR))
+                        violation   = p_tail_base - p_tail_i
+                        if violation > 0.0: residuals.append(penalty_scale*violation)
+                    except(KeyError):
+                        pass
+
+            return np.array(residuals)
         
         def log_prior(self,x):
 
@@ -650,7 +685,7 @@ def Dynamic_InferenceModel(base):
 
             if not self.in_bounds(x): return -np.inf
 
-            if(self.wf_model.wf_model=='Damped-sinusoids'):
+            if('Damped-sinusoids' in self.wf_model.wf_model):
                 # Order the frequencies per given polarisation (same as m1>m2 in LAL).
                 for i in range(self.wf_model.N_ds_modes):
                     try:
@@ -661,8 +696,9 @@ def Dynamic_InferenceModel(base):
                         pass
 
             # In the case of Kerr tails, order the tails by exponent
-            if(self.wf_model.wf_model=='Kerr' and self.wf_model.tail==1):
-                for (l_ring, m_ring) in self.tail_modes:
+            if(('Kerr' in self.wf_model.wf_model) and self.wf_model.tail==1):
+                tail_modes = getattr(self, 'tail_modes', self.wf_model.tail_modes)
+                for (l_ring, m_ring) in tail_modes:
                     # FIXME: temporarily valid only for two modes. Eventually do it for an arbitrary number of modes.
                     p_tail_1 = utils.get_param_override(self.fixed_params,x,'p_tail_{}{}'.format(l_ring            , m_ring            ))
                     p_tail_2 = utils.get_param_override(self.fixed_params,x,'p_tail_{}{}'.format(self.wf_model.l_NR, self.wf_model.m_NR))
@@ -679,19 +715,47 @@ class Minimization_Algorithm():
     def __init__(self, inference_model, parameters):
 
         self.inference_model = inference_model
-        self.min_method      = inference_model.min_method
         self.bounds          = inference_model.access_bounds()
         self.names           = inference_model.access_names()
 
-        self.iter_min        = parameters['Inference']['min-iter-min']
         self.iter_max        = parameters['Inference']['min-iter-max']
+        self.n_random_seeds  = max(1, parameters['Inference']['n-random-seeds'])
+        self.rng             = np.random.default_rng(parameters['Inference']['seed'])
+        self.min_method      = self._least_squares_method(inference_model.min_method)
 
         # Convert bounds to a format compatible with `least_squares` arguments
-        self.bounds_minim    = ([self.bounds[i][0] for i in range(len(self.bounds))], [self.bounds[i][1] for i in range(len(self.bounds))])
+        self.bounds_minim    = (np.array([self.bounds[i][0] for i in range(len(self.bounds))]), np.array([self.bounds[i][1] for i in range(len(self.bounds))]))
 
-        self.start_values = []
+        self.start_values = self._initial_points()
+
+    def _least_squares_method(self, requested_method):
+
+        if requested_method is None or str(requested_method).lower() in ['', 'none']:
+            requested_method = 'trf'
+
+        requested_method = str(requested_method).lower()
+        if requested_method not in ['trf', 'dogbox']:
+            raise ValueError("Unknown minimization method: {}. Available options are: ['trf', 'dogbox'].".format(requested_method))
+
+        return requested_method
+
+    def _initial_points(self):
+
+        print('\n* Minimization starting values:')
+
+        start_columns = []
         for i,name_x in enumerate(self.names):
-            self.start_values.append(read_parameter_start_minimization(inference_model.Config, configparser, name_x, self.bounds[i]))
+            start_values = read_parameter_start_minimization(self.inference_model.Config, configparser, name_x, self.bounds[i], self.n_random_seeds, rng=self.rng)
+            start_values = np.asarray(start_values, dtype=float)
+
+            if start_values.ndim == 0:
+                start_values = np.full(self.n_random_seeds, float(start_values))
+            else:
+                start_values = np.array(start_values, dtype=float)
+
+            start_columns.append(start_values)
+
+        return np.column_stack(start_columns)
 
     def fun(self, x):
     
@@ -701,84 +765,32 @@ class Minimization_Algorithm():
 
     def minimize_likelihood(self):
 
-        # Initialize the structures
-        j_min    = self.iter_min
-        j_max    = self.iter_max
-        j        = 0
-        x_min_tt = []
-        res_tt   = []
+        best_result = None
 
-        # Initial parameters and corresponding residuals
-        x0_0, res_0 = l_s(self.fun, self.start_values, method = self.min_method)
-        x_min       = x0_0
-        x_min_tt.append(x_min)
-        res_tt.append(  res_0)
+        for i,x0 in enumerate(self.start_values):
+            result = l_s(self.fun,
+                         x0,
+                         bounds   = self.bounds_minim,
+                         method   = self.min_method,
+                         max_nfev = self.iter_max)
 
-        # Start the minimimization loop using the initial parameters
-        min_fun_i = l_s(self.fun, x0_0, method = self.min_method)
-        res_i     = min_fun_i.cost
-        x0_i      = min_fun_i.x
+            print("* Minimization seed {}/{}: cost = {:.12e}, nfev = {}, success = {}".format(i+1, self.n_random_seeds, result.cost, result.nfev, result.success))
 
-        # Iterate until all of these conditions are met:
-        # 1. The cost function is smaller than the *previous* step
-        # 2. All the value are within the bounds
-        # 3. The cost function is larger than the previous one but the number of iterations is smaller than j_min. Forces to do at least jmin iterations
+            if best_result is None or result.cost < best_result.cost:
+                best_result = result
 
-        condition_1  = (np.abs(res_i) < np.abs(res_0))
-        condition_2a = not(all([x_min[i] < self.bounds[i][1] for i in range(len(self.bounds))]))
-        condition_2b = not(all([x_min[i] > self.bounds[i][0] for i in range(len(self.bounds))]))
-        condition_2  = (condition_2a or condition_2b)
-        condition_3  = (np.abs(res_i) >= np.abs(res_0) and j < j_min)
+        if best_result is None:
+            raise RuntimeError("Minimization failed before producing a result.")
 
-        while (condition_1 or condition_2 or condition_3):
-            
-            min_fun_tmp = l_s(self.fun, x0_i, method = self.min_method)
-            res_0       = res_i
-            res_i       = min_fun_tmp.cost
-            
-            condition_1  = (np.abs(res_i) < np.abs(res_0))
-            condition_2  = all([x0_i[i] < self.bounds[i][1] for i in range(len(self.bounds))])
-            condition_3  = all([x0_i[i] > self.bounds[i][0] for i in range(len(self.bounds))])
+        print("\n* Best minimization cost: {:.12e}".format(best_result.cost))
+        if not(best_result.success):
+            print("* Warning: best minimization result did not satisfy scipy's convergence criterion: {}".format(best_result.message))
 
-            if condition_1 and condition_2 and condition_3:
-                
-                x_min = x0_i
-                x0_i  = min_fun_tmp.x
-                x_min_tt.append(x_min)
-                res_tt.append(  res_0)
-                
-            else:
-                delta_A = read_jumps_from_user()
-                # If you have not improved wrt to x0_i, try to change the initial guess
-                x0_i  = []
-                shrinkage_ratio = params['shrinkage_ratio']
-                for i in range(0,len(self.Kerr_modes)):
-                    epsilon_A = np.random.uniform(-1, 1)*2*delta_A[i]/shrinkage_ratio
-                    x0_tmp    = min_fun_tmp.x[i] + epsilon_A
-                    i_test    = 0
-                    while x0_tmp > self.bounds[i][1] and x0_tmp < self.bounds[i][0]:
-                        epsilon_A = np.random.uniform(-1, 1)*2*delta_A[i]/shrinkage_ratio
-                        x0_tmp    = min_fun_tmp.x[i] + epsilon_A
-                        i_test   += 1
-                        if i_test > 100:
-                            print('failure')
-                            exit()
-                    x0_i.append(x0_tmp)
-                
-                min_fun_tmp = l_s(self.fun, x0_i, method = self.min_method)
-                x0_i        = min_fun_tmp.x
-                res_i       = min_fun_tmp.cost
-                j          += 1
-
-            if(j > j_max): break
-        
-        return x_min_tt[np.argmin(res_tt)]
+        return best_result.x
 
 def run_inference(parameters, inference_model):
 
     if(parameters['Inference']['method'] == 'Minimization'):
-        
-        utils.minimisation_compatibility_check(parameters)
 
         print('\nStarting minimization algorithm using `scipy.optimize.least_squares`.\n')
         

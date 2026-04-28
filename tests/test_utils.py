@@ -47,29 +47,6 @@ def test_find_longest_name_length():
     assert utils.find_longest_name_length(names) == len("longest_name")
 
 
-def test_minimisation_compatibility_check_rejects_non_kerr():
-    parameters = {"template": "non-kerr", "QQNM_modes": None, "tail": 0}
-    with pytest.raises(ValueError):
-        utils.minimisation_compatibility_check(parameters)
-
-
-def test_minimisation_compatibility_check_rejects_qqnm_modes():
-    parameters = {"template": "Kerr", "QQNM_modes": [1, 2], "tail": 0}
-    with pytest.raises(ValueError):
-        utils.minimisation_compatibility_check(parameters)
-
-
-def test_minimisation_compatibility_check_rejects_tail():
-    parameters = {"template": "Kerr", "QQNM_modes": None, "tail": 1}
-    with pytest.raises(ValueError):
-        utils.minimisation_compatibility_check(parameters)
-
-
-def test_minimisation_compatibility_check_accepts_valid_configuration():
-    parameters = {"template": "Kerr", "QQNM_modes": None, "tail": 0}
-    utils.minimisation_compatibility_check(parameters)
-
-
 def test_diff1_central_difference_with_padding():
     xp = np.array([0.0, 1.0, 2.0, 3.0])
     yp = np.array([value * value for value in xp])

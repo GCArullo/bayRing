@@ -34,13 +34,29 @@ colbGray   = "#BBBBBB"
 C_mt=(lal.MSUN_SI * lal.G_SI) / (lal.C_SI**3) #s, converts a mass expressed in solar masses into a time in seconds
 C_md=(lal.MSUN_SI * lal.G_SI)/(1e6*lal.PC_SI*lal.C_SI**2) #adimensional, converts a mass expressed in solar masses to a distance in Megaparsec
 
+def waveform_parameter_samples(results, method=None):
+
+    if method == 'Minimization' or isinstance(results, dict):
+        return [results]
+
+    return list(results)
+
+def model_component_lists(results, inference_model, method=None):
+
+    parameter_samples = waveform_parameter_samples(results, method)
+    models_re_list    = [np.real(np.array(inference_model.model(p))) for p in parameter_samples]
+    models_im_list    = [np.imag(np.array(inference_model.model(p))) for p in parameter_samples]
+
+    return models_re_list, models_im_list
+
 def read_results_object_from_previous_inference(parameters):
 
     if(parameters['Inference']['method'] == 'Minimization'):
 
-        utils.minimisation_compatibility_check(parameters)
-
-        results_object_tmp = np.genfromtxt(os.path.join( parameters['I/O']['outdir'],'Algorithm/Minimization_results.txt'), names=True, deletechars="")
+        results_path = os.path.join(parameters['I/O']['outdir'], 'Algorithm/Minimization_Results.txt')
+        if not(os.path.exists(results_path)):
+            results_path = os.path.join(parameters['I/O']['outdir'], 'Algorithm/Minimization_results.txt')
+        results_object_tmp = np.genfromtxt(results_path, names=True, deletechars="")
         results_object = {}
         for key in results_object_tmp.dtype.names:
             print(results_object_tmp[key])
@@ -313,8 +329,7 @@ def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir):
     NR_r, NR_i         = np.real(NR_sim.NR_cpx_cut)     , np.imag(NR_sim.NR_cpx_cut)
     t_cut = NR_sim.t_NR_cut
 
-    models_re_list = [np.real(np.array(inference_model.model(p))) for p in results_object]
-    models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results_object]
+    models_re_list, models_im_list = model_component_lists(results_object, inference_model)
 
     wf_r = np.percentile(np.array(models_re_list),[50], axis=0)[0]
     wf_i = np.percentile(np.array(models_im_list),[50], axis=0)[0]
@@ -610,12 +625,7 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
     NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
 
     # Initialize lists to store waveform components
-    models_re_list = []
-    models_im_list = []
-
-    if method == 'Nested-sampler':
-        models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
-        models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
+    models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
     wf_r_quantiles = {}
     wf_i_quantiles = {}
@@ -752,6 +762,7 @@ def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, metho
     NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
     NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
     NR_dict = {'real': NR_r, 'imag': NR_i}
+    models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
     for NR_quant, NR_data in NR_dict.items():
         try:
@@ -764,9 +775,7 @@ def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, metho
             continue
         
         # Load waveform template
-        if method == 'Nested-sampler':
-            models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
-            models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
+        models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
         for perc in [5, 50, 95]:
             try:
@@ -838,9 +847,7 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
             continue
         
         # Load waveform template
-        if method == 'Nested-sampler':
-            models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
-            models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
+        models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
         for perc in [5, 50, 95]:
             try:
@@ -960,13 +967,14 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
     NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
     NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
     NR_dict = {'real': NR_r, 'imag': NR_i}
+    models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
     for NR_quant, NR_data in NR_dict.items():
 
         for perc in [5, 50, 95]:
             try:
-                wf_r = np.percentile([np.real(np.array(inference_model.model(p))) for p in results], [perc], axis=0)[0]
-                wf_i = np.percentile([np.imag(np.array(inference_model.model(p))) for p in results], [perc], axis=0)[0]
+                wf_r = np.percentile(models_re_list, [perc], axis=0)[0]
+                wf_i = np.percentile(models_im_list, [perc], axis=0)[0]
 
                 wf_r *= (C_md * M) / dL
                 wf_i *= (C_md * M) / dL
@@ -1011,14 +1019,15 @@ def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, 
     NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
     NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
     NR_dict = {'real': NR_r, 'imag': NR_i}
+    models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
     # Loop through the real and imaginary NR data
     for NR_quant, NR_data in NR_dict.items():
         for perc in [5, 50, 95]:
             try:
                 # Extract the percentiles of the real and imaginary parts of the model waveform
-                wf_r = np.percentile([np.real(np.array(inference_model.model(p))) for p in results], [perc], axis=0)[0]
-                wf_i = np.percentile([np.imag(np.array(inference_model.model(p))) for p in results], [perc], axis=0)[0]
+                wf_r = np.percentile(models_re_list, [perc], axis=0)[0]
+                wf_i = np.percentile(models_im_list, [perc], axis=0)[0]
 
                 # Scale the waveforms according to physical parameters
                 wf_r *= (C_md * M) / dL
@@ -1713,7 +1722,13 @@ def global_corner(x, names, output, truths=None):
     samples = []
     for xy in names: samples.append(np.array(x[xy]))
     samples = np.transpose(samples)
+    if samples.ndim < 2 or samples.shape[0] < 2:
+        print('* Skipping corner plot: at least two samples are required.')
+        return
     mask    = [i for i in range(samples.shape[-1]) if not all(samples[:,i]==samples[0,i]) ]
+    if len(mask) == 0:
+        print('* Skipping corner plot: all samples are constant.')
+        return
 
     fig = plt.figure(figsize=(10,10))
     C   = corner.corner(samples[:,mask],
