@@ -8,7 +8,7 @@ import bayRing.utils   as utils
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc', fit_type = None):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc', TEOB_qc_fit_type = None):
 
         self.t_NR                      = t_NR
         self.t_start                   = tM_start
@@ -29,7 +29,7 @@ class WaveformModel(cpnest.model.Model):
         self.KerrBinary_amp_nc_version = KerrBinary_amp_nc_version
         self.TEOB_NR_fit               = TEOB_NR_fit
         self.TEOB_template             = TEOB_template
-        self.fit_type                  = fit_type
+        self.TEOB_qc_fit_type          = TEOB_qc_fit_type
 
         if not(const_params==None):
             self.const_r = [const_params[0]*np.cos(const_params[1])]
@@ -214,15 +214,15 @@ class WaveformModel(cpnest.model.Model):
             try:
                 NR_fit_coeffs = {
                     (self.l_NR, self.m_NR): {
-                        'omg_peak': self.metadata['omg_peak_{}{}'.format(self.l_NR, self.m_NR)],
-                        'A_peak_over_nu': self.metadata['A_peak_{}{}'.format(self.l_NR, self.m_NR)] / nu,
+                        'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR, self.m_NR)],
+                        'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR, self.m_NR)] / nu,
                         'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR, self.m_NR)] / nu,
-                        'ecc': self.metadata['ecc'],
-                        'bmrg': self.metadata['bmrg'],
-                        'Jmrg': self.metadata['Jmrg'],
-                        'Emrg': self.metadata['Emrg'],
-                        'fit_type': self.fit_metadata['fit_type'],
-                        'fit_order': self.fit_metadata['fit_order'],
+                        'ecc'                 : self.metadata['ecc'],
+                        'bmrg'                : self.metadata['bmrg'],
+                        'Jmrg'                : self.metadata['Jmrg'],
+                        'Emrg'                : self.metadata['Emrg'],
+                        'TEOB_qc_fit_type'    : self.fit_metadata['TEOB_qc_fit_type'],
+                        'TEOB_qc_fit_order'   : self.fit_metadata['TEOB_qc_fit_order'],
                     }
                 }
 
@@ -240,7 +240,7 @@ class WaveformModel(cpnest.model.Model):
                                                         'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]       ,
                                                         'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu      ,
                                                         'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR,self.m_NR)]/nu ,
-                                                        'fit_type'            : None                                                            ,
+                                                        'TEOB_qc_fit_type'    : None                                                            ,
                                                         }
                                 }
             
@@ -251,20 +251,20 @@ class WaveformModel(cpnest.model.Model):
         elif(self.TEOB_template=='nc'): ecc_par = 1
 
         if(ecc_par==0):
-            if (self.fit_type=='non-spinning'): 
+            if (self.TEOB_qc_fit_type=='non-spinning'): 
                 order_nu = 111
                 order_S_hat = 0
-            elif(self.fit_type=='equal-mass'): 
+            elif(self.TEOB_qc_fit_type=='equal-mass'): 
                 order_S_hat = 342
                 order_nu = 0
             else:
                 order_S_hat = 0
                 order_nu = 0
         elif(ecc_par==1):
-            if(self.fit_type=='non-spinning'): 
+            if(self.TEOB_qc_fit_type=='non-spinning'): 
                 order_nu = 11111
                 order_S_hat = 0
-            elif(self.fit_type=='equal-mass'): 
+            elif(self.TEOB_qc_fit_type=='equal-mass'): 
                 order_S_hat = 33333
                 order_nu = 0
             else: 

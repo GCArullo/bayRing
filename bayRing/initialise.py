@@ -131,7 +131,7 @@ def read_config(Config):
         'KerrBinary-amplitudes-nc-version' : ''           ,
         'TEOB-NR-fit'                      : 0            ,
         'TEOB-template'                    : 'qc'         ,
-        'fit-type'                         : 'equal-mass' , 
+        'TEOB-qc-fit-type'                 : 'equal-mass' , 
         },
 
         'Inference':
@@ -261,9 +261,9 @@ def read_config(Config):
         parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,321,310,311,440,441,430,431,420,421,410,411,550,551'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4  or parameters['NR-data']['l-NR']==5): raise ValueError("The TEOBPM template is only available for l=2,3,4,5")
         if parameters['Model']['TEOB-NR-fit'] == 0:
-            keytype = type(parameters['Model']['fit-type'])
+            keytype = type(parameters['Model']['TEOB-qc-fit-type'])
             try:
-                parameters['Model']['fit-type'] = keytype(Config.get('Model', 'fit-type'))
+                parameters['Model']['TEOB-qc-fit-type'] = keytype(Config.get('Model', 'TEOB-qc-fit-type'))
             except (KeyError, configparser.NoOptionError, TypeError): pass
 
     print('\n\n\nFIXME: print updated vars\n\n\n')
@@ -396,7 +396,7 @@ A dot is present at the end of each description line and is not to be intended a
         TEOB-template                    TEOB template to be used. Available options: ['qc', 'nc']. The 'qc' version is defined in  \
                                          arXiv:1904.09550, arXiv:2001.09082, while the 'nc' in II.C of arXiv:2305.19336.                                                  Default: 'qc'.
 
-        fit-type                         Type of fit to be used. Available options: ['non_spinning', 'equal_mass'].                                                       Default: None.
+        TEOB-qc-fit-type                 Type of fit to be used. Available options: ['non_spinning', 'equal_mass'].                                                       Default: None.
 
     *******************************************************
     * Parameters to be passed to the [Inference] section. *

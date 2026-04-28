@@ -14,25 +14,6 @@ import pyRing.waveform        as wf
 
 twopi = 2.*np.pi
 
-def get_sxs_version():
-    """
-    Get the installed version of the sxs package.
-
-    Returns
-    -------
-    str
-        The installed version of sxs.
-    """
-    try:
-        # Use pip to get the version of sxs installed
-        version_output = subprocess.check_output(['pip', 'show', 'sxs'], text=True)
-        for line in version_output.split('\n'):
-            if line.startswith('Version:'):
-                return line.split(' ')[1]
-    except subprocess.CalledProcessError:
-        print("Error while checking sxs version.")
-        return None
-
 def read_fake_NR(NR_catalog, fake_NR_modes):
 
     if(NR_catalog=='fake_NR'):
