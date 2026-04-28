@@ -12,6 +12,8 @@ import bayRing.utils       as utils
 
 twopi                  = 2.*np.pi
 max_parameter_name_len = len('ln_A_tail_22')
+linear_inversion_methods = ['Linear-inversion']
+point_estimate_methods   = ['Minimization'] + linear_inversion_methods
 
 # CPNest workers using the spawn start method must pickle the inference model.
 # Register the factory-built classes as module globals so pickle can import them.
@@ -73,6 +75,14 @@ def read_parameter_bounds(Config, configparser, basename, fullname, default_boun
     print(('{} : [{}, {}]'.format(fullname.ljust(max_parameter_name_len), single_bounds[0], single_bounds[1])))
 
     return single_bounds
+
+def is_linear_inversion_method(method):
+
+    return str(method) in linear_inversion_methods
+
+def is_point_estimate_method(method):
+
+    return str(method) in point_estimate_methods
 
 def read_parameter_start_minimization(Config, configparser, fullname, bounds, nseeds=1, rng=None):
     
@@ -788,6 +798,250 @@ class Minimization_Algorithm():
 
         return best_result.x
 
+class KerrLinearInversion_Algorithm():
+      
+    def __init__(self, inference_model, parameters):
+
+        self.inference_model = inference_model
+        self.names           = inference_model.access_names()
+        self.name_set        = set(self.names)
+        self.fixed_params    = inference_model.fixed_params
+        self.eigenvalue_tol  = parameters['Inference']['linear-inversion-eigenvalue-tol']
+
+        self._validate_model()
+        self.solve_components, self.fixed_components = self._classify_linear_components()
+
+        if len(self.solve_components)==0:
+            raise ValueError("Linear inversion needs at least one free Kerr complex-amplitude pair.")
+
+        solved_names = set()
+        for component in self.solve_components:
+            solved_names.add(component['ln_A_name'])
+            solved_names.add(component['phi_name'])
+
+        if self.name_set != solved_names:
+            unresolved_names = sorted(self.name_set - solved_names)
+            raise ValueError(
+                "Linear inversion cannot solve non-linear or unsupported free parameters: {}. "
+                "Fix these parameters in [Priors] or use Minimization.".format(', '.join(unresolved_names))
+            )
+
+    def _validate_model(self):
+
+        if not(self.inference_model.wf_model.wf_model=='Kerr'):
+            raise ValueError("Linear inversion is currently implemented only for the Kerr template.")
+
+        if self.inference_model.kind != 'gaussian':
+            raise ValueError("Linear inversion is available only with the gaussian likelihood.")
+
+    def _component_status(self, ln_A_name, phi_name):
+
+        ln_A_free = ln_A_name in self.name_set
+        phi_free  = phi_name  in self.name_set
+
+        if ln_A_free != phi_free:
+            raise ValueError(
+                "Linear inversion requires both `{}` and `{}` to be either free or fixed.".format(ln_A_name, phi_name)
+            )
+
+        return 'free' if ln_A_free else 'fixed'
+
+    def _fixed_complex_amplitude(self, ln_A_name, phi_name):
+
+        ln_A_value = self.fixed_params[ln_A_name]
+        phi_value  = self.fixed_params[phi_name]
+
+        return np.exp(ln_A_value) * np.exp(1j*phi_value)
+
+    def _quadratic_name(self, quad_term, modes):
+
+        (l, m, n), (l1, m1, n1), (l2, m2, n2) = modes
+
+        return '{}_{}{}{}_{}{}{}_{}{}{}'.format(quad_term, l,m,n, l1,m1,n1, l2,m2,n2)
+
+    def _classify_linear_components(self):
+
+        solve_components  = []
+        fixed_components  = {
+            'linear'   : {},
+            'tail'     : {'amplitudes': {}, 'exponents': {}},
+            'quadratic': {},
+        }
+
+        for mode in self.inference_model.wf_model.Kerr_modes:
+            l_ring, m_ring, n = mode
+            mode_string = '{}{}{}'.format(l_ring, m_ring, n)
+            ln_A_name   = 'ln_A_{}'.format(mode_string)
+            phi_name    = 'phi_{}'.format(mode_string)
+            status      = self._component_status(ln_A_name, phi_name)
+
+            if status == 'free':
+                solve_components.append({'kind': 'linear', 'mode': mode, 'ln_A_name': ln_A_name, 'phi_name': phi_name})
+            else:
+                fixed_components['linear'][mode] = self._fixed_complex_amplitude(ln_A_name, phi_name)
+
+        if self.inference_model.wf_model.quadratic_modes is not None:
+            for quad_term in self.inference_model.wf_model.quadratic_modes:
+                for modes in self.inference_model.wf_model.quadratic_modes[quad_term]:
+                    quad_string = self._quadratic_name(quad_term, modes)
+                    ln_A_name   = 'ln_A_{}'.format(quad_string)
+                    phi_name    = 'phi_{}'.format(quad_string)
+                    status      = self._component_status(ln_A_name, phi_name)
+                    key         = (quad_term, modes)
+
+                    if status == 'free':
+                        solve_components.append({'kind': 'quadratic', 'key': key, 'ln_A_name': ln_A_name, 'phi_name': phi_name})
+                    else:
+                        fixed_components['quadratic'][key] = self._fixed_complex_amplitude(ln_A_name, phi_name)
+
+        if self.inference_model.wf_model.tail:
+            for tail_mode in self.inference_model.wf_model.tail_modes:
+                l_ring, m_ring = tail_mode
+                if (l_ring, m_ring, 0) not in self.inference_model.wf_model.Kerr_modes:
+                    raise ValueError(
+                        "Linear inversion needs tail mode `{}{}0` in QNM-modes so the tail basis can be built.".format(l_ring, m_ring)
+                    )
+
+                tail_string    = '{}{}'.format(l_ring, m_ring)
+                ln_A_name      = 'ln_A_tail_{}'.format(tail_string)
+                phi_name       = 'phi_tail_{}'.format(tail_string)
+                p_name         = 'p_tail_{}'.format(tail_string)
+
+                if p_name in self.name_set:
+                    raise ValueError(
+                        "Linear inversion can solve tail amplitudes only at fixed `{}`. "
+                        "Fix `{}` in [Priors] or use Minimization.".format(p_name, p_name)
+                    )
+
+                try:
+                    fixed_components['tail']['exponents'][tail_mode] = self.fixed_params[p_name]
+                except KeyError as exc:
+                    raise ValueError(
+                        "Linear inversion needs fixed `{}` for Kerr tails. "
+                        "Add `fix-{} = value` to [Priors] or use Minimization.".format(p_name, p_name)
+                    ) from exc
+
+                status = self._component_status(ln_A_name, phi_name)
+                if status == 'free':
+                    solve_components.append(
+                        {'kind': 'tail', 'tail_mode': tail_mode, 'ln_A_name': ln_A_name, 'phi_name': phi_name}
+                    )
+                else:
+                    fixed_components['tail']['amplitudes'][tail_mode] = self._fixed_complex_amplitude(ln_A_name, phi_name)
+
+        return solve_components, fixed_components
+
+    def _waveform_from_components(self, components, include_const=False):
+
+        return self.inference_model.wf_model.kerr_waveform_from_components(
+            amplitudes           = components.get('linear', {}),
+            tail_amplitudes      = components.get('tail', {}).get('amplitudes', {}),
+            tail_exponents       = components.get('tail', {}).get('exponents', {}),
+            quadratic_amplitudes = components.get('quadratic', {}),
+            include_const        = include_const,
+        )
+
+    def _component_amplitudes(self, component, amplitude):
+
+        amplitudes = {
+            'linear'   : {},
+            'tail'     : {'amplitudes': {}, 'exponents': self.fixed_components['tail']['exponents']},
+            'quadratic': {},
+        }
+
+        if component['kind'] == 'linear':
+            amplitudes['linear'][component['mode']] = amplitude
+        elif component['kind'] == 'quadratic':
+            amplitudes['quadratic'][component['key']] = amplitude
+        elif component['kind'] == 'tail':
+            amplitudes['tail']['amplitudes'][component['tail_mode']] = amplitude
+        else:
+            raise ValueError("Unknown linear-inversion component kind: {}".format(component['kind']))
+
+        return amplitudes
+
+    def _fixed_waveform(self):
+
+        if (
+            len(self.fixed_components['linear'])==0
+            and len(self.fixed_components['tail']['amplitudes'])==0
+            and len(self.fixed_components['quadratic'])==0
+        ):
+            return np.zeros(len(self.inference_model.data), dtype=np.complex128)
+
+        return self._waveform_from_components(self.fixed_components, include_const=False)
+
+    def _constant_waveform(self):
+
+        waveform_model = self.inference_model.wf_model
+        const_waveform = np.zeros(len(self.inference_model.data), dtype=np.complex128)
+
+        if not(waveform_model.const_params==None):
+            const_value = waveform_model.const_params[0]*np.cos(waveform_model.const_params[1])
+            const_value = -const_value + 1j*waveform_model.const_params[0]*np.sin(waveform_model.const_params[1])
+            const_waveform += const_value
+
+        return const_waveform
+
+    def _weighted_vector(self, waveform):
+
+        err = 1e-16
+        sigma_r = np.real(self.inference_model.error) + err
+        sigma_i = np.imag(self.inference_model.error) + err
+
+        return np.concatenate((np.real(waveform)/sigma_r, np.imag(waveform)/sigma_i))
+
+    def _component_basis(self, component, amplitude):
+
+        return self._waveform_from_components(self._component_amplitudes(component, amplitude), include_const=False)
+
+    def _design_matrix(self):
+
+        columns = []
+        for component in self.solve_components:
+            columns.append(self._weighted_vector(self._component_basis(component, 1.0 + 0.0j)))
+            columns.append(self._weighted_vector(self._component_basis(component, 0.0 + 1.0j)))
+
+        return np.column_stack(columns)
+
+    def _regularized_inverse(self, matrix):
+
+        eigvals, eigvecs = np.linalg.eigh(matrix)
+        eigvals_regularized = np.maximum(eigvals, self.eigenvalue_tol)
+        inverse = np.dot(eigvecs/eigvals_regularized, eigvecs.T)
+
+        return inverse, eigvals, eigvals_regularized
+
+    def solve_likelihood(self):
+
+        baseline = self._constant_waveform() + self._fixed_waveform()
+        data_vec = self._weighted_vector(self.inference_model.data - baseline)
+        design   = self._design_matrix()
+
+        fisher = np.dot(design.T, design)
+        fisher = 0.5*(fisher + fisher.T)
+        rhs    = np.dot(design.T, data_vec)
+
+        fisher_inv, eigvals, eigvals_regularized = self._regularized_inverse(fisher)
+        linear_solution = np.dot(fisher_inv, rhs)
+
+        residual = data_vec - np.dot(design, linear_solution)
+        cost     = 0.5*np.dot(residual, residual)
+
+        print("* Linear inversion solved {} complex Kerr amplitudes.".format(len(self.solve_components)))
+        print("* Linear inversion cost: {:.12e}".format(cost))
+        print("* Fisher eigenvalue range before regularization: [{:.12e}, {:.12e}]".format(np.min(eigvals), np.max(eigvals)))
+        print("* Fisher eigenvalue tolerance: {:.12e}".format(self.eigenvalue_tol))
+        print("* Fisher condition after regularization: {:.12e}".format(np.max(eigvals_regularized)/np.min(eigvals_regularized)))
+
+        results = {}
+        for i, component in enumerate(self.solve_components):
+            complex_amplitude = linear_solution[2*i] + 1j*linear_solution[2*i+1]
+            results[component['ln_A_name']] = np.log(max(np.abs(complex_amplitude), 1e-300))
+            results[component['phi_name']]  = np.angle(complex_amplitude) % twopi
+
+        return np.array([results[name] for name in self.names])
+
 def run_inference(parameters, inference_model):
 
     if(parameters['Inference']['method'] == 'Minimization'):
@@ -798,6 +1052,16 @@ def run_inference(parameters, inference_model):
         minimization_results = minimization.minimize_likelihood()
         
         results_object = dict(zip(inference_model.names, minimization_results))
+        postprocess.save_results_minimization(results_object, parameters['I/O']['outdir'])
+
+    elif(is_linear_inversion_method(parameters['Inference']['method'])):
+
+        print('\nStarting Kerr linear inversion using weighted normal equations.\n')
+        
+        linear_inversion         = KerrLinearInversion_Algorithm(inference_model, parameters)
+        linear_inversion_results = linear_inversion.solve_likelihood()
+        
+        results_object = dict(zip(inference_model.names, linear_inversion_results))
         postprocess.save_results_minimization(results_object, parameters['I/O']['outdir'])
 
     elif(parameters['Inference']['method'] == 'Nested-sampler'):

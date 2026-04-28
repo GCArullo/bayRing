@@ -37,6 +37,107 @@ class WaveformModel(cpnest.model.Model):
             self.const_r = [const_params[0]*np.cos(const_params[1])]
             self.const_i = [const_params[0]*np.sin(const_params[1])]
     
+    def _Kerr_TGR_parameters(self):
+
+        if('qf' in self.metadata): 
+            TGR_parameters      = {}
+            TGR_parameters['Q'] = self.metadata['qf']
+            self.charge         = 1
+        else:
+            TGR_parameters      = None
+            self.charge         = 0
+
+        return TGR_parameters
+
+    def _KerrBH_model(self, amps, tail_parameters=None, quadratic_modes=None):
+
+        if tail_parameters is None: tail_parameters = {}
+        if quadratic_modes is None: quadratic_modes = {}
+        TGR_parameters = self._Kerr_TGR_parameters()
+
+        ringdown_model = wf.KerrBH(self.t_start                               ,
+                                   self.Mf                                    ,
+                                   self.af                                    ,
+                                   amps                                       ,
+                                   0.0                                        , # distance,    overrun by geom
+                                   0.0                                        , # inclination, overrun by geom
+                                   0.0                                        , # phi,         overrun by geom
+                                    
+                                   reference_amplitude = 0.0                  ,
+                                   geom                = 1                    ,
+                                   qnm_fit             = 0                    ,
+                                   qnm_interpolants    = None                 , #self.qnm_interpolants,
+                                    
+                                   Spheroidal          = 0                    , # Spheroidal harmonics, overrun by geom
+                                   amp_non_prec_sym    = 1                    ,
+                                   tail_parameters     = tail_parameters      ,
+                                   quadratic_modes     = quadratic_modes      ,
+                                   quad_lin_prop       = 0                    ,
+                                   qnm_cached          = self.qnm_cached      ,
+                                   t_ref               = self.t_peak          ,
+
+                                   charge              = self.charge          ,
+                                   TGR_params          = TGR_parameters       ,
+                                   )
+        
+        return ringdown_model
+
+    def _apply_waveform_conventions(self, wf_r, wf_i, include_const=True):
+
+        wf_r = np.array(wf_r)
+        wf_i = np.array(wf_i)
+
+        if include_const and not(self.const_params==None):
+            wf_r = wf_r + self.const_r
+            wf_i = wf_i + self.const_i
+
+        # UNDERSTAND WHY!!!!
+        if not(self.wf_model=='KerrBinary'): wf_r = -wf_r
+
+        return wf_r, wf_i
+
+    def kerr_waveform_from_components(self, amplitudes=None, tail_amplitudes=None, tail_exponents=None, quadratic_amplitudes=None, include_const=True):
+
+        if amplitudes is None: amplitudes = {}
+        if tail_amplitudes is None: tail_amplitudes = {}
+        if tail_exponents is None: tail_exponents = {}
+        if quadratic_amplitudes is None: quadratic_amplitudes = {}
+
+        amps = {}
+        for (l_ring, m_ring, n) in self.Kerr_modes:
+            try:
+                amps[(2, l_ring, m_ring, n)] = amplitudes[(l_ring, m_ring, n)]
+            except KeyError:
+                pass
+
+        for (l_ring, m_ring) in tail_amplitudes:
+            if ((l_ring, m_ring, 0) in self.Kerr_modes) and ((2, l_ring, m_ring, 0) not in amps):
+                amps[(2, l_ring, m_ring, 0)] = 0.0 + 0.0j
+
+        tail_parameters = {}
+        for (l_ring, m_ring), tail_amplitude in tail_amplitudes.items():
+            tail_parameters[(l_ring, m_ring)] = {
+                'A'  : np.abs(tail_amplitude),
+                'phi': np.angle(tail_amplitude),
+                'p'  : tail_exponents[(l_ring, m_ring)],
+            }
+
+        quad_amps = {}
+        for quad_term, modes in quadratic_amplitudes:
+            (l, m, n), (l1, m1, n1), (l2, m2, n2) = modes
+            quad_amps.setdefault(quad_term, {})
+            quad_amps[quad_term][((2,l,m,n),(2,l1,m1,n1),(2,l2,m2,n2))] = quadratic_amplitudes[(quad_term, modes)]
+
+        ringdown_model = self._KerrBH_model(amps, tail_parameters=tail_parameters, quadratic_modes=quad_amps)
+        _, _, _, wf_r, wf_i = ringdown_model.waveform(self.t_NR)
+        wf_r, wf_i = self._apply_waveform_conventions(wf_r, wf_i, include_const=include_const)
+
+        return wf_r + 1j * wf_i
+
+    def kerr_waveform_from_complex_amplitudes(self, amplitudes, include_const=True):
+
+        return self.kerr_waveform_from_components(amplitudes=amplitudes, include_const=include_const)
+
     def Kerr_waveform(self, params, fixed_params):
 
         amps, quad_amps, tail_parameters = {}, {}, {}
@@ -72,38 +173,8 @@ class WaveformModel(cpnest.model.Model):
                     quad_phi_value = utils.get_param_override(fixed_params,params, 'phi_{}'.format(quad_string))
                     quad_amps[quad_term][((2,l,m,n),(2,l1,m1,n1),(2,l2,m2,n2))] = np.exp(quad_amp_value) * np.exp(1j*quad_phi_value)
 
-        if('qf' in self.metadata): 
-            TGR_parameters      = {}
-            TGR_parameters['Q'] = self.metadata['qf']
-            self.charge         = 1
-        else:
-            TGR_parameters      = None
-            self.charge         = 0
-
-        ringdown_model = wf.KerrBH(self.t_start                               ,
-                                   self.Mf                                    ,
-                                   self.af                                    ,
-                                   amps                                       ,
-                                   0.0                                        , # distance,    overrun by geom
-                                   0.0                                        , # inclination, overrun by geom
-                                   0.0                                        , # phi,         overrun by geom
-                                    
-                                   reference_amplitude = 0.0                  ,
-                                   geom                = 1                    ,
-                                   qnm_fit             = 0                    ,
-                                   qnm_interpolants    = None                 , #self.qnm_interpolants,
-                                    
-                                   Spheroidal          = 0                    , # Spheroidal harmonics, overrun by geom
-                                   amp_non_prec_sym    = 1                    ,
-                                   tail_parameters     = tail_parameters      ,
-                                   quadratic_modes     = quad_amps            ,
-                                   quad_lin_prop       = 0                    ,
-                                   qnm_cached          = self.qnm_cached      ,
-                                   t_ref               = self.t_peak          ,
-
-                                   charge              = self.charge          ,
-                                   TGR_params          = TGR_parameters       ,
-                                   )
+        self._Kerr_TGR_parameters()
+        ringdown_model = self._KerrBH_model(amps, tail_parameters=tail_parameters, quadratic_modes=quad_amps)
         
         return ringdown_model
         
@@ -365,6 +436,7 @@ class WaveformModel(cpnest.model.Model):
             
             ringdown_model = self.Kerr_waveform(params, fixed_params)
             _, _, _, self.wf_r, self.wf_i = ringdown_model.waveform(self.t_NR)
+            self.wf_r, self.wf_i = self._apply_waveform_conventions(self.wf_r, self.wf_i)
     
         elif (self.wf_model=='Damped-sinusoids'):
             
@@ -395,11 +467,7 @@ class WaveformModel(cpnest.model.Model):
         else:
             raise ValueError("Unknown template selected: {}".format(self.wf_model))
 
-        if not(self.const_params==None):
-            self.wf_r = self.wf_r + self.const_r
-            self.wf_i = self.wf_i + self.const_i
-
-        # UNDERSTAND WHY!!!!
-        if not(self.wf_model=='KerrBinary'): self.wf_r = -self.wf_r
+        if not(self.wf_model=='Kerr'):
+            self.wf_r, self.wf_i = self._apply_waveform_conventions(self.wf_r, self.wf_i)
 
         return self.wf_r + 1j * self.wf_i
