@@ -1,4 +1,4 @@
-import io, numpy as np, pkg_resources, os, re, tarfile, warnings
+import io, numpy as np, os, re, tarfile, warnings
 
 #FIXME: implement fixed params reading for all models
 def get_param_override(fixed_params, x, name):
