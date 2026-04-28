@@ -767,7 +767,7 @@ class NR_simulation():
                         
                         # Set the resolution level if successful
                         self.res_level = res_level_x
-                        print("\n* Resolution found at level: {}\n".format(self.res_level))
+                        print("\n* Resolution found at level: {}".format(self.res_level))
 
                         # Exit the loop if the level is valid and waveform is loaded
                         break
@@ -775,7 +775,7 @@ class NR_simulation():
 
                         # If an error occurs (e.g., file not found or data issues), increment the attempt count
                         attempts += 1
-                        print(f"Error in attempt {attempts} with resolution level {res_level_x}: {e}")
+                        print(f"\n*Error in attempt {attempts} with resolution level {res_level_x}: {e}")
                         
                         # If we reach the maximum number of attempts, break the loop and stop trying
                         if attempts >= max_attempts:
@@ -790,7 +790,7 @@ class NR_simulation():
                 try              : 
                     if(self.res_level-counter==0): raise ValueError("Only a single resolution available.")
                     t_res, NR_r_res, NR_i_res = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level-counter)
-                    print('Resolution error constructed with resolution level {}'.format(self.res_level-counter))
+                    print('\n* Resolution error constructed with resolution level {}'.format(self.res_level-counter))
                     counter = 0
                 except ValueError: 
                     counter += 1
@@ -798,8 +798,6 @@ class NR_simulation():
 
         elif(self.NR_catalog=='RIT'):
         
-            print('\n\n\nFIXME: figure out extrapolation order and resolution level for RIT\n\n\n')
-
             self.q, self.chi1, self.chi2, self.ecc, self.Mf, self.af, self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot, self.bmrg, self.Emrg, self.Jmrg = self.read_RIT_metadata()
 
             # Build NR waveform and time axis.

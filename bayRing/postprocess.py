@@ -11,10 +11,12 @@ from pycbc.types.frequencyseries import FrequencySeries
 from pycbc.filter                import sigma, match as compute_FD_match
 import lal
 from lal.antenna                 import AntennaResponse
+import pyRing.utils              as pyRing_utils
 
 # Package internal imports
 import bayRing.utils             as utils
 import bayRing.waveform_utils    as waveform_utils
+
 
 # Costants
 twopi = 2.*np.pi
@@ -320,8 +322,8 @@ def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir):
     l2_NR       = np.trapz(np.sqrt(      NR_err_r** 2 +       NR_err_i** 2), t_cut)
     l2_residual = np.trapz(np.sqrt((NR_r - wf_r) ** 2 + (NR_i - wf_i) ** 2), t_cut)
 
-    print(f'\n* L2 norm of residual is {l2_residual}')
-    print(f'* L2 norm of NR error is {l2_NR}\n')
+    print(f'* L2 norm of residual is: {l2_residual}')
+    print(f'* L2 norm of NR error is: {l2_NR}\n')
 
     outFile_L2_errors = open(os.path.join(outdir,'Algorithm/L2_errors.txt'), 'w')
     outFile_L2_errors.write('# L2 norm of residual is \n')
@@ -980,6 +982,10 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
             except Exception as e:
                 print(f"Error processing optimal SNR for {perc}% CI and {NR_quant}: {e}")
                 continue
+
+    print('\n')
+
+    return
 
 def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, method, acf, acf_tot, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, delta_f, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX):
     """
@@ -2696,7 +2702,7 @@ def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX
         print(f"\nSaved: {full_path}\n")
         plt.close()
 
-def run_mismatch_computation(NR_sim, results_object, inference_model, parameters, wf_utils):
+def run_mismatch_and_SNR_computation(NR_sim, results_object, inference_model, parameters, wf_utils):
     """
     Run the mismatch computation section for a given NR simulation and inference model.
 
@@ -2768,11 +2774,12 @@ def run_mismatch_computation(NR_sim, results_object, inference_model, parameters
                                     return None
 
                                 try:
+
                                     #---------------------------------------------#
                                     # PSD / ACF computation
                                     #---------------------------------------------#
                                     if apply_window == 1:
-                                        print(f"\n* Applying window: w_DX={window_size_DX:.1f}Hz, w_SX={window_size_SX:.1f}Hz, "
+                                        print(f"* Applying window with parameters: w_DX={window_size_DX:.1f}Hz, w_SX={window_size_SX:.1f}Hz, "
                                               f"k={k:.1f}, satDX={saturation_DX:.1f}, satSX={saturation_SX:.1f}, N_FFT={N_fft}")
                                         PSD_smoothed, ACF_smoothed = wf_utils.acf_from_asd_with_smoothing(
                                             asd_path, f_min, f_max, N_fft,
@@ -2791,9 +2798,10 @@ def run_mismatch_computation(NR_sim, results_object, inference_model, parameters
                                     psd_data[label] = PSD_smoothed
                                     acf_data[label] = ACF_smoothed
 
-                                    #---------------------------------------------#
-                                    # Mismatch computation
-                                    #---------------------------------------------#
+                                    #----------------------#
+                                    # Mismatch computation #
+                                    #----------------------#
+
                                     t_ACF = np.linspace(0, N_fft * dt, len(ACF_smoothed))
                                     ACF_truncated_NR = truncate_and_interpolate_acf(
                                         t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_NR_s, mismatch_print_flag
@@ -2808,10 +2816,11 @@ def run_mismatch_computation(NR_sim, results_object, inference_model, parameters
                                         saturation_DX, saturation_SX,
                                         mismatch_print_flag, compare_TD_FD
                                     )
+                                         
+                                    #----------------------------------#
+                                    # Optimal SNR and condition number #
+                                    #----------------------------------#
 
-                                    #---------------------------------------------#
-                                    # Optimal SNR and condition number
-                                    #---------------------------------------------#
                                     compute_optimal_SNR(
                                         NR_sim, results_object, inference_model,
                                         parameters['I/O']['outdir'], parameters['Inference']['method'],
@@ -2835,6 +2844,7 @@ def run_mismatch_computation(NR_sim, results_object, inference_model, parameters
 
                                 except Exception as e:
                                     print(f"* Mismatch computation failed for wDX={window_size_DX}, wSX={window_size_SX}, k={k}: {e}")
+
 
         #---------------------------------------------#
         # Postprocessing plots
