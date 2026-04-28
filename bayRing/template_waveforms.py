@@ -8,7 +8,7 @@ import bayRing.utils   as utils
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc'):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc', TEOB_qc_fit_type = None):
 
         self.t_NR                      = t_NR
         self.t_start                   = tM_start
@@ -16,6 +16,7 @@ class WaveformModel(cpnest.model.Model):
         self.wf_model                  = wf_model
         self.Kerr_modes                = Kerr_modes
         self.metadata                  = metadata
+        self.fit_metadata              = fit_metadata
         self.const_params              = const_params
         self.Mf, self.af               = self.metadata['Mf'], self.metadata['af']
         self.qnm_cached                = qnm_cached
@@ -28,6 +29,7 @@ class WaveformModel(cpnest.model.Model):
         self.KerrBinary_amp_nc_version = KerrBinary_amp_nc_version
         self.TEOB_NR_fit               = TEOB_NR_fit
         self.TEOB_template             = TEOB_template
+        self.TEOB_qc_fit_type          = TEOB_qc_fit_type
 
         if not(const_params==None):
             self.const_r = [const_params[0]*np.cos(const_params[1])]
@@ -106,23 +108,26 @@ class WaveformModel(cpnest.model.Model):
     def Damped_sinusoids_waveform(self, params, fixed_params):
 
         ringdown_model = np.zeros(len(self.t_NR), dtype=np.complex128)
-        
-        amp_value = utils.get_param_override(fixed_params,params,'ln_A_{}'.format(i))
-        phi_value = utils.get_param_override(fixed_params,params, 'phi_{}'.format(i))
-        f_value   = utils.get_param_override(fixed_params,params,   'f_{}'.format(i))
-        tau_value = utils.get_param_override(fixed_params,params, 'tau_{}'.format(i))
 
-        # In this case modes is an integer storing the number of free damped sinusoids
+        # Loop over each damped sinusoid mode
         for i in range(self.N_ds_modes):
-            ringdown_model += wf.damped_sinusoid(np.exp(amp_value)   ,
-                                                        f_value      ,
-                                                        tau_value    ,
-                                                        phi_value    ,
-                                                        self.t_start ,
-                                                        self.t_start ,
-                                                        self.t_NR    )
-            
+            amp_value = utils.get_param_override(fixed_params, params, 'ln_A_{}'.format(i))
+            phi_value = utils.get_param_override(fixed_params, params, 'phi_{}'.format(i))
+            f_value   = utils.get_param_override(fixed_params, params, 'f_{}'.format(i))
+            tau_value = utils.get_param_override(fixed_params, params, 'tau_{}'.format(i))
+
+            ringdown_model += wf.damped_sinusoid(
+                np.exp(amp_value),
+                f_value,
+                tau_value,
+                phi_value,
+                self.t_start,
+                self.t_start,
+                self.t_NR
+            )
+
         return ringdown_model
+
 
     def KerrBinary_waveform(self, params, fixed_params):
 
@@ -133,7 +138,7 @@ class WaveformModel(cpnest.model.Model):
         else                                  : noncircular_parameters = {}
 
         KerrBinary_params['Mi'], KerrBinary_params['eta'], KerrBinary_params['chis'], KerrBinary_params['chia'] = pyr_utils.compute_KerrBinary_binary_quantities(self.metadata['m1'], self.metadata['m2'], self.metadata['chi1'], self.metadata['chi2'])  
-
+        
         phi_value = utils.get_param_override(fixed_params,params,'phi')
 
         available_modes_with_given_lm = utils.filter_dict_by_key(pyr_utils.available_modes_dict_KerrBinary[self.KerrBinary_version], (self.l_NR,self.m_NR))
@@ -196,7 +201,7 @@ class WaveformModel(cpnest.model.Model):
                                                         'c4p'                 : params[       'c4p_{}{}'.format(self.l_NR,self.m_NR)]            ,
                                                         'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]       ,
                                                         'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu      ,
-                                                        'A_peakdotdot_over_nu': params[       'A_peakdotdot_{}{}'.format(self.l_NR,self.m_NR)]/nu,
+                                                        'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR,self.m_NR)]/nu,
                                                         }
                                 }
             else:
@@ -205,14 +210,69 @@ class WaveformModel(cpnest.model.Model):
             NR_fit_coeffs['Mf'] = self.Mf
             NR_fit_coeffs['af'] = self.af
 
-        else                :
-            NR_fit_coeffs = None
+        else:
+            try:
+                NR_fit_coeffs = {
+                    (self.l_NR, self.m_NR): {
+                        'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR, self.m_NR)],
+                        'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR, self.m_NR)] / nu,
+                        'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR, self.m_NR)] / nu,
+                        'ecc'                 : self.metadata['ecc'],
+                        'bmrg'                : self.metadata['bmrg'],
+                        'Jmrg'                : self.metadata['Jmrg'],
+                        'Emrg'                : self.metadata['Emrg'],
+                        'TEOB_qc_fit_type'    : self.fit_metadata['TEOB_qc_fit_type'],
+                        'TEOB_qc_fit_order'   : self.fit_metadata['TEOB_qc_fit_order'],
+                    }
+                }
+
+                fit_coeffs = {key: val for key, val in self.fit_metadata.items() if key.startswith(('c_2_', 'c_3_', 'c_4_'))}
+                NR_fit_coeffs[(self.l_NR, self.m_NR)].update(fit_coeffs)
+                for key in ['nu', 'ecc', 'bmrg', 'jmrg', 'emrg']:
+                    norm_scale_key, norm_shift_key = 'norm_{}_scale'.format(key), 'norm_{}_shift'.format(key)
+                    if norm_scale_key in self.fit_metadata:
+                        NR_fit_coeffs[norm_scale_key] = self.fit_metadata[norm_scale_key]
+                    if norm_shift_key in self.fit_metadata:
+                        NR_fit_coeffs[norm_shift_key] = self.fit_metadata[norm_shift_key]
+            except:
+                NR_fit_coeffs = {
+                                (self.l_NR,self.m_NR): {
+                                                        'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]       ,
+                                                        'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu      ,
+                                                        'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR,self.m_NR)]/nu ,
+                                                        'TEOB_qc_fit_type'    : None                                                            ,
+                                                        }
+                                }
+            
+            NR_fit_coeffs['Mf'] = self.Mf
+            NR_fit_coeffs['af'] = self.af
 
         if(  self.TEOB_template=='qc'): ecc_par = 0
         elif(self.TEOB_template=='nc'): ecc_par = 1
 
+        if(ecc_par==0):
+            if (self.TEOB_qc_fit_type=='non-spinning'): 
+                order_nu = 111
+                order_S_hat = 0
+            elif(self.TEOB_qc_fit_type=='equal-mass'): 
+                order_S_hat = 342
+                order_nu = 0
+            else:
+                order_S_hat = 0
+                order_nu = 0
+        elif(ecc_par==1):
+            if(self.TEOB_qc_fit_type=='non-spinning'): 
+                order_nu = 11111
+                order_S_hat = 0
+            elif(self.TEOB_qc_fit_type=='equal-mass'): 
+                order_S_hat = 33333
+                order_nu = 0
+            else: 
+                order_S_hat = 0
+                order_nu = 0
+
         TGR_parameters = {}
-        ringdown_model = wf.TEOBPM(self.t_start                 ,
+        ringdown_model = wf.TEOBPM(self.t_peak                  ,
                                    self.metadata['m1']          ,
                                    self.metadata['m2']          ,
                                    self.metadata['chi1']        ,
@@ -225,9 +285,9 @@ class WaveformModel(cpnest.model.Model):
                                    TGR_parameters               ,
                                    geom          = 1            ,
                                    ecc_par       = ecc_par      ,
+                                   order_nu      = order_nu     ,
+                                   order_S_hat   = order_S_hat    ,
                                    NR_fit_coeffs = NR_fit_coeffs)
-
-
         return ringdown_model
 
     def waveform(self, params, fixed_params):
@@ -262,7 +322,7 @@ class WaveformModel(cpnest.model.Model):
             
             ringdown_model                = self.TEOBPM_waveform(params, fixed_params)
             _, _, _, self.wf_r, self.wf_i = ringdown_model.waveform(self.t_NR)
-
+            
         else:
             raise ValueError("Unknown template selected: {}".format(self.wf_model))
 

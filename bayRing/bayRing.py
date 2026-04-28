@@ -2,9 +2,14 @@
 
 # Standard python packages
 import matplotlib.pyplot as plt, numpy as np, os, time, traceback
+from scipy.interpolate import interp1d, CubicSpline
 from optparse       import OptionParser
 try:                import configparser
 except ImportError: import ConfigParser as configparser
+
+# GW-specific imports
+from pyRing.utils import print_section
+import lal
 import cpnest, cpnest.model
 
 # Package internal imports
@@ -14,9 +19,14 @@ import bayRing.initialise         as initialise
 import bayRing.QNM_utils          as QNM_utils
 import bayRing.inference          as inference
 import bayRing.template_waveforms as template_waveforms
-from pyRing.utils           import print_section
+import bayRing.waveform_utils     as wf_utils
 
+# Constants
 twopi = 2.*np.pi
+
+# Conversions
+C_mt=(lal.MSUN_SI * lal.G_SI) / (lal.C_SI**3) #s, converts a mass expressed in solar masses into a time in seconds
+C_md=(lal.MSUN_SI * lal.G_SI)/(1e6*lal.PC_SI*lal.C_SI**2) #adimensional, converts a mass expressed in solar masses to a distance in Megaparsec
 
 if __name__=='__main__':
     main()
@@ -70,13 +80,15 @@ def main():
     print_section('NR data loading')
     parameters['Injection-data']['modes-list'] = NR_waveforms.read_fake_NR(parameters['NR-data']['catalog'], parameters['Injection-data']['modes'])
 
+    #NR simulation object
     NR_sim      = NR_waveforms.NR_simulation(parameters['NR-data']['catalog']                       , 
                                              parameters['NR-data']['ID']                            , 
                                              parameters['NR-data']['res-level']                     , 
-                                             parameters['NR-data']['extrap-order']                  , 
+                                             parameters['NR-data']['extrap-order']                  ,
                                              parameters['NR-data']['pert-order']                    , 
                                              parameters['NR-data']['dir']                           , 
                                              parameters['NR-data']['properties-file']               ,
+                                             parameters['NR-data']['fits-file']                     ,
                                              parameters['Injection-data']['modes-list']             , 
                                              parameters['Injection-data']['times']                  , 
                                              parameters['Injection-data']['noise']                  , 
@@ -84,6 +96,7 @@ def main():
                                              parameters['NR-data']['l-NR']                          , 
                                              parameters['NR-data']['m']                             , 
                                              parameters['I/O']['outdir']                            ,
+
                                              waveform_type  = parameters['NR-data']['waveform-type'], 
                                              download       = parameters['NR-data']['download']     , 
                                              NR_error       = parameters['NR-data']['error']        , 
@@ -93,12 +106,19 @@ def main():
                                              t_peak_22      = parameters['NR-data']['t-peak-22']    ,
                                              t_min_mismatch = parameters['NR-data']['error-t-min']  , 
                                              t_max_mismatch = parameters['NR-data']['error-t-max']  )
-
     error       = NR_sim.NR_cpx_err_cut
     NR_metadata = NR_waveforms.read_NR_metadata(NR_sim, parameters['NR-data']['catalog'])
-
     print_section('Simulation metadata')
     for key in NR_metadata.keys(): print('{}: {}'.format(key.ljust(len('omg_peak_22')), NR_metadata[key]))
+
+    if parameters['NR-data']['fits-file'] is not '':
+        import pandas as pd
+        fit_data = pd.read_csv(parameters['NR-data']['fits-file'])
+        fit_metadata = fit_data.iloc[0].to_dict()
+        print_section('FITS metadata')
+        for key in fit_metadata.keys(): print('{}: {}'.format(key.ljust(len('fit_type')), fit_metadata[key]))
+    else:
+        fit_metadata = None    
 
     # =================#
     # Load Kerr modes. #
@@ -117,18 +137,20 @@ def main():
                                                 parameters['Model']['template']                                            , 
                                                 parameters['Model']['N-DS-modes']                                          , 
                                                 Kerr_modes                                                                 , 
-                                                NR_metadata                                                                , 
+                                                NR_metadata                                                                ,
+                                                fit_metadata                                                               ,  
                                                 qnm_cached                                                                 , 
                                                 parameters['NR-data']['l-NR']                                              , 
                                                 parameters['NR-data']['m']                                                 , 
-                                                tail                      = parameters['Model']['Kerr-tail']                   ,
-                                                tail_modes                = Kerr_tail_modes                                    ,     
-                                                quadratic_modes           = Kerr_quad_modes                                    , 
-                                                const_params              = parameters['NR-data']['add-const']                 , 
+                                                tail                      = parameters['Model']['Kerr-tail']                       ,
+                                                tail_modes                = Kerr_tail_modes                                        ,     
+                                                quadratic_modes           = Kerr_quad_modes                                        , 
+                                                const_params              = parameters['NR-data']['add-const']                     , 
                                                 KerrBinary_version        = parameters['Model']['KerrBinary-version']              ,
                                                 KerrBinary_amp_nc_version = parameters['Model']['KerrBinary-amplitudes-nc-version'],
-                                                TEOB_NR_fit               = parameters['Model']['TEOB-NR-fit']                 ,
-                                                TEOB_template             = parameters['Model']['TEOB-template']               ,
+                                                TEOB_NR_fit               = parameters['Model']['TEOB-NR-fit']                     ,
+                                                TEOB_template             = parameters['Model']['TEOB-template']                   ,
+                                                TEOB_qc_fit_type          = parameters['Model']['TEOB-qc-fit-type']                ,
                                                 )
 
     # ===============#
@@ -154,9 +176,9 @@ def main():
     tail_flag = wf_model.wf_model=='Kerr' and wf_model.tail==1
     # Plot and terminate execution if plotting only.
     if(parameters['I/O']['run-type']=='plot-NR-only'): 
-        postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, tail_flag)
+        postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, tail_flag, parameters['I/O']['extract-damping-time-flag'])
         # In case a tail run is selected, do plots also without tail format
-        if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, False)
+        if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, False, parameters['I/O']['extract-damping-time-flag'])
         print('\n* NR-only plotting run-type selected. Exiting.\n')
         exit()
 
@@ -169,6 +191,11 @@ def main():
     if(  parameters['I/O']['run-type']=='full'           ): results_object = inference.run_inference(parameters, inference_model)
     elif(parameters['I/O']['run-type']=='post-processing'): results_object = postprocess.read_results_object_from_previous_inference(parameters)
     else                                                  : raise Exception("Unknown run type selected: {}. Exiting.".format(parameters['I/O']['run-type']))
+
+    if parameters['I/O']['run-type']=='full':
+        import pickle
+        with open(os.path.join(parameters['I/O']['outdir'], 'NR_sim.pkl'), 'wb') as f:
+            pickle.dump([NR_sim, [np.array(inference_model.model(p)) for p in results_object], wf_model], f)
         
     #=========================#
     # Postprocessing section. #
@@ -178,9 +205,10 @@ def main():
 
     print('\n* Note: except for free damped sinusoids fits, quantities are quoted at the selected peak time.\n')
     postprocess.print_point_estimate(results_object, inference_model.access_names(), parameters['Inference']['method'])
+    postprocess.l2norm_residual_vs_nr(results_object, inference_model, NR_sim, parameters['I/O']['outdir'])
+
     # postprocess.plot_fancy_residual(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'])
     # postprocess.plot_fancy_reconstruction(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], method)
-    postprocess.l2norm_residual_vs_nr(results_object, inference_model, NR_sim, parameters['I/O']['outdir'])
 
     # Not needed now that we define everything directly at the peak.
     # if(parameters['Model']['template']=='Kerr'): postprocess.post_process_amplitudes(parameters['Inference']['t-start'], results_object, NR_metadata, qnm_cached, Kerr_modes, Kerr_quad_modes, parameters['I/O']['outdir'])
@@ -196,18 +224,25 @@ def main():
         execution_time = (time.time() - execution_time)/60.0
         print('\nExecution time (min): {:.2f}\n'.format(execution_time))
 
-    try:
-        postprocess.plot_NR_vs_model(              NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], tail_flag)
+
+    try   : 
+        postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], tail_flag, parameters['I/O']['extract-damping-time-flag']) 
         # In case a tail run is selected, do plots also without tail format
-        if tail_flag: postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], False   )
+        if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], False, parameters['I/O']['extract-damping-time-flag'])
     except Exception as e:
         print(f"Waveform reconstruction plot failed with error: {e}")
-        traceback.print_exc()
+        traceback.print_exc()    
 
-    try                  : 
+    # Mismatch computation
+    postprocess.run_mismatch_computation(NR_sim, results_object, inference_model, parameters, wf_utils)
+
+    # Attempt to generate the global corner plot
+    try:
         postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
-    except Exception as e: 
+    except Exception as e:
         print(f"Corner plot failed with error: {e}")
         traceback.print_exc()
 
-    if parameters['I/O']['show-plots']: plt.show()
+    # Show plots if the option is enabled
+    if parameters['I/O']['show-plots']:
+        plt.show()
