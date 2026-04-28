@@ -2,7 +2,6 @@ import ast, json, os, sys
 try:                import configparser
 except ImportError: import ConfigParser as configparser
 
-import bayRing.QNM_utils as QNM_utils
 import pyRing.utils    as pyRing_utils
 from pyRing.initialise import store_git_info
 
