@@ -39,8 +39,9 @@ def set_prefix(warning_message=True):
         prefix = ''
         if(warning_message):
             warnings.warn("The requested functionality requires data not included in the package. Please set a $BAYRING_PREFIX variable which contains the path to such data. This can be done by setting 'export BAYRING_PREFIX= yourpath' in your ~/.bashrc file. Typically, BAYRING_PREFIX contains the path to the clone of the repository containing the source code.")
-    return prefix
     
+    return prefix
+
 def filter_dict_by_key(a, target_key):
 
     """

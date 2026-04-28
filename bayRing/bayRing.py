@@ -88,6 +88,7 @@ def main():
                                              parameters['NR-data']['pert-order']                    , 
                                              parameters['NR-data']['dir']                           , 
                                              parameters['NR-data']['properties-file']               ,
+                                             parameters['NR-data']['fits-file']                     ,
                                              parameters['Injection-data']['modes-list']             , 
                                              parameters['Injection-data']['times']                  , 
                                              parameters['Injection-data']['noise']                  , 
@@ -95,8 +96,6 @@ def main():
                                              parameters['NR-data']['l-NR']                          , 
                                              parameters['NR-data']['m']                             , 
                                              parameters['I/O']['outdir']                            ,
-                                             parameters['NR-data']['sxs-installed-version']         , 
-                                             parameters['NR-data']['sxs-local']                     ,   
 
                                              waveform_type  = parameters['NR-data']['waveform-type'], 
                                              download       = parameters['NR-data']['download']     , 
@@ -109,9 +108,17 @@ def main():
                                              t_max_mismatch = parameters['NR-data']['error-t-max']  )
     error       = NR_sim.NR_cpx_err_cut
     NR_metadata = NR_waveforms.read_NR_metadata(NR_sim, parameters['NR-data']['catalog'])
-
     print_section('Simulation metadata')
     for key in NR_metadata.keys(): print('{}: {}'.format(key.ljust(len('omg_peak_22')), NR_metadata[key]))
+
+    if parameters['NR-data']['fits-file'] is not '':
+        import pandas as pd
+        fit_data = pd.read_csv(parameters['NR-data']['fits-file'])
+        fit_metadata = fit_data.iloc[0].to_dict()
+        print_section('FITS metadata')
+        for key in fit_metadata.keys(): print('{}: {}'.format(key.ljust(len('fit_type')), fit_metadata[key]))
+    else:
+        fit_metadata = None    
 
     # =================#
     # Load Kerr modes. #
@@ -130,18 +137,20 @@ def main():
                                                 parameters['Model']['template']                                            , 
                                                 parameters['Model']['N-DS-modes']                                          , 
                                                 Kerr_modes                                                                 , 
-                                                NR_metadata                                                                , 
+                                                NR_metadata                                                                ,
+                                                fit_metadata                                                               ,  
                                                 qnm_cached                                                                 , 
                                                 parameters['NR-data']['l-NR']                                              , 
                                                 parameters['NR-data']['m']                                                 , 
-                                                tail                      = parameters['Model']['Kerr-tail']                   ,
-                                                tail_modes                = Kerr_tail_modes                                    ,     
-                                                quadratic_modes           = Kerr_quad_modes                                    , 
-                                                const_params              = parameters['NR-data']['add-const']                 , 
+                                                tail                      = parameters['Model']['Kerr-tail']                       ,
+                                                tail_modes                = Kerr_tail_modes                                        ,     
+                                                quadratic_modes           = Kerr_quad_modes                                        , 
+                                                const_params              = parameters['NR-data']['add-const']                     , 
                                                 KerrBinary_version        = parameters['Model']['KerrBinary-version']              ,
                                                 KerrBinary_amp_nc_version = parameters['Model']['KerrBinary-amplitudes-nc-version'],
-                                                TEOB_NR_fit               = parameters['Model']['TEOB-NR-fit']                 ,
-                                                TEOB_template             = parameters['Model']['TEOB-template']               ,
+                                                TEOB_NR_fit               = parameters['Model']['TEOB-NR-fit']                     ,
+                                                TEOB_template             = parameters['Model']['TEOB-template']                   ,
+                                                TEOB_qc_fit_type          = parameters['Model']['TEOB-qc-fit-type']                ,
                                                 sigmoid_flag              = parameters['Model']['sigmoid-flag']                ,
                                                 quadratic_fits            = parameters['Model']['quadratic-fits']            
                                                 )
@@ -184,6 +193,11 @@ def main():
     if(  parameters['I/O']['run-type']=='full'           ): results_object = inference.run_inference(parameters, inference_model)
     elif(parameters['I/O']['run-type']=='post-processing'): results_object = postprocess.read_results_object_from_previous_inference(parameters)
     else                                                  : raise Exception("Unknown run type selected: {}. Exiting.".format(parameters['I/O']['run-type']))
+
+    if parameters['I/O']['run-type']=='full':
+        import pickle
+        with open(os.path.join(parameters['I/O']['outdir'], 'NR_sim.pkl'), 'wb') as f:
+            pickle.dump([NR_sim, [np.array(inference_model.model(p)) for p in results_object], wf_model], f)
         
     #=========================#
     # Postprocessing section. #

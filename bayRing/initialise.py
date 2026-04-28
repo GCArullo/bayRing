@@ -90,26 +90,25 @@ def read_config(Config):
 
         'NR-data':
         {
-        'download'             : 1,
-        'dir'                  : '',
-        'catalog'              : 'SXS',
-        'sxs-installed-version': '2025.0.10',
-        'sxs-local'            : True,     
-        'ID'                   : '0305',
-        'extrap-order'         : 2,
-        'res-level'            : -1,
-        'res-nx'               : 0,   
-        'res-nl'               : 0,  
-        'pert-order'           : 'lin', 
-        'l-NR'                 : 2,
-        'm'                    : 2,
-        'error'                : 'align-with-mismatch-res-only',
-        'error-t-min'          : 3e-1,
-        'error-t-max'          : 4e-3,
-        'add-const'            : '0.0,0.0',
-        'properties-file'      : '',
-        't-peak-22'            : 0.0,
-        'waveform-type'        : 'strain',
+        'download'         : 1,
+        'dir'              : '',
+        'catalog'          : 'SXS',
+        'ID'               : '0305',
+        'extrap-order'     : 2,
+        'res-level'        : -1,
+        'res-nx'           : 0,   
+        'res-nl'           : 0,  
+        'pert-order'       : 'lin', 
+        'l-NR'             : 2,
+        'm'                : 2,
+        'error'            : 'align-with-mismatch-res-only',
+        'error-t-min'      : 3e-1,
+        'error-t-max'      : 4e-3,
+        'add-const'        : '0.0,0.0',
+        'properties-file'  : '',
+        'fits-file'        : '',
+        't-peak-22'        : 0.0,
+        'waveform-type'    : 'strain',
         },
 
         'Injection-data':
@@ -132,6 +131,7 @@ def read_config(Config):
         'KerrBinary-amplitudes-nc-version' : ''           ,
         'TEOB-NR-fit'                      : 0            ,
         'TEOB-template'                    : 'qc'         ,
+        'TEOB-qc-fit-type'                 : 'equal-mass' , 
         'sigmoid-flag'                     : 0            ,
         'quadratic-fits'                   : 0            ,
         },
@@ -262,6 +262,11 @@ def read_config(Config):
     elif(parameters['Model']['template']=='TEOBPM'      ):
         #parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,321,310,311,440,441,430,431,420,421,410,411,550,551'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4  or parameters['NR-data']['l-NR']==5): raise ValueError("The TEOBPM template is only available for l=2,3,4,5")
+        if parameters['Model']['TEOB-NR-fit'] == 0:
+            keytype = type(parameters['Model']['TEOB-qc-fit-type'])
+            try:
+                parameters['Model']['TEOB-qc-fit-type'] = keytype(Config.get('Model', 'TEOB-qc-fit-type'))
+            except (KeyError, configparser.NoOptionError, TypeError): pass
 
     print('\n\n\nFIXME: print updated vars\n\n\n')
 
@@ -300,10 +305,6 @@ A dot is present at the end of each description line and is not to be intended a
         
         catalog                 NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'fake_NR']. Default: 'SXS'.
         
-        sxs-installed-version   Version of the sxs package.                                                                         Default: "2025.0.10".
-
-        sxs-local               Flag to use the local SXS simulations. If False, the SXS simulations are downloaded.              Default: False.
-
         ID                      Simulation ID to be considered. Example for SXS: 0305. Example for Teukolsky: \
                                 `a_0.7_A_0.141_w_1.4_ingoing_ang_15`.                                                               Default: 0305.
         
@@ -339,8 +340,10 @@ A dot is present at the end of each description line and is not to be intended a
         add-const               Parameter of the complex constant to be added to the fit template. Required to account for spurious \
                                 effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.
         
-        properties-file         Path to the file containing additional properties of the NR simulation in `.csv` format. \
-                                Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
+        properties-file  Path to the file containing additional properties of the NR simulation in `.csv` format. \
+                         Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
+
+        fits-file       Path to the file containing the fits of the NR simulation.                                           Default: ''.
         
         t-peak-22               Time of the peak of the 22 mode. Used as reference time in KerrBinary model. Must be passed when \
                                 fitting HMs with KerrBinary.                                                                        Default: 0.0.                         
@@ -397,8 +400,8 @@ A dot is present at the end of each description line and is not to be intended a
 
         sigmoid-flag                     Flag to include sigmoid for each additional Kerr mode.
         quadratic-fits                   Flag to include quadratic fits.                                                   
-                                                                                                                                                                           Default: 0.                                
-    
+        TEOB-qc-fit-type                 Type of fit to be used. Available options: ['non_spinning', 'equal_mass'].                                                       Default: None.
+
     *******************************************************
     * Parameters to be passed to the [Inference] section. *
     *******************************************************
