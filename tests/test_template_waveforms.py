@@ -32,6 +32,7 @@ def _build_model(**kwargs):
         "N_ds_modes": 0,
         "Kerr_modes": [(2, 2, 0)],
         "metadata": _basic_metadata(**kwargs.pop("metadata_overrides", {})),
+        "fit_metadata": None,
         "qnm_cached": "cached",
         "l_NR": 2,
         "m_NR": 2,
