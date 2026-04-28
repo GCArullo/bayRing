@@ -13,6 +13,23 @@ def get_param_override(fixed_params, x, name):
     if name in fixed_params: return fixed_params[name]
     else:                    return x[name]
 
+def normalize_optional_path(path):
+
+    """
+    Normalize optional path-like configuration values.
+
+    Empty strings in config files mean the optional file was not supplied.
+    """
+
+    if path is None:
+        return None
+    if isinstance(path, str):
+        path = path.strip()
+        if path == '':
+            return None
+
+    return path
+
 def set_prefix(warning_message=True):
     
     """

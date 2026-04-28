@@ -19,6 +19,15 @@ def test_get_param_override_returns_sample_when_not_fixed():
     assert utils.get_param_override(params, sample, "spin") == 0.1
 
 
+@pytest.mark.parametrize("path", [None, "", "   "])
+def test_normalize_optional_path_returns_none_for_missing_values(path):
+    assert utils.normalize_optional_path(path) is None
+
+
+def test_normalize_optional_path_strips_config_values():
+    assert utils.normalize_optional_path("  metadata.csv  ") == "metadata.csv"
+
+
 def test_filter_dict_by_key_extracts_per_category():
     data = {
         "linear": {"mass": [1, 2], "spin": [3, 4]},
