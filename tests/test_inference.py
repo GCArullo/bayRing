@@ -1,4 +1,5 @@
 import os
+import pickle
 
 import pytest
 
@@ -14,6 +15,10 @@ class FakeConfig:
             return self.values[(section, option)]
         except KeyError as exc:
             raise inference.configparser.NoOptionError(option, section) from exc
+
+
+class PickleBase:
+    pass
 
 
 def test_read_parameter_bounds_uses_config_value(capsys):
@@ -56,6 +61,25 @@ def test_store_evidence_to_file_writes_expected_content(tmp_path):
     evidence_path = output_dir / "Evidence.txt"
     content = evidence_path.read_text(encoding="utf-8")
     assert content.splitlines() == ["logZ", "12.34"]
+
+
+def test_dynamic_inference_model_instances_are_pickleable_after_global_lookup_reset():
+    model_class = inference.Dynamic_InferenceModel(PickleBase)
+    instance = model_class.__new__(model_class)
+    instance.payload = "value"
+
+    payload = pickle.dumps(instance)
+    model_class_name = model_class.__name__
+
+    assert "<locals>" not in model_class.__qualname__
+    delattr(inference, model_class_name)
+    inference._DYNAMIC_INFERENCE_MODEL_CLASSES.pop(model_class_name, None)
+
+    restored = pickle.loads(payload)
+
+    assert type(restored).__name__ == model_class_name
+    assert isinstance(restored, PickleBase)
+    assert restored.payload == "value"
 
 
 @pytest.mark.parametrize(
