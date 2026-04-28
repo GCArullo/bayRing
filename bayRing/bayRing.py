@@ -197,7 +197,7 @@ def main():
 
     if parameters['I/O']['run-type']=='full':
         import pickle
-        if(parameters['Inference']['method']=='Minimization'):
+        if(inference.is_point_estimate_method(parameters['Inference']['method'])):
             model_samples = [np.array(inference_model.model(results_object))]
         else:
             model_samples = [np.array(inference_model.model(p)) for p in results_object]

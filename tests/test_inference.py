@@ -42,6 +42,69 @@ class FakeWaveform:
         return np.array([0j, 0j, 0j])
 
 
+class FakeLinearKerrWaveform:
+    def __init__(self, basis, **overrides):
+        self.wf_model = "Kerr"
+        self.Kerr_modes = [key for key in basis.keys() if isinstance(key, tuple) and len(key) == 3 and isinstance(key[0], int)]
+        self.tail = 0
+        self.tail_modes = []
+        self.quadratic_modes = None
+        self.const_params = None
+        self.basis = basis
+        for key, value in overrides.items():
+            setattr(self, key, value)
+
+    def _basis(self, *keys):
+        for key in keys:
+            if key in self.basis:
+                return self.basis[key]
+        raise KeyError(keys)
+
+    def kerr_waveform_from_components(self, amplitudes=None, tail_amplitudes=None, tail_exponents=None, quadratic_amplitudes=None, include_const=True):
+        if amplitudes is None:
+            amplitudes = {}
+        if tail_amplitudes is None:
+            tail_amplitudes = {}
+        if tail_exponents is None:
+            tail_exponents = {}
+        if quadratic_amplitudes is None:
+            quadratic_amplitudes = {}
+
+        waveform = np.zeros(len(next(iter(self.basis.values()))), dtype=np.complex128)
+        for mode, amplitude in amplitudes.items():
+            waveform += amplitude * self._basis(mode, ("linear", mode))
+        for key, amplitude in quadratic_amplitudes.items():
+            waveform += amplitude * self._basis(key, ("quadratic", key))
+        for mode, amplitude in tail_amplitudes.items():
+            waveform += amplitude * self._basis(("tail", mode, tail_exponents[mode]), ("tail", mode))
+
+        if include_const and self.const_params is not None:
+            const_value = self.const_params[0] * np.cos(self.const_params[1])
+            const_value = -const_value + 1j * self.const_params[0] * np.sin(self.const_params[1])
+            waveform += const_value
+
+        return waveform
+
+    def kerr_waveform_from_complex_amplitudes(self, amplitudes, include_const=True):
+        return self.kerr_waveform_from_components(amplitudes=amplitudes, include_const=include_const)
+
+
+class FakeLinearInferenceModel:
+    def __init__(self, waveform, data, error, names, fixed_params=None, kind="gaussian"):
+        self.wf_model = waveform
+        self.data = data
+        self.error = error
+        self.names = names
+        self.fixed_params = fixed_params or {}
+        self.kind = kind
+
+    def access_names(self):
+        return self.names
+
+    def access_bounds(self):
+        return [[-20.0, 5.0] if name.startswith("ln_A") else [0.0, inference.twopi] for name in self.names]
+
+
 def test_read_parameter_bounds_uses_config_value(capsys):
     config = FakeConfig({("Priors", "ln_A_220-min"): -1.5, ("Priors", "ln_A_220-max"): 2.5})
     defaults = {"ln_A": (-20.0, 5.0)}
@@ -60,6 +123,11 @@ def test_read_parameter_bounds_falls_back_to_defaults():
     result = inference.read_parameter_bounds(config, inference.configparser, "phi", "phi_220", defaults)
 
     assert result == [0.0, inference.twopi]
+
+
+def test_linear_inversion_is_the_only_linear_inversion_method():
+    assert inference.linear_inversion_methods == ["Linear-inversion"]
+    assert inference.point_estimate_methods == ["Minimization", "Linear-inversion"]
 
 
 def test_read_parameter_start_minimization_returns_config_value(capsys):
@@ -246,3 +314,120 @@ def test_minimization_method_rejects_lm():
 
     with pytest.raises(ValueError, match="Available options"):
         minimization._least_squares_method("lm")
+
+
+def test_kerr_linear_inversion_recovers_two_complex_mode_amplitudes():
+    if not hasattr(inference.np, "linalg"):
+        pytest.skip("requires real numpy linear algebra")
+
+    modes = [(2, 2, 0), (2, 2, 1)]
+    basis = {
+        modes[0]: np.array([1.0 + 0.2j, 0.4 + 1.1j, -0.3 + 0.7j, 0.5 - 0.8j]),
+        modes[1]: np.array([0.7 - 0.4j, -1.2 + 0.3j, 0.2 + 1.4j, 0.9 + 0.6j]),
+    }
+    true_amplitudes = {
+        modes[0]: 1.25 * np.exp(1j * 0.4),
+        modes[1]: 0.70 * np.exp(1j * 2.1),
+    }
+    waveform = FakeLinearKerrWaveform(basis)
+    data = sum(true_amplitudes[mode] * basis[mode] for mode in modes)
+    error = np.array([1.0 + 1.5j, 2.0 + 2.5j, 1.2 + 1.8j, 0.8 + 1.1j])
+    names = ["ln_A_220", "phi_220", "ln_A_221", "phi_221"]
+    model = FakeLinearInferenceModel(waveform, data, error, names)
+    parameters = {"Inference": {"linear-inversion-eigenvalue-tol": 1e-12}}
+
+    solution = inference.KerrLinearInversion_Algorithm(model, parameters).solve_likelihood()
+    recovered = dict(zip(names, solution))
+
+    for mode, label in zip(modes, ["220", "221"]):
+        complex_amplitude = np.exp(recovered[f"ln_A_{label}"]) * np.exp(1j * recovered[f"phi_{label}"])
+        assert complex_amplitude == pytest.approx(true_amplitudes[mode])
+
+
+def test_kerr_linear_inversion_rejects_partly_fixed_polar_amplitude():
+    mode = (2, 2, 0)
+    waveform = FakeLinearKerrWaveform({mode: np.array([1.0 + 0.0j, 0.0 + 1.0j])})
+    model = FakeLinearInferenceModel(
+        waveform,
+        np.array([0.0 + 0.0j, 0.0 + 0.0j]),
+        np.array([1.0 + 1.0j, 1.0 + 1.0j]),
+        ["ln_A_220"],
+        fixed_params={"phi_220": 0.0},
+    )
+    parameters = {"Inference": {"linear-inversion-eigenvalue-tol": 1e-12}}
+
+    with pytest.raises(ValueError, match="both `ln_A_220` and `phi_220`"):
+        inference.KerrLinearInversion_Algorithm(model, parameters)
+
+
+def test_kerr_linear_inversion_recovers_quadratic_and_fixed_exponent_tail_amplitudes():
+    if not hasattr(inference.np, "linalg"):
+        pytest.skip("requires real numpy linear algebra")
+
+    linear_mode = (2, 2, 0)
+    quad_modes = ((4, 4, 0), (2, 2, 0), (2, 2, 0))
+    quad_key = ("sum", quad_modes)
+    tail_mode = (2, 2)
+    basis = {
+        linear_mode: np.array([1.0 + 0.2j, 0.4 + 1.1j, -0.3 + 0.7j, 0.5 - 0.8j, 1.2 + 0.4j, -0.7 + 0.5j]),
+        ("quadratic", quad_key): np.array([0.3 + 0.6j, -0.2 + 1.0j, 0.8 - 0.4j, -1.1 + 0.2j, 0.1 + 0.9j, 0.5 - 0.6j]),
+        ("tail", tail_mode, -2.0): np.array([1.1 - 0.2j, 0.6 + 0.3j, -0.4 + 0.8j, 0.9 + 0.7j, -0.5 + 1.2j, 0.2 - 1.0j]),
+    }
+    true_amplitudes = {
+        "linear": 1.10 * np.exp(1j * 0.25),
+        "quadratic": 0.35 * np.exp(1j * 1.2),
+        "tail": 0.80 * np.exp(1j * 2.4),
+    }
+    waveform = FakeLinearKerrWaveform(
+        basis,
+        Kerr_modes=[linear_mode],
+        quadratic_modes={"sum": [quad_modes], "diff": []},
+        tail=1,
+        tail_modes=[tail_mode],
+    )
+    data = (
+        true_amplitudes["linear"] * basis[linear_mode]
+        + true_amplitudes["quadratic"] * basis[("quadratic", quad_key)]
+        + true_amplitudes["tail"] * basis[("tail", tail_mode, -2.0)]
+    )
+    error = np.array([1.0 + 1.1j, 1.2 + 1.3j, 1.4 + 1.5j, 1.6 + 1.7j, 1.8 + 1.9j, 2.0 + 2.1j])
+    names = [
+        "ln_A_220",
+        "phi_220",
+        "ln_A_sum_440_220_220",
+        "phi_sum_440_220_220",
+        "ln_A_tail_22",
+        "phi_tail_22",
+    ]
+    model = FakeLinearInferenceModel(waveform, data, error, names, fixed_params={"p_tail_22": -2.0})
+    parameters = {"Inference": {"linear-inversion-eigenvalue-tol": 1e-12}}
+
+    solution = inference.KerrLinearInversion_Algorithm(model, parameters).solve_likelihood()
+    recovered = dict(zip(names, solution))
+
+    recovered_amplitudes = {
+        "linear": np.exp(recovered["ln_A_220"]) * np.exp(1j * recovered["phi_220"]),
+        "quadratic": np.exp(recovered["ln_A_sum_440_220_220"]) * np.exp(1j * recovered["phi_sum_440_220_220"]),
+        "tail": np.exp(recovered["ln_A_tail_22"]) * np.exp(1j * recovered["phi_tail_22"]),
+    }
+    for key in true_amplitudes:
+        assert recovered_amplitudes[key] == pytest.approx(true_amplitudes[key])
+
+
+def test_kerr_linear_inversion_rejects_free_tail_exponents():
+    mode = (2, 2, 0)
+    waveform = FakeLinearKerrWaveform(
+        {mode: np.array([1.0 + 0.0j, 0.0 + 1.0j]), ("tail", (2, 2)): np.array([0.5 + 0.0j, 0.0 + 0.5j])},
+        tail=1,
+        tail_modes=[(2, 2)],
+    )
+    model = FakeLinearInferenceModel(
+        waveform,
+        np.array([0.0 + 0.0j, 0.0 + 0.0j]),
+        np.array([1.0 + 1.0j, 1.0 + 1.0j]),
+        ["ln_A_220", "phi_220", "ln_A_tail_22", "phi_tail_22", "p_tail_22"],
+    )
+    parameters = {"Inference": {"linear-inversion-eigenvalue-tol": 1e-12}}
+
+    with pytest.raises(ValueError, match="fixed `p_tail_22`"):
+        inference.KerrLinearInversion_Algorithm(model, parameters)

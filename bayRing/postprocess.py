@@ -33,9 +33,21 @@ colbGray   = "#BBBBBB"
 C_mt=(lal.MSUN_SI * lal.G_SI) / (lal.C_SI**3) #s, converts a mass expressed in solar masses into a time in seconds
 C_md=(lal.MSUN_SI * lal.G_SI)/(1e6*lal.PC_SI*lal.C_SI**2) #adimensional, converts a mass expressed in solar masses to a distance in Megaparsec
 
+strain_components = ('real', 'imag')
+summary_percentiles = (5, 50, 95)
+plot_percentiles = (50,)
+point_estimate_methods = ('Minimization', 'Linear-inversion')
+window_key_index = {
+    'window_DX': 0,
+    'window_SX': 1,
+    'k': 2,
+    'saturation_DX': 3,
+    'saturation_SX': 4,
+}
+
 def waveform_parameter_samples(results, method=None):
 
-    if method == 'Minimization' or isinstance(results, dict):
+    if method in point_estimate_methods or isinstance(results, dict):
         return [results]
 
     return list(results)
@@ -48,9 +60,74 @@ def model_component_lists(results, inference_model, method=None):
 
     return models_re_list, models_im_list
 
+def _physical_strain_scale(M, dL):
+    return (C_md * M) / dL
+
+def _scaled_strain_components(NR_sim, M, dL):
+    scale = _physical_strain_scale(M, dL)
+    return {
+        'real': NR_sim.NR_r_cut * scale,
+        'imag': NR_sim.NR_i_cut * scale,
+    }
+
+def _percentile_waveforms(models_re_list, models_im_list, perc, M, dL):
+    scale = _physical_strain_scale(M, dL)
+    return (
+        np.percentile(np.array(models_re_list), [perc], axis=0)[0] * scale,
+        np.percentile(np.array(models_im_list), [perc], axis=0)[0] * scale,
+    )
+
+def _toeplitz_whitened_norm(acf, waveform):
+    whitened = sl.solve_toeplitz(acf, waveform, check_finite=False)
+    return whitened, np.sqrt(abs(np.dot(waveform, whitened)))
+
+def _windowed_result_path(outdir, prefix, M, dL, t_start_g, n_fft, window_size_DX,
+                          window_size_SX, k, saturation_DX, saturation_SX,
+                          include_saturation=True, fd=False):
+    filename = (
+        f"{prefix}_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M"
+        f"_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz"
+        f"_k_{round(k,2)}"
+    )
+    if include_saturation:
+        filename += f"_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}"
+    filename += f"_NFFT_{n_fft}"
+    if fd:
+        filename += "_FD"
+    return os.path.join(outdir, 'Algorithm/Mismatch', f"{filename}.txt")
+
+def _initialise_result_files(*path_headers):
+    for path, header in path_headers:
+        with open(path, 'w') as outfile:
+            outfile.write(header)
+
+def _append_result(path, *values):
+    with open(path, 'a') as outfile:
+        outfile.write('\t'.join(map(str, values)) + '\n')
+
+def _mismatch_subfolder(direction):
+    return "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
+
+def _mismatch_plot_dir(outdir, direction):
+    save_path = os.path.join(outdir, "Algorithm/Mismatch", _mismatch_subfolder(direction))
+    os.makedirs(save_path, exist_ok=True)
+    return save_path
+
+def _window_values(data, index):
+    return sorted(set(key[index] for key in data.keys()))
+
+def _groups_from_keys(data, indices):
+    return sorted(set(tuple(key[index] for index in indices) for key in data.keys()))
+
+def _groups_from_grid(data, indices):
+    return product(*(_window_values(data, index) for index in indices))
+
+def _key_matches(key, indices, values):
+    return all(key[index] == value for index, value in zip(indices, values))
+
 def read_results_object_from_previous_inference(parameters):
 
-    if(parameters['Inference']['method'] == 'Minimization'):
+    if(parameters['Inference']['method'] in point_estimate_methods):
 
         results_path = os.path.join(parameters['I/O']['outdir'], 'Algorithm/Minimization_Results.txt')
         if not(os.path.exists(results_path)):
@@ -100,7 +177,7 @@ def print_point_estimate(results_object, names, method):
 
     """
 
-    if(method=='Minimization'):
+    if(method in point_estimate_methods):
         longest_name_length = utils.find_longest_name_length(results_object.keys())
         for key in results_object.keys(): print('{} : {:.12f}'.format(key.ljust(longest_name_length), results_object[key]))
     else:
@@ -544,9 +621,9 @@ def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_N
     t_ACF_half        = t_ACF[:half_index]
     ACF_smoothed_half = ACF_smoothed[:half_index]
 
-    # Compute the truncation point (T_RD = t_end - t_start)
-    T_RD  = (t_end_g - t_start_g) * C_mt * M
-    index = np.argmin(np.abs(t_ACF_half - T_RD))
+    # Compute the truncation point (t_rd = t_end - t_start)
+    t_rd  = (t_end_g - t_start_g) * C_mt * M
+    index = np.argmin(np.abs(t_ACF_half - t_rd))
 
     # Truncate the ACF to ringdown analysis (See https://arxiv.org/abs/2107.05609 for discussion on truncation)
     ACF_truncated   = ACF_smoothed_half[:index+1]
@@ -799,9 +876,9 @@ def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, metho
                 if compare_TD_FD:
                     psd   = convert_asd_to_pycbc_psd(asd_file, f_min, f_max, delta_f=2*f_max/len(acf))
                     h_TS  = TimeSeries(wf_int, delta_t=1/(2*f_max))
-                    NR_TS = TimeSeries(NR_int, delta_t=1/(2*f_max))
+                    nr_TS = TimeSeries(NR_int, delta_t=1/(2*f_max))
 
-                    FD_match_m  = float(compute_FD_match(h_TS, NR_TS, psd=psd, low_frequency_cutoff=f_min, high_frequency_cutoff=f_max)[0])
+                    FD_match_m  = float(compute_FD_match(h_TS, nr_TS, psd=psd, low_frequency_cutoff=f_min, high_frequency_cutoff=f_max)[0])
                     FD_mismatch = 1 - FD_match_m
 
                     with open(outFile_path_fd, 'a') as outFile_mismatch_fd: outFile_mismatch_fd.write(f'{perc}\t{NR_quant}\t{FD_mismatch}\n')
@@ -821,23 +898,16 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
     print(f"\n* Computing mismatch for plus and cross polarizations assuming: M={M}, D_L={dL}.")
 
     # File paths for saving results
-    mismatch_filename = f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
-    outFile_path      = os.path.join(outdir, 'Algorithm/Mismatch', mismatch_filename)
-    
-    with open(outFile_path, 'w') as outFile_mismatch:
-        outFile_mismatch.write('#CI\tStrain_data\tMismatch\n')
+    outFile_path = _windowed_result_path(
+        outdir, "Mismatch", M, dL, t_start_g, N_FFT,
+        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX
+    )
+    _initialise_result_files((outFile_path, '#CI\tStrain_data\tMismatch\n'))
 
-    # Extract NR waveform components (physical units)
-    NR_r    = NR_sim.NR_r_cut * (C_md * M) / dL
-    NR_i    = NR_sim.NR_i_cut * (C_md * M) / dL
-    NR_dict = {'real': NR_r, 'imag': NR_i}
-
-    for NR_quant, NR_data in NR_dict.items():
+    for NR_quant, NR_data in _scaled_strain_components(NR_sim, M, dL).items():
         try:
-
             # Compute <NR|NR>
-            whiten_whiten_h_NR = sl.solve_toeplitz(acf, NR_data, check_finite=False)
-            h_NR_h_NR_sqrt     = np.sqrt(abs(np.dot(NR_data, whiten_whiten_h_NR)))
+            whiten_whiten_h_NR, h_NR_h_NR_sqrt = _toeplitz_whitened_norm(acf, NR_data)
 
             if mismatch_print_flag: print(f"<NR|NR>**0.5={h_NR_h_NR_sqrt:.3f}")
 
@@ -848,22 +918,15 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
         # Load waveform template
         models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
-        for perc in [5, 50, 95]:
+        for perc in summary_percentiles:
             try:
-
                 # Extract waveform (geometric units)
-                wf_r = np.percentile(np.array(models_re_list), [perc], axis=0)[0]
-                wf_i = np.percentile(np.array(models_im_list), [perc], axis=0)[0]
-
-                # Convert to physical units
-                wf_r    *= (C_md * M) / dL
-                wf_i    *= (C_md * M) / dL
+                wf_r, wf_i = _percentile_waveforms(models_re_list, models_im_list, perc, M, dL)
                 wf_quant = {'real': wf_r, 'imag': wf_i}
 
                 # Compute scalar products with h_wf
-                whiten_whiten_h_wf = sl.solve_toeplitz(acf, wf_quant[NR_quant], check_finite=False)
-                h_wf_h_wf_sqrt     = np.sqrt(abs(np.dot(wf_quant[NR_quant], whiten_whiten_h_wf)))
-                h_wf_h_NR          = np.dot(wf_quant[NR_quant], whiten_whiten_h_NR)
+                _, h_wf_h_wf_sqrt = _toeplitz_whitened_norm(acf, wf_quant[NR_quant])
+                h_wf_h_NR         = np.dot(wf_quant[NR_quant], whiten_whiten_h_NR)
 
                 # Match computation
                 TD_match    = abs(h_wf_h_NR) / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
@@ -880,8 +943,7 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
 
                 if(perc==50): print(f"* Time-domain mismatch (h {NR_quant}): {TD_mismatch}")
 
-                with open(outFile_path, 'a') as outFile_mismatch:
-                    outFile_mismatch.write(f'{perc}\t{NR_quant}\t{TD_mismatch}\n')    
+                _append_result(outFile_path, perc, NR_quant, TD_mismatch)
 
             except Exception as e:
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
@@ -898,52 +960,41 @@ def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf,
     print(f"* Computing mismatch for the strain assuming: M={M}, D_L={dL}, ra={ra}, dec={dec}, psi={psi}")
 
     # File paths for saving results
-    mismatch_filename = f"Mismatch_h_tot_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
-    outFile_path      = os.path.join(outdir, 'Algorithm/Mismatch', mismatch_filename)
-    
-    with open(outFile_path, 'w') as outFile_mismatch:
-        outFile_mismatch.write('#CI\tStrain_data\tMismatch\n')
+    outFile_path = _windowed_result_path(
+        outdir, "Mismatch_h_tot", M, dL, t_start_g, N_FFT,
+        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX
+    )
+    _initialise_result_files((outFile_path, '#CI\tStrain_data\tMismatch\n'))
 
     # Extract NR waveform components (physical units)
-    NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
-    NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
+    NR_dict = _scaled_strain_components(NR_sim, M, dL)
 
     # Compute polarizations
     resp            = AntennaResponse('H1', ra=ra, dec=dec, psi=psi, tensor=True, times=1126259462.43)
     F_plus, F_cross = resp.plus, resp.cross
-    NR_data         = F_plus * NR_r + F_cross * NR_i
+    NR_data         = F_plus * NR_dict['real'] + F_cross * NR_dict['imag']
 
     # Compute <NR|NR>
-    whiten_whiten_h_NR = sl.solve_toeplitz(acf, NR_data, check_finite=False)
-    h_NR_h_NR_sqrt     = np.sqrt(abs(np.dot(NR_data, whiten_whiten_h_NR)))
+    whiten_whiten_h_NR, h_NR_h_NR_sqrt = _toeplitz_whitened_norm(acf, NR_data)
 
     # Load waveform template
     if method == 'Nested-sampler':
-        models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
-        models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
+        models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
-    for perc in [5, 50, 95]:
-            
-            # Extract waveform (geometric units)
-            wf_r = np.percentile(np.array(models_re_list), [perc], axis=0)[0]
-            wf_i = np.percentile(np.array(models_im_list), [perc], axis=0)[0]
+    for perc in summary_percentiles:
+        # Extract waveform (geometric units)
+        wf_r, wf_i = _percentile_waveforms(models_re_list, models_im_list, perc, M, dL)
+        wf         = F_plus * wf_r + F_cross * wf_i
 
-            # Convert to physical units
-            wf_r *= (C_md * M) / dL
-            wf_i *= (C_md * M) / dL
-            wf    = F_plus * wf_r + F_cross * wf_i
+        # Compute scalar products with h_wf
+        _, h_wf_h_wf_sqrt = _toeplitz_whitened_norm(acf, wf)
+        h_wf_h_NR         = np.dot(wf, whiten_whiten_h_NR)
 
-            # Compute scalar products with h_wf
-            whiten_whiten_h_wf = sl.solve_toeplitz(acf, wf, check_finite=False)
-            h_wf_h_wf_sqrt     = np.sqrt(abs(np.dot(wf, whiten_whiten_h_wf)))
-            h_wf_h_NR          = np.dot(wf, whiten_whiten_h_NR)
+        # Match/mismatch computations
+        TD_match    = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
+        TD_mismatch = 1 - TD_match
 
-            # Match/mismatch computations
-            TD_match    = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
-            TD_mismatch = 1 - TD_match
-
-            with open(outFile_path, 'a') as outFile_mismatch:
-                outFile_mismatch.write(f'{perc}\t{TD_mismatch}\n')
+        _append_result(outFile_path, perc, TD_mismatch)
         
     return 
 
@@ -954,35 +1005,31 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
     print(f"\n* Optimal SNR computation for plus and cross polarizations assuming: M={M}, D_L={dL}.")
 
     # File paths for saving results
-    optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
-    optimal_SNR_filename_fd = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}_FD.txt"
-    outFile_path = os.path.join(outdir, 'Algorithm/Mismatch', optimal_SNR_filename)
-    outFile_path_fd = os.path.join(outdir, 'Algorithm/Mismatch', optimal_SNR_filename_fd)
+    outFile_path = _windowed_result_path(
+        outdir, "Optimal_SNR", M, dL, t_start_g, N_FFT,
+        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX
+    )
+    outFile_path_fd = _windowed_result_path(
+        outdir, "Optimal_SNR", M, dL, t_start_g, N_FFT,
+        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+        include_saturation=False, fd=True
+    )
+    _initialise_result_files(
+        (outFile_path, '#CI\tStrain_data\tOptimal_SNR\n'),
+        (outFile_path_fd, '#CI\tStrain_data\tOptimal_SNR_FD\n'),
+    )
 
-    with open(outFile_path, 'w') as outFile_SNR, open(outFile_path_fd, 'w') as outFile_SNR_fd:
-        outFile_SNR.write('#CI\tStrain_data\tOptimal_SNR\n')
-        outFile_SNR_fd.write('#CI\tStrain_data\tOptimal_SNR_FD\n')
-
-    NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
-    NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
-    NR_dict = {'real': NR_r, 'imag': NR_i}
     models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
-    for NR_quant, NR_data in NR_dict.items():
-
-        for perc in [5, 50, 95]:
+    for NR_quant in _scaled_strain_components(NR_sim, M, dL):
+        for perc in summary_percentiles:
             try:
-                wf_r = np.percentile(models_re_list, [perc], axis=0)[0]
-                wf_i = np.percentile(models_im_list, [perc], axis=0)[0]
-
-                wf_r *= (C_md * M) / dL
-                wf_i *= (C_md * M) / dL
+                wf_r, wf_i = _percentile_waveforms(models_re_list, models_im_list, perc, M, dL)
                 wf_int = interpolate_waveform(t_start_g, t_end_g, M, wf_lNR=wf_r if NR_quant == "real" else wf_i, acf=acf)
 
                 optimal_SNR_TD = np.sqrt(abs(np.dot(wf_int, sl.solve_toeplitz(acf, wf_int, check_finite=False))))
 
-                with open(outFile_path, 'a') as outFile_SNR:
-                    outFile_SNR.write(f'{perc}\t{NR_quant}\t{optimal_SNR_TD}\n')
+                _append_result(outFile_path, perc, NR_quant, optimal_SNR_TD)
 
                 if(perc==50): print(f"* Optimal TD SNR (h {NR_quant}): {optimal_SNR_TD}")
 
@@ -1004,33 +1051,30 @@ def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, 
     print("\nProcessing optimal SNR computation (with TD/FD check) for plus and cross polarizations.\n")
 
     # File paths for saving results
-    optimal_SNR_filename = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_satDX_{round(saturation_DX,1)}_satSD_{round(saturation_SX,1)}_NFFT_{N_FFT}.txt"
-    optimal_SNR_filename_fd = f"Optimal_SNR_M_{M}_dL_{dL}_t_s_{round(t_start_g,1)}M_wDX_{round(window_size_DX,1)}Hz_wSX_{round(window_size_SX,1)}Hz_k_{round(k,2)}_NFFT_{N_FFT}_FD.txt"
-    outFile_path = os.path.join(outdir, 'Algorithm/Mismatch', optimal_SNR_filename)
-    outFile_path_fd = os.path.join(outdir, 'Algorithm/Mismatch', optimal_SNR_filename_fd)
+    outFile_path = _windowed_result_path(
+        outdir, "Optimal_SNR", M, dL, t_start_g, N_FFT,
+        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX
+    )
+    outFile_path_fd = _windowed_result_path(
+        outdir, "Optimal_SNR", M, dL, t_start_g, N_FFT,
+        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+        include_saturation=False, fd=True
+    )
 
     # Open output files to write results
-    with open(outFile_path, 'w') as outFile_SNR, open(outFile_path_fd, 'w') as outFile_SNR_fd:
-        outFile_SNR.write('#CI\tStrain_data\tOptimal_SNR\n')
-        outFile_SNR_fd.write('#CI\tStrain_data\tOptimal_SNR_FD\n')
+    _initialise_result_files(
+        (outFile_path, '#CI\tStrain_data\tOptimal_SNR\n'),
+        (outFile_path_fd, '#CI\tStrain_data\tOptimal_SNR_FD\n'),
+    )
 
-    # Calculate NR (Noise Reduction) values
-    NR_r = NR_sim.NR_r_cut * (C_md * M) / dL
-    NR_i = NR_sim.NR_i_cut * (C_md * M) / dL
-    NR_dict = {'real': NR_r, 'imag': NR_i}
     models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
     # Loop through the real and imaginary NR data
-    for NR_quant, NR_data in NR_dict.items():
-        for perc in [5, 50, 95]:
+    for NR_quant in _scaled_strain_components(NR_sim, M, dL):
+        for perc in summary_percentiles:
             try:
                 # Extract the percentiles of the real and imaginary parts of the model waveform
-                wf_r = np.percentile(models_re_list, [perc], axis=0)[0]
-                wf_i = np.percentile(models_im_list, [perc], axis=0)[0]
-
-                # Scale the waveforms according to physical parameters
-                wf_r *= (C_md * M) / dL
-                wf_i *= (C_md * M) / dL
+                wf_r, wf_i = _percentile_waveforms(models_re_list, models_im_list, perc, M, dL)
 
                 # Interpolate the waveform based on the start and end times
                 wf_int = interpolate_waveform(t_start_g, t_end_g, M, wf_lNR=wf_r if NR_quant == "real" else wf_i, acf=acf_tot)
@@ -1322,7 +1366,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
                     ax2.semilogy(t_cut - t_peak, wf_amp,                                                       c='royalblue', lw=lw_std,       alpha=alpha_med, ls='--' )
                     ax4.plot(    t_cut - t_peak, wf_f,                                                         c='royalblue', lw=lw_std,       alpha=alpha_med, ls='--' )
 
-                if(method=='Minimization'): break
+                if(method in point_estimate_methods): break
 
     if not(tail_flag):
         ax1.set_ylabel(r'$\mathit{Re(%s)}$'%(label_data)                           , fontsize=fontsize_labels*rescale)
@@ -1392,7 +1436,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
             ax3.plot(t_cut - t_peak, wf_i   - NR_i_cut  ,                                                  c=color_model, lw=lw_std, alpha=alpha_med, ls='--')
             ax4.plot(t_cut - t_peak, wf_f   - NR_f_cut  ,                                                  c=color_model, lw=lw_std, alpha=alpha_med, ls='--')
             
-        if(method=='Minimization'): break
+        if(method in point_estimate_methods): break
 
     ax1.legend(loc='best', fontsize=fontsize_legend)
     ax3.legend(loc='best', fontsize=fontsize_legend)
@@ -1739,10 +1783,7 @@ def plot_multiple_psd(psd_data, f_min, f_max, outdir, direction, window):
         None
     """
     try:
-        # Determine subfolder based on direction
-        subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-        save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-        os.makedirs(save_path, exist_ok=True)
+        save_path = _mismatch_plot_dir(outdir, direction)
 
         # Set x-axis range based on direction
         if direction == "below":
@@ -1801,12 +1842,7 @@ def plot_psd_and_acf(psd_data, acf_data, asd_filepath, f_min, f_max, outdir, dir
         freq_file, asd_file = np.loadtxt(asd_filepath, unpack=True)
         psd_file            = asd_file**2 
 
-        # Determine subfolder based on smoothing direction
-        subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-        save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-
-        # Clear the directory if it exists, otherwise create it
-        os.makedirs(save_path, exist_ok=True)
+        save_path = _mismatch_plot_dir(outdir, direction)
 
         # ------------------ Plot PSD ------------------ #
         fig_psd, ax_psd = plt.subplots(figsize=(10, 6))
@@ -1842,9 +1878,9 @@ def plot_psd_and_acf(psd_data, acf_data, asd_filepath, f_min, f_max, outdir, dir
         dt = 1 / (2 * f_max)
 
         for i, (label, ACF_smoothed) in enumerate(acf_data.items()):
-            N_FFT = len(ACF_smoothed)
-            T = N_FFT * dt
-            t_array = np.linspace(0, T, N_FFT)
+            n_fft = len(ACF_smoothed)
+            duration = n_fft * dt
+            t_array = np.linspace(0, duration, n_fft)
             alpha = max(0.3, 1 - (i * 0.15))  # Decrease opacity for different curves
             ax_acf.plot(t_array, ACF_smoothed, label=label, linewidth=2, color=colbBlue, alpha=alpha)
 
@@ -1963,10 +1999,7 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_
 
 def plot_acf_interpolated(t_array, t_trunc, ACF_smoothed, truncated_acf, outdir, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, direction):
 
-    # Determine subfolder based on direction
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
+    save_path = _mismatch_plot_dir(outdir, direction)
 
     # Create the plot
     plt.figure(figsize=(12, 8))
@@ -1985,525 +2018,270 @@ def plot_acf_interpolated(t_array, t_trunc, ACF_smoothed, truncated_acf, outdir,
     plt.savefig(path)
     plt.close()
 
+def _finish_parameter_scan_plot(save_path, filename, xlabel, ylabel, xscale=None, yscale=None, legend=False):
+    plt.xlabel(xlabel, fontsize=26)
+    plt.ylabel(ylabel, fontsize=26)
+    plt.xticks(fontsize=22)
+    plt.yticks(fontsize=22)
+    if legend:
+        plt.legend()
+    if xscale:
+        plt.xscale(xscale)
+    if yscale:
+        plt.yscale(yscale)
+    plt.grid(True)
+    plt.savefig(os.path.join(save_path, filename))
+    plt.close()
+
+def _nfft_label(n_fft, rounded):
+    return round(n_fft, 0) if rounded else n_fft
+
+def _component_scan_filename(prefix, M, dL, component, suffix, direction, n_fft, round_nfft=False):
+    return (
+        f"{prefix}_M={M}M0_dL={dL}Mpc_{component}_{suffix}"
+        f"_direction={direction}_NFFT_{_nfft_label(n_fft, round_nfft)}.pdf"
+    )
+
+def _condition_scan_filename(M, dL, suffix, direction, n_fft, round_nfft=False):
+    return (
+        f"Condition_Number_M={M}M0_dL={dL}Mpc_{suffix}"
+        f"_direction={direction}_NFFT_{_nfft_label(n_fft, round_nfft)}.pdf"
+    )
+
+def _plot_component_metric_scan(data, outdir, direction, M, dL, N_fft, prefix, ylabel,
+                                x_index, xlabel, fixed_indices, suffix_builder,
+                                use_grid_groups=False, xscale=None, legend=False,
+                                round_nfft=False):
+    save_path = _mismatch_plot_dir(outdir, direction)
+    group_fn  = _groups_from_grid if use_grid_groups else _groups_from_keys
+
+    for n_fft_value in N_fft:
+        for fixed_values in group_fn(data, fixed_indices):
+            suffix = suffix_builder(*fixed_values)
+            for component in strain_components:
+                plt.figure(figsize=(12, 8))
+                for perc in plot_percentiles:
+                    x_vals, metric_vals = [], []
+                    for key, values in data.items():
+                        if _key_matches(key, fixed_indices, fixed_values):
+                            x_vals.append(key[x_index])
+                            metric_vals.append(values[component][perc])
+                    plt.plot(x_vals, metric_vals, label=f"{perc}% CI", marker='o')
+
+                filename = _component_scan_filename(
+                    prefix, M, dL, component, suffix, direction, n_fft_value, round_nfft
+                )
+                _finish_parameter_scan_plot(
+                    save_path, filename, xlabel, ylabel, xscale=xscale, legend=legend
+                )
+
+def _plot_condition_scan(data, outdir, direction, M, dL, N_fft, x_index, xlabel,
+                         fixed_indices, suffix_builder, xscale=None, yscale=None,
+                         round_nfft=True):
+    save_path = _mismatch_plot_dir(outdir, direction)
+
+    for n_fft_value in N_fft:
+        for fixed_values in _groups_from_grid(data, fixed_indices):
+            x_vals, cond_vals = [], []
+            for key, cond_number in data.items():
+                if _key_matches(key, fixed_indices, fixed_values):
+                    x_vals.append(key[x_index])
+                    cond_vals.append(cond_number)
+
+            plt.figure(figsize=(12, 8))
+            plt.plot(x_vals, cond_vals, marker='o')
+            filename = _condition_scan_filename(
+                M, dL, suffix_builder(*fixed_values), direction, n_fft_value, round_nfft
+            )
+            _finish_parameter_scan_plot(
+                save_path, filename, xlabel, "Condition Number", xscale=xscale, yscale=yscale
+            )
+
+def _plot_condition_scan_all(data, outdir, direction, M, dL, N_fft, x_index, xlabel):
+    save_path = _mismatch_plot_dir(outdir, direction)
+
+    for n_fft_value in N_fft:
+        x_vals, cond_vals = [], []
+        for key, cond_number in data.items():
+            x_vals.append(key[x_index])
+            cond_vals.append(cond_number)
+
+        plt.figure(figsize=(12, 8))
+        plt.plot(x_vals, cond_vals, marker='o')
+        filename = f"Condition_Number_M={M}M0_dL={dL}Mpc_direction={direction}_NFFT_{n_fft_value}.pdf"
+        _finish_parameter_scan_plot(
+            save_path, filename, xlabel, "Condition Number", xscale="log", yscale="log"
+        )
+
 def plot_mismatch_by_window_DX(mismatch_data, outdir, direction, M, dL, N_fft):
     """
     Plot mismatch for real and imaginary components against window_size_DX for fixed other parameters.
     """
-    components = ['real', 'imag']
-    percentiles = [50]
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    for N_FFT in N_fft:
-        for k, saturation_DX, saturation_SX, window_size_SX in sorted(set((k, sDX, sSX, wsx) for (_, wsx, k, sDX, sSX) in mismatch_data.keys())):
-            for component in components:
-                plt.figure(figsize=(12, 8))
-                for perc in percentiles:
-                    window_vals, mismatch_vals = [], []
-                    for (wDX, wsx, k_val, sDX, sSX), data in mismatch_data.items():
-                        if k_val == k and sDX == saturation_DX and sSX == saturation_SX and wsx == window_size_SX:
-                            window_vals.append(wDX)
-                            mismatch_vals.append(data[component][perc])
-                    plt.plot(window_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
-                plt.xlabel(r"$w_l$ [Hz]", fontsize=26)
-                plt.ylabel("Mismatch", fontsize=26)
-                plt.xticks(fontsize=22)
-                plt.yticks(fontsize=22)
-                plt.grid(True)
-                filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_k={round(k,0)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_wsx={window_size_SX}_direction={direction}_NFFT_{N_FFT}.pdf"
-                plt.savefig(os.path.join(save_path, filename))
-                plt.close()
+    _plot_component_metric_scan(
+        mismatch_data, outdir, direction, M, dL, N_fft,
+        "Mismatch", "Mismatch", window_key_index['window_DX'], r"$w_l$ [Hz]",
+        (window_key_index['k'], window_key_index['saturation_DX'], window_key_index['saturation_SX'], window_key_index['window_SX']),
+        lambda k, sDX, sSX, wsx: f"k={round(k,0)}_satDX={sDX:.2e}_satSX={sSX:.2e}_wsx={wsx}",
+    )
 
 def plot_mismatch_by_window_SX(mismatch_data, outdir, direction, M, dL, N_fft):
     """
     Plot mismatch for real and imaginary components against window_size_SX for fixed other parameters.
     """
-    components = ['real', 'imag']
-    percentiles = [50]
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    for N_FFT in N_fft:
-        for k, saturation_DX, saturation_SX, window_size_DX in sorted(set((k, sDX, sSX, wdx) for (wdx, _, k, sDX, sSX) in mismatch_data.keys())):
-            for component in components:
-                plt.figure(figsize=(12, 8))
-                for perc in percentiles:
-                    window_vals, mismatch_vals = [], []
-                    for (wdx, wSX, k_val, sDX, sSX), data in mismatch_data.items():
-                        if k_val == k and sDX == saturation_DX and sSX == saturation_SX and wdx == window_size_DX:
-                            window_vals.append(wSX)
-                            mismatch_vals.append(data[component][perc])
-                    plt.plot(window_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
-                plt.xlabel(r"$w_h$ [Hz]", fontsize=26)
-                plt.ylabel("Mismatch", fontsize=26)
-                plt.xticks(fontsize=22)
-                plt.yticks(fontsize=22)
-                plt.grid(True)
-                filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_k={round(k,0)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_wdx={window_size_DX}_direction={direction}_NFFT_{N_FFT}.pdf"
-                plt.savefig(os.path.join(save_path, filename))
-                plt.close()
+    _plot_component_metric_scan(
+        mismatch_data, outdir, direction, M, dL, N_fft,
+        "Mismatch", "Mismatch", window_key_index['window_SX'], r"$w_h$ [Hz]",
+        (window_key_index['k'], window_key_index['saturation_DX'], window_key_index['saturation_SX'], window_key_index['window_DX']),
+        lambda k, sDX, sSX, wdx: f"k={round(k,0)}_satDX={sDX:.2e}_satSX={sSX:.2e}_wdx={wdx}",
+    )
 
 def plot_optimal_SNR_by_window_DX(optimal_SNR_data, outdir, direction, M, dL, N_fft):
     """
     Plot optimal SNR for real and imaginary components against window_size_DX for fixed k and saturations.
     """
-    components = ['real', 'imag']
-    percentiles = [50]
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    for N_FFT in N_fft:
-        for k, saturation_DX, saturation_SX, window_size_SX in sorted(set((k, sDX, sSX, wsx) for (_, wsx, k, sDX, sSX) in optimal_SNR_data.keys())):
-            for component in components:
-                plt.figure(figsize=(12, 8))
-                for perc in percentiles:
-                    window_vals, snr_vals = [], []
-                    for (wDX, wsx, k_val, sDX, sSX), data in optimal_SNR_data.items():
-                        if k_val == k and sDX == saturation_DX and sSX == saturation_SX and wsx == window_size_SX:
-                            window_vals.append(wDX)
-                            snr_vals.append(data[component][perc])
-                    plt.plot(window_vals, snr_vals, label=f"{perc}% CI", marker='o')
-                plt.xlabel(r"$w_l$ [Hz]", fontsize=26)
-                plt.ylabel("Optimal SNR", fontsize=26)
-                plt.xticks(fontsize=22)
-                plt.yticks(fontsize=22)
-                plt.grid(True)
-                filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_k={round(k,0)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_wsx={window_size_SX}_direction={direction}_NFFT_{N_FFT}.pdf"
-                plt.savefig(os.path.join(save_path, filename))
-                plt.close()
+    _plot_component_metric_scan(
+        optimal_SNR_data, outdir, direction, M, dL, N_fft,
+        "Optimal_SNR", "Optimal SNR", window_key_index['window_DX'], r"$w_l$ [Hz]",
+        (window_key_index['k'], window_key_index['saturation_DX'], window_key_index['saturation_SX'], window_key_index['window_SX']),
+        lambda k, sDX, sSX, wsx: f"k={round(k,0)}_satDX={sDX:.2e}_satSX={sSX:.2e}_wsx={wsx}",
+    )
 
 def plot_optimal_SNR_by_window_SX(optimal_SNR_data, outdir, direction, M, dL, N_fft):
     """
     Plot optimal SNR for real and imaginary components against window_size_SX for fixed k and saturations.
     """
-    components = ['real', 'imag']
-    percentiles = [50]
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    for N_FFT in N_fft:
-        for k, saturation_DX, saturation_SX, window_size_DX in sorted(set((k, sDX, sSX, wdx) for (wdx, _, k, sDX, sSX) in optimal_SNR_data.keys())):
-            for component in components:
-                plt.figure(figsize=(12, 8))
-                for perc in percentiles:
-                    window_vals, snr_vals = [], []
-                    for (wdx, wSX, k_val, sDX, sSX), data in optimal_SNR_data.items():
-                        if k_val == k and sDX == saturation_DX and sSX == saturation_SX and wdx == window_size_DX:
-                            window_vals.append(wSX)
-                            snr_vals.append(data[component][perc])
-                    plt.plot(window_vals, snr_vals, label=f"{perc}% CI", marker='o')
-                plt.xlabel(r"$w_h$ [Hz]", fontsize=26)
-                plt.ylabel("Optimal SNR", fontsize=26)
-                plt.xticks(fontsize=22)
-                plt.yticks(fontsize=22)
-                plt.grid(True)
-                filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_k={round(k,0)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_wdx={window_size_DX}_direction={direction}_NFFT_{N_FFT}.pdf"
-                plt.savefig(os.path.join(save_path, filename))
-                plt.close()
+    _plot_component_metric_scan(
+        optimal_SNR_data, outdir, direction, M, dL, N_fft,
+        "Optimal_SNR", "Optimal SNR", window_key_index['window_SX'], r"$w_h$ [Hz]",
+        (window_key_index['k'], window_key_index['saturation_DX'], window_key_index['saturation_SX'], window_key_index['window_DX']),
+        lambda k, sDX, sSX, wdx: f"k={round(k,0)}_satDX={sDX:.2e}_satSX={sSX:.2e}_wdx={wdx}",
+    )
 
 def plot_condition_number_by_window_DX(condition_numbers, outdir, direction, M, dL, N_fft):
     """
     Plot condition number against window_size_DX.
     """
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    for N_FFT in N_fft:
-        plt.figure(figsize=(12, 8))
-        window_vals, cond_vals = [], []
-        for (wDX, _, k, sDX, sSX), cond_number in condition_numbers.items():
-            window_vals.append(wDX)
-            cond_vals.append(cond_number)
-        plt.plot(window_vals, cond_vals, marker='o')
-        plt.xlabel(r"$w_l$ [Hz]", fontsize=26)
-        plt.ylabel("Condition Number", fontsize=26)
-        plt.xscale("log")
-        plt.yscale('log')
-        plt.xticks(fontsize=22)
-        plt.yticks(fontsize=22)
-        plt.grid(True)
-        filename = f"Condition_Number_M={M}M0_dL={dL}Mpc_direction={direction}_NFFT_{N_FFT}.pdf"
-        plt.savefig(os.path.join(save_path, filename))
-        plt.close()
+    _plot_condition_scan_all(
+        condition_numbers, outdir, direction, M, dL, N_fft,
+        window_key_index['window_DX'], r"$w_l$ [Hz]"
+    )
 
 def plot_condition_number_by_window_SX(condition_numbers, outdir, direction, M, dL, N_fft):
     """
     Plot condition number against window_size_SX.
     """
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    for N_FFT in N_fft:
-        plt.figure(figsize=(12, 8))
-        window_vals, cond_vals = [], []
-        for (_, wSX, k, sDX, sSX), cond_number in condition_numbers.items():
-            window_vals.append(wSX)
-            cond_vals.append(cond_number)
-        plt.plot(window_vals, cond_vals, marker='o')
-        plt.xlabel(r"$w_h$ [Hz]", fontsize=26)
-        plt.ylabel("Condition Number", fontsize=26)
-        plt.xscale("log")
-        plt.yscale('log')
-        plt.xticks(fontsize=22)
-        plt.yticks(fontsize=22)
-        plt.grid(True)
-        filename = f"Condition_Number_M={M}M0_dL={dL}Mpc_direction={direction}_NFFT_{N_FFT}.pdf"
-        plt.savefig(os.path.join(save_path, filename))
-        plt.close()
+    _plot_condition_scan_all(
+        condition_numbers, outdir, direction, M, dL, N_fft,
+        window_key_index['window_SX'], r"$w_h$ [Hz]"
+    )
 
 def plot_mismatch_by_k(mismatch_data, outdir, direction, M, dL, N_fft):
     """
     Plot mismatch for real and imaginary components by varying k, keeping window sizes and saturations fixed.
     """
-    components = ['real', 'imag']
-    percentiles = [50]
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in mismatch_data.keys()))
-    window_sizes_SX = sorted(set(wsx for _, wsx, _, _, _ in mismatch_data.keys()))
-    saturation_DX_values = sorted(set(s for _, _, _, s, _ in mismatch_data.keys()))
-    saturation_SX_values = sorted(set(s for _, _, _, _, s in mismatch_data.keys()))
-    
-    for N_FFT in N_fft:
-        for window_size_DX in window_sizes_DX:
-            for window_size_SX in window_sizes_SX:
-                for saturation_DX in saturation_DX_values:
-                    for saturation_SX in saturation_SX_values:
-                        for component in components:
-                            plt.figure(figsize=(12, 8))
-                            for perc in percentiles:
-                                k_vals, mismatch_vals = [], []
-                                for (wdx, wsx, k_val, sDX, sSX), data in mismatch_data.items():
-                                    if wdx == window_size_DX and wsx == window_size_SX and sDX == saturation_DX and sSX == saturation_SX:
-                                        k_vals.append(k_val)
-                                        mismatch_vals.append(data[component][perc])
-                            plt.plot(k_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
-                            plt.xlabel("k", fontsize=26)
-                            plt.ylabel("Mismatch", fontsize=26)
-                            plt.xticks(fontsize=22)
-                            plt.yticks(fontsize=22)
-                            plt.legend()
-                            plt.xscale("log")
-                            plt.grid(True)
-                            filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_wDX={round(window_size_DX,1)}_wSX={round(window_size_SX,1)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.pdf"
-                            plt.savefig(os.path.join(save_path, filename))
-                            plt.close()
+    _plot_component_metric_scan(
+        mismatch_data, outdir, direction, M, dL, N_fft,
+        "Mismatch", "Mismatch", window_key_index['k'], "k",
+        (window_key_index['window_DX'], window_key_index['window_SX'], window_key_index['saturation_DX'], window_key_index['saturation_SX']),
+        lambda wDX, wSX, sDX, sSX: f"wDX={round(wDX,1)}_wSX={round(wSX,1)}_satDX={sDX:.2e}_satSX={sSX:.2e}",
+        use_grid_groups=True, xscale="log", legend=True, round_nfft=True,
+    )
 
 def plot_optimal_SNR_by_k(optimal_SNR_data, outdir, direction, M, dL, N_fft):
     """
     Plot optimal SNR for real and imaginary components by varying k, keeping window sizes and saturations fixed.
     """
-    components = ['real', 'imag']
-    percentiles = [50]
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in optimal_SNR_data.keys()))
-    window_sizes_SX = sorted(set(wsx for _, wsx, _, _, _ in optimal_SNR_data.keys()))
-    saturation_DX_values = sorted(set(s for _, _, _, s, _ in optimal_SNR_data.keys()))
-    saturation_SX_values = sorted(set(s for _, _, _, _, s in optimal_SNR_data.keys()))
-    
-    for N_FFT in N_fft:
-        for window_size_DX in window_sizes_DX:
-            for window_size_SX in window_sizes_SX:
-                for saturation_DX in saturation_DX_values:
-                    for saturation_SX in saturation_SX_values:
-                        for component in components:
-                            plt.figure(figsize=(12, 8))
-                            for perc in percentiles:
-                                k_vals, snr_vals = [], []
-                                for (wdx, wsx, k_val, sDX, sSX), data in optimal_SNR_data.items():
-                                    if wdx == window_size_DX and wsx == window_size_SX and sDX == saturation_DX and sSX == saturation_SX:
-                                        k_vals.append(k_val)
-                                        snr_vals.append(data[component][perc])
-                            plt.plot(k_vals, snr_vals, label=f"{perc}% CI", marker='o')
-                            plt.xlabel("k", fontsize=26)
-                            plt.ylabel("Optimal SNR", fontsize=26)
-                            plt.xticks(fontsize=22)
-                            plt.yticks(fontsize=22)
-                            plt.legend()
-                            plt.xscale("log")
-                            plt.grid(True)
-                            filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_wDX={round(window_size_DX,1)}_wSX={round(window_size_SX,1)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.pdf"
-                            plt.savefig(os.path.join(save_path, filename))
-                            plt.close()
+    _plot_component_metric_scan(
+        optimal_SNR_data, outdir, direction, M, dL, N_fft,
+        "Optimal_SNR", "Optimal SNR", window_key_index['k'], "k",
+        (window_key_index['window_DX'], window_key_index['window_SX'], window_key_index['saturation_DX'], window_key_index['saturation_SX']),
+        lambda wDX, wSX, sDX, sSX: f"wDX={round(wDX,1)}_wSX={round(wSX,1)}_satDX={sDX:.2e}_satSX={sSX:.2e}",
+        use_grid_groups=True, xscale="log", legend=True, round_nfft=True,
+    )
 
 def plot_condition_number_by_k(condition_numbers, outdir, direction, M, dL, N_fft):
     """
     Plot the condition number of the ACF Toeplitz matrix by varying k, keeping window sizes, saturation_DX, and saturation_SX fixed.
     """
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in condition_numbers.keys()))
-    window_sizes_SX = sorted(set(wsx for _, wsx, _, _, _ in condition_numbers.keys()))
-    saturation_DX_values = sorted(set(s for _, _, _, s, _ in condition_numbers.keys()))
-    saturation_SX_values = sorted(set(s for _, _, _, _, s in condition_numbers.keys()))
-    
-    for N_FFT in N_fft:
-        for window_size_DX in window_sizes_DX:
-            for window_size_SX in window_sizes_SX:
-                for saturation_DX in saturation_DX_values:
-                    for saturation_SX in saturation_SX_values:
-                        plt.figure(figsize=(12, 8))
-                        k_vals, cond_vals = [], []
-                        for (wdx, wsx, k_val, sDX, sSX), cond_number in condition_numbers.items():
-                            if wdx == window_size_DX and wsx == window_size_SX and sDX == saturation_DX and sSX == saturation_SX:
-                                k_vals.append(k_val)
-                                cond_vals.append(cond_number)
-                        plt.plot(k_vals, cond_vals, marker='o')
-                        plt.xlabel("k", fontsize=26)
-                        plt.ylabel("Condition Number", fontsize=26)
-                        plt.xticks(fontsize=22)
-                        plt.yticks(fontsize=22)
-                        plt.xscale("log")
-                        #plt.yscale('log')
-                        plt.grid(True)
-                        filename = f"Condition_Number_M={M}M0_dL={dL}Mpc_wDX={round(window_size_DX,1)}_wSX={round(window_size_SX,1)}_satDX={saturation_DX:.2e}_satSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.pdf"
-                        plt.savefig(os.path.join(save_path, filename))
-                        plt.close()
+    _plot_condition_scan(
+        condition_numbers, outdir, direction, M, dL, N_fft,
+        window_key_index['k'], "k",
+        (window_key_index['window_DX'], window_key_index['window_SX'], window_key_index['saturation_DX'], window_key_index['saturation_SX']),
+        lambda wDX, wSX, sDX, sSX: f"wDX={round(wDX,1)}_wSX={round(wSX,1)}_satDX={sDX:.2e}_satSX={sSX:.2e}",
+        xscale="log", round_nfft=True,
+    )
 
 def plot_mismatch_by_saturation_DX(mismatch_data, outdir, direction, M, dL, N_fft):
     """
     Plot mismatch for real and imaginary components by varying saturation_DX, keeping window sizes, k, and saturation_SX fixed.
     """
-    components = ['real', 'imag']
-    percentiles = [50]
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in mismatch_data.keys()))
-    window_sizes_SX = sorted(set(wsx for _, wsx, _, _, _ in mismatch_data.keys()))
-    k_values = sorted(set(k for _, _, k, _, _ in mismatch_data.keys()))
-    saturation_SX_values = sorted(set(s for _, _, _, _, s in mismatch_data.keys()))
-    
-    for N_FFT in N_fft:
-        for window_size_DX in window_sizes_DX:
-            for window_size_SX in window_sizes_SX:
-                for k in k_values:
-                    for saturation_SX in saturation_SX_values:
-                        for component in components:
-                            plt.figure(figsize=(12, 8))
-                            for perc in percentiles:
-                                sat_DX_vals, mismatch_vals = [], []
-                                for (wdx, wsx, k_val, sDX, sSX), data in mismatch_data.items():
-                                    if wdx == window_size_DX and wsx == window_size_SX and k_val == k and sSX == saturation_SX:
-                                        sat_DX_vals.append(sDX)
-                                        mismatch_vals.append(data[component][perc])
-                            plt.plot(sat_DX_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
-                            plt.xlabel(r"$\mathcal{I}_l$", fontsize=26)
-                            plt.ylabel("Mismatch", fontsize=26)
-                            plt.xticks(fontsize=22)
-                            plt.yticks(fontsize=22)
-                            plt.legend()
-                            plt.xscale('log')
-                            plt.grid(True)
-                            filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_wDX={round(window_size_DX,1)}_wSX={round(window_size_SX,1)}_k={round(k,0)}_satSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.pdf"
-                            plt.savefig(os.path.join(save_path, filename))
-                            plt.close()
+    _plot_component_metric_scan(
+        mismatch_data, outdir, direction, M, dL, N_fft,
+        "Mismatch", "Mismatch", window_key_index['saturation_DX'], r"$\mathcal{I}_l$",
+        (window_key_index['window_DX'], window_key_index['window_SX'], window_key_index['k'], window_key_index['saturation_SX']),
+        lambda wDX, wSX, k, sSX: f"wDX={round(wDX,1)}_wSX={round(wSX,1)}_k={round(k,0)}_satSX={sSX:.2e}",
+        use_grid_groups=True, xscale="log", legend=True, round_nfft=True,
+    )
 
 def plot_optimal_SNR_by_saturation_DX(optimal_SNR_data, outdir, direction, M, dL, N_fft):
     """
     Plot optimal SNR for real and imaginary components by varying saturation_DX, keeping window sizes, k, and saturation_SX fixed.
     """
-    components = ['real', 'imag']
-    percentiles = [50]
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in optimal_SNR_data.keys()))
-    window_sizes_SX = sorted(set(wsx for _, wsx, _, _, _ in optimal_SNR_data.keys()))
-    k_values = sorted(set(k for _, _, k, _, _ in optimal_SNR_data.keys()))
-    saturation_SX_values = sorted(set(s for _, _, _, _, s in optimal_SNR_data.keys()))
-    
-    for N_FFT in N_fft:
-        for window_size_DX in window_sizes_DX:
-            for window_size_SX in window_sizes_SX:
-                for k in k_values:
-                    for saturation_SX in saturation_SX_values:
-                        for component in components:
-                            plt.figure(figsize=(12, 8))
-                            for perc in percentiles:
-                                sat_DX_vals, snr_vals = [], []
-                                for (wdx, wsx, k_val, sDX, sSX), data in optimal_SNR_data.items():
-                                    if wdx == window_size_DX and wsx == window_size_SX and k_val == k and sSX == saturation_SX:
-                                        sat_DX_vals.append(sDX)
-                                        snr_vals.append(data[component][perc])
-                            plt.plot(sat_DX_vals, snr_vals, label=f"{perc}% CI", marker='o')
-                            plt.xlabel(r"$\mathcal{I}_l$", fontsize=26)
-                            plt.ylabel("Optimal SNR", fontsize=26)
-                            plt.xticks(fontsize=22)
-                            plt.yticks(fontsize=22)
-                            plt.legend()
-                            plt.xscale('log')
-                            plt.grid(True)
-                            filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_wDX={round(window_size_DX,1)}_wSX={round(window_size_SX,1)}_k={round(k,0)}_satSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.pdf"
-                            plt.savefig(os.path.join(save_path, filename))
-                            plt.close()
+    _plot_component_metric_scan(
+        optimal_SNR_data, outdir, direction, M, dL, N_fft,
+        "Optimal_SNR", "Optimal SNR", window_key_index['saturation_DX'], r"$\mathcal{I}_l$",
+        (window_key_index['window_DX'], window_key_index['window_SX'], window_key_index['k'], window_key_index['saturation_SX']),
+        lambda wDX, wSX, k, sSX: f"wDX={round(wDX,1)}_wSX={round(wSX,1)}_k={round(k,0)}_satSX={sSX:.2e}",
+        use_grid_groups=True, xscale="log", legend=True, round_nfft=True,
+    )
 
 def plot_condition_number_by_saturation_DX(condition_numbers, outdir, direction, M, dL, N_fft):
     """
     Plot the condition number of the ACF Toeplitz matrix by varying saturation_DX, keeping window sizes, k, and saturation_SX fixed.
     """
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in condition_numbers.keys()))
-    window_sizes_SX = sorted(set(wsx for _, wsx, _, _, _ in condition_numbers.keys()))
-    k_values = sorted(set(k for _, _, k, _, _ in condition_numbers.keys()))
-    saturation_SX_values = sorted(set(s for _, _, _, _, s in condition_numbers.keys()))
-    
-    for N_FFT in N_fft:
-        for window_size_DX in window_sizes_DX:
-            for window_size_SX in window_sizes_SX:
-                for k in k_values:
-                    for saturation_SX in saturation_SX_values:
-                        plt.figure(figsize=(12, 8))
-                        sat_DX_vals, cond_vals = [], []
-                        for (wdx, wsx, k_val, sDX, sSX), cond_number in condition_numbers.items():
-                            if wdx == window_size_DX and wsx == window_size_SX and k_val == k and sSX == saturation_SX:
-                                sat_DX_vals.append(sDX)
-                                cond_vals.append(cond_number)
-                        plt.plot(sat_DX_vals, cond_vals, marker='o')
-                        plt.xlabel(r"$\mathcal{I}_l$", fontsize=26)
-                        plt.ylabel("Condition Number", fontsize=26)
-                        plt.xticks(fontsize=22)
-                        plt.yticks(fontsize=22)
-                        plt.xscale('log')
-                        plt.yscale('log')
-                        plt.grid(True)
-                        filename = f"Condition_Number_M={M}M0_dL={dL}Mpc_wDX={round(window_size_DX,1)}_wSX={round(window_size_SX,1)}_k={round(k,0)}_satSX={saturation_SX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.pdf"
-                        plt.savefig(os.path.join(save_path, filename))
-                        plt.close()
+    _plot_condition_scan(
+        condition_numbers, outdir, direction, M, dL, N_fft,
+        window_key_index['saturation_DX'], r"$\mathcal{I}_l$",
+        (window_key_index['window_DX'], window_key_index['window_SX'], window_key_index['k'], window_key_index['saturation_SX']),
+        lambda wDX, wSX, k, sSX: f"wDX={round(wDX,1)}_wSX={round(wSX,1)}_k={round(k,0)}_satSX={sSX:.2e}",
+        xscale="log", yscale="log", round_nfft=True,
+    )
 
 def plot_mismatch_by_saturation_SX(mismatch_data, outdir, direction, M, dL, N_fft):
     """
     Plot mismatch for real and imaginary components by varying saturation_SX, keeping window sizes, k, and saturation_DX fixed.
     """
-    components = ['real', 'imag']
-    percentiles = [50]
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in mismatch_data.keys()))
-    window_sizes_SX = sorted(set(wsx for _, wsx, _, _, _ in mismatch_data.keys()))
-    k_values = sorted(set(k for _, _, k, _, _ in mismatch_data.keys()))
-    saturation_DX_values = sorted(set(s for _, _, _, s, _ in mismatch_data.keys()))
-    
-    for N_FFT in N_fft:
-        for window_size_DX in window_sizes_DX:
-            for window_size_SX in window_sizes_SX:
-                for k in k_values:
-                    for saturation_DX in saturation_DX_values:
-                        for component in components:
-                            plt.figure(figsize=(12, 8))
-                            for perc in percentiles:
-                                sat_SX_vals, mismatch_vals = [], []
-                                for (wdx, wsx, k_val, sDX, sSX), data in mismatch_data.items():
-                                    if wdx == window_size_DX and wsx == window_size_SX and k_val == k and sDX == saturation_DX:
-                                        sat_SX_vals.append(sSX)
-                                        mismatch_vals.append(data[component][perc])
-                            plt.plot(sat_SX_vals, mismatch_vals, label=f"{perc}% CI", marker='o')
-                            plt.xlabel(r"$\mathcal{I}_h$", fontsize=26)
-                            plt.ylabel("Mismatch", fontsize=26)
-                            plt.xticks(fontsize=22)
-                            plt.yticks(fontsize=22)
-                            plt.xscale('log')
-                            plt.legend()
-                            plt.grid(True)
-                            filename = f"Mismatch_M={M}M0_dL={dL}Mpc_{component}_wDX={round(window_size_DX,1)}_wSX={round(window_size_SX,1)}_k={round(k,0)}_satDX={saturation_DX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.pdf"
-                            plt.savefig(os.path.join(save_path, filename))
-                            plt.close()
+    _plot_component_metric_scan(
+        mismatch_data, outdir, direction, M, dL, N_fft,
+        "Mismatch", "Mismatch", window_key_index['saturation_SX'], r"$\mathcal{I}_h$",
+        (window_key_index['window_DX'], window_key_index['window_SX'], window_key_index['k'], window_key_index['saturation_DX']),
+        lambda wDX, wSX, k, sDX: f"wDX={round(wDX,1)}_wSX={round(wSX,1)}_k={round(k,0)}_satDX={sDX:.2e}",
+        use_grid_groups=True, xscale="log", legend=True, round_nfft=True,
+    )
 
 def plot_optimal_SNR_by_saturation_SX(optimal_SNR_data, outdir, direction, M, dL, N_fft):
     """
     Plot optimal SNR for real and imaginary components by varying saturation_SX, keeping window sizes, k, and saturation_DX fixed.
     """
-    components = ['real', 'imag']
-    percentiles = [50]
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in optimal_SNR_data.keys()))
-    window_sizes_SX = sorted(set(wsx for _, wsx, _, _, _ in optimal_SNR_data.keys()))
-    k_values = sorted(set(k for _, _, k, _, _ in optimal_SNR_data.keys()))
-    saturation_DX_values = sorted(set(s for _, _, _, s, _ in optimal_SNR_data.keys()))
-    
-    for N_FFT in N_fft:
-        for window_size_DX in window_sizes_DX:
-            for window_size_SX in window_sizes_SX:
-                for k in k_values:
-                    for saturation_DX in saturation_DX_values:
-                        for component in components:
-                            plt.figure(figsize=(12, 8))
-                            for perc in percentiles:
-                                sat_SX_vals, snr_vals = [], []
-                                for (wdx, wsx, k_val, sDX, sSX), data in optimal_SNR_data.items():
-                                    if wdx == window_size_DX and wsx == window_size_SX and k_val == k and sDX == saturation_DX:
-                                        sat_SX_vals.append(sSX)
-                                        snr_vals.append(data[component][perc])
-                            plt.plot(sat_SX_vals, snr_vals, label=f"{perc}% CI", marker='o')
-                            plt.xlabel(r"$\mathcal{I}_h$", fontsize=26)
-                            plt.ylabel("Optimal SNR", fontsize=26)
-                            plt.xticks(fontsize=22)
-                            plt.yticks(fontsize=22)
-                            plt.xscale('log')
-                            plt.legend()
-                            plt.grid(True)
-                            filename = f"Optimal_SNR_M={M}M0_dL={dL}Mpc_{component}_wDX={round(window_size_DX,1)}_wSX={round(window_size_SX,1)}_k={round(k,0)}_satDX={saturation_DX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.pdf"
-                            plt.savefig(os.path.join(save_path, filename))
-                            plt.close()
+    _plot_component_metric_scan(
+        optimal_SNR_data, outdir, direction, M, dL, N_fft,
+        "Optimal_SNR", "Optimal SNR", window_key_index['saturation_SX'], r"$\mathcal{I}_h$",
+        (window_key_index['window_DX'], window_key_index['window_SX'], window_key_index['k'], window_key_index['saturation_DX']),
+        lambda wDX, wSX, k, sDX: f"wDX={round(wDX,1)}_wSX={round(wSX,1)}_k={round(k,0)}_satDX={sDX:.2e}",
+        use_grid_groups=True, xscale="log", legend=True, round_nfft=True,
+    )
 
 def plot_condition_number_by_saturation_SX(condition_numbers, outdir, direction, M, dL, N_fft):
     """
     Plot the condition number of the ACF Toeplitz matrix by varying saturation_SX, keeping window sizes, k, and saturation_DX fixed.
     """
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
-    
-    window_sizes_DX = sorted(set(wdx for wdx, _, _, _, _ in condition_numbers.keys()))
-    window_sizes_SX = sorted(set(wsx for _, wsx, _, _, _ in condition_numbers.keys()))
-    k_values = sorted(set(k for _, _, k, _, _ in condition_numbers.keys()))
-    saturation_DX_values = sorted(set(s for _, _, _, s, _ in condition_numbers.keys()))
-    
-    for N_FFT in N_fft:
-        for window_size_DX in window_sizes_DX:
-            for window_size_SX in window_sizes_SX:
-                for k in k_values:
-                    for saturation_DX in saturation_DX_values:
-                        plt.figure(figsize=(12, 8))
-                        sat_SX_vals, cond_vals = [], []
-                        for (wdx, wsx, k_val, sDX, sSX), cond_number in condition_numbers.items():
-                            if wdx == window_size_DX and wsx == window_size_SX and k_val == k and sDX == saturation_DX:
-                                sat_SX_vals.append(sSX)
-                                cond_vals.append(cond_number)
-                        plt.plot(sat_SX_vals, cond_vals, marker='o')
-                        plt.xlabel(r"$\mathcal{I}_h$", fontsize=26)
-                        plt.ylabel("Condition Number", fontsize=26)
-                        plt.xticks(fontsize=22)
-                        plt.yticks(fontsize=22)
-                        plt.xscale('log')
-                        plt.yscale('log')
-                        plt.grid(True)
-                        filename = f"Condition_Number_M={M}M0_dL={dL}Mpc_wDX={round(window_size_DX,1)}_wSX={round(window_size_SX,1)}_k={round(k,0)}_satDX={saturation_DX:.2e}_direction={direction}_NFFT_{round(N_FFT,0)}.pdf"
-                        plt.savefig(os.path.join(save_path, filename))
-                        plt.close()
+    _plot_condition_scan(
+        condition_numbers, outdir, direction, M, dL, N_fft,
+        window_key_index['saturation_SX'], r"$\mathcal{I}_h$",
+        (window_key_index['window_DX'], window_key_index['window_SX'], window_key_index['k'], window_key_index['saturation_DX']),
+        lambda wDX, wSX, k, sDX: f"wDX={round(wDX,1)}_wSX={round(wSX,1)}_k={round(k,0)}_satDX={sDX:.2e}",
+        xscale="log", yscale="log", round_nfft=True,
+    )
 
 def plot_condition_numbers(outdir, condition_numbers, thresholds=(1e3, 1e6)):
 
@@ -2561,60 +2339,35 @@ def plot_mismatch_optimal_SNR_condition_number_window_parameters(mismatch_data, 
     Plots mismatch, optimal SNR, and condition number data if the corresponding x-axis variable has dim > 1.
     """
 
-    # Define plotting functions with their corresponding x-axis variables
-    plot_functions = {
-        "mismatch": {
-            "plot_mismatch_by_window_DX": "window_DX",
-            "plot_mismatch_by_window_SX": "window_SX",
-            "plot_mismatch_by_k": "k",
-            "plot_mismatch_by_saturation_DX": "saturation_DX",
-            "plot_mismatch_by_saturation_SX": "saturation_SX",
-        },
-        "optimal_SNR": {
-            "plot_optimal_SNR_by_window_DX": "window_DX",
-            "plot_optimal_SNR_by_window_SX": "window_SX",
-            "plot_optimal_SNR_by_k": "k",
-            "plot_optimal_SNR_by_saturation_DX": "saturation_DX",
-            "plot_optimal_SNR_by_saturation_SX": "saturation_SX",
-        },
-        "condition_numbers": {
-            "plot_condition_number_by_window_DX": "window_DX",
-            "plot_condition_number_by_window_SX": "window_SX",
-            "plot_condition_number_by_k": "k",
-            "plot_condition_number_by_saturation_DX": "saturation_DX",
-            "plot_condition_number_by_saturation_SX": "saturation_SX",
-        }
-    }
+    plot_specs = (
+        (mismatch_data, (
+            (plot_mismatch_by_window_DX, "window_DX"),
+            (plot_mismatch_by_window_SX, "window_SX"),
+            (plot_mismatch_by_k, "k"),
+            (plot_mismatch_by_saturation_DX, "saturation_DX"),
+            (plot_mismatch_by_saturation_SX, "saturation_SX"),
+        )),
+        (optimal_SNR_data, (
+            (plot_optimal_SNR_by_window_DX, "window_DX"),
+            (plot_optimal_SNR_by_window_SX, "window_SX"),
+            (plot_optimal_SNR_by_k, "k"),
+            (plot_optimal_SNR_by_saturation_DX, "saturation_DX"),
+            (plot_optimal_SNR_by_saturation_SX, "saturation_SX"),
+        )),
+        (condition_numbers, (
+            (plot_condition_number_by_window_DX, "window_DX"),
+            (plot_condition_number_by_window_SX, "window_SX"),
+            (plot_condition_number_by_k, "k"),
+            (plot_condition_number_by_saturation_DX, "saturation_DX"),
+            (plot_condition_number_by_saturation_SX, "saturation_SX"),
+        )),
+    )
 
-    datasets = {
-        "mismatch": mismatch_data,
-        "optimal_SNR": optimal_SNR_data,
-        "condition_numbers": condition_numbers
-    }
-
-    for category, functions in plot_functions.items():
-        data_dict = datasets[category]
-
-        for func_name, x_key in functions.items():
-            extracted_values = set()
-            for key in data_dict.keys():
-                param_mapping = {
-                    "window_DX": key[0],
-                    "window_SX": key[1],
-                    "k": key[2],
-                    "saturation_DX": key[3],
-                    "saturation_SX": key[4],
-                }
-                if x_key in param_mapping:
-                    extracted_values.add(param_mapping[x_key])
-
-            # Only call the function if there are multiple unique values for the x-axis variable
-            if len(extracted_values) > 1:
-                plot_function = globals().get(func_name, None)
-                if plot_function:
-                    plot_function(data_dict, outdir, direction, M, dL, N_FFT)
-                else:
-                    print(f"Warning: Function {func_name} not found in global scope.")
+    for data_dict, functions in plot_specs:
+        for plot_function, x_key in functions:
+            index = window_key_index[x_key]
+            if len({key[index] for key in data_dict.keys()}) > 1:
+                plot_function(data_dict, outdir, direction, M, dL, N_FFT)
 
 def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX_list, window_SX_list, k_list, saturation_DX_list, saturation_SX_list,  outdir, direction):
     
@@ -2622,9 +2375,7 @@ def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX
     Loop through all combinations of windowing parameters and plot mismatch (real & imaginary at 50% CI) vs N_FFT.
     """
 
-    subfolder = "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-    os.makedirs(save_path, exist_ok=True)
+    save_path = _mismatch_plot_dir(outdir, direction)
 
     for (window_DX, window_SX, k, satDX, satSX) in product(
         window_DX_list, window_SX_list, k_list, saturation_DX_list, saturation_SX_list
@@ -2634,29 +2385,24 @@ def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX
         nffts_found = []
 
         for N_fft in N_FFT_list:
-            filename = (
-                f"Mismatch_M_{M}_dL_{dL}_t_s_{round(t_start_g_true,1)}M_wDX_{round(window_DX,1)}Hz"
-                f"_wSX_{round(window_SX,1)}Hz_k_{round(k,2)}_satDX_{round(satDX,1)}"
-                f"_satSD_{round(satSX,1)}_NFFT_{N_fft}.txt"
+            path = _windowed_result_path(
+                outdir, "Mismatch", M, dL, t_start_g_true, N_fft,
+                window_DX, window_SX, k, satDX, satSX
             )
-            path = os.path.join(outdir, "Algorithm/Mismatch", filename)
             if os.path.exists(path):
                 with open(path, "r") as f:
+                    component_mismatches = {'real': None, 'imag': None}
                     lines = f.readlines()[1:]
-                    real_50, imag_50 = None, None
                     for line in lines:
                         perc, component, mismatch = line.strip().split()
-                        if perc == "50":
-                            if component == "real":
-                                real_50 = float(mismatch)
-                            elif component == "imag":
-                                imag_50 = float(mismatch)
-                    if real_50 is not None and imag_50 is not None:
+                        if perc == "50" and component in component_mismatches:
+                            component_mismatches[component] = float(mismatch)
+                    if all(value is not None for value in component_mismatches.values()):
                         nffts_found.append(N_fft)
-                        real_mismatches.append(real_50)
-                        imag_mismatches.append(imag_50)
+                        real_mismatches.append(component_mismatches['real'])
+                        imag_mismatches.append(component_mismatches['imag'])
             else:
-                print(f"File not found: {filename}")
+                print(f"File not found: {os.path.basename(path)}")
 
         if not nffts_found:
             print(f"Skipping: No data for combo wDX={window_DX}, wSX={window_SX}, k={k}, satDX={satDX}, satSX={satSX}")
