@@ -115,14 +115,6 @@ def find_longest_name_length(names):
 
     return longest_name_length
 
-def minimisation_compatibility_check(parameters):
-
-    if not(parameters['template']=='Kerr'): raise ValueError("Minimization algorithm only works for Kerr parameters['template']." )
-    if not(parameters['QQNM_modes']==None): raise ValueError("Minimization algorithm does not work with QQNM modes.")
-    if not(parameters['tail']==0)         : raise ValueError("Minimization algorithm does not work with Kerr tail." )
-
-    return
-
 # Function taken from watpy (https://git.tpi.uni-jena.de/core/watpy).
 
 def diff1(xp, yp, pad=True):

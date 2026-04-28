@@ -148,9 +148,9 @@ def read_config(Config):
         't-end'            : 140.0,
         'dt-scd'           : 0.0  ,
         
-        'min-method'       : 'lm',
-        'min-iter-min'     : 1   ,
+        'min-method'       : 'trf',
         'min-iter-max'     : 1000,
+        'n-random-seeds'   : 16  ,
         },
 
         'Mismatch-PSD-settings':
@@ -229,13 +229,14 @@ def read_config(Config):
         if not(parameters['Injection-data']['times']=='from-SXS-NR'):
             raise ValueError("When the error is taken from the corresponding SXS simulation, the times must be taken from the simulation as well.")
     
-    if (parameters['Inference']['method']=='Minimization'): raise ValueError("Minimization is still a work in progress and is not supported yet. Please use the `Nested-sampler` method.")
-
-    if not(parameters['Inference']['method']=='Nested-sampler'):
+    if(parameters['Inference']['method']=='Minimization'):
 
         parameters['Inference']['nlive']   = None
         parameters['Inference']['maxmcmc'] = None
-        parameters['Inference']['nGuess']  = {'A' : parameters['Inference']['nGuess-A'], 'phi' : parameters['Inference']['nGuess-phi']}
+
+    elif not(parameters['Inference']['method']=='Nested-sampler'):
+
+        raise ValueError("Unknown inference method: {}.".format(parameters['Inference']['method']))
 
     if(parameters['NR-data']['catalog'] == 'cbhdb' or parameters['NR-data']['catalog'] == 'charged_raw'): parameters['Model']['charge'] = 1
     else                                                                                                : parameters['Model']['charge'] = 0
@@ -444,16 +445,14 @@ A dot is present at the end of each description line and is not to be intended a
                 - is bounded within the selected prior bounds;
                 - is seeded by a starting value, which can be either set by the user, or will be randomly selected within \
                   the prior bounds. In the latter case, a user-given number of seeds will be used and the best one will
-                  be kept to initialize the main minimization loop;
-                - is forced to run for a minimum number of iterations, and to stop after a maximum number of iterations; 
+                  be kept as the point estimate;
+                - is stopped after a maximum number of function evaluations per seed; 
         
-            min-method       Method to be used in the scipy.least_squares() function. Available options: ['lm', 'None'].         Default: 'lm'.
-            
-            min-iter-min     Minimum number of iterations for the minimization algorithm.                                        Default: 1.
+            min-method       Method to be used in the scipy.least_squares() function. Available options: ['trf', 'dogbox']. Default: 'trf'.
             
             min-iter-max     Maximum number of iterations for the minimization algorithm.                                        Default: 1000.
             
-            n-random-seeds   Number of random seeds to be used to initialize the minimization.                                   Default: 1.
+            n-random-seeds   Number of random seeds to be used to initialize the minimization.                                   Default: 16.
 
         
     ****************************************************
