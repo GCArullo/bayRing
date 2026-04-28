@@ -600,8 +600,8 @@ class NR_simulation():
         self.pert_order               = perturbation_order
 
         self.NR_dir                   = NR_dir
-        self.additional_NR_properties = additional_NR_properties
-        self.fits                     = fits
+        self.additional_NR_properties = utils.normalize_optional_path(additional_NR_properties)
+        self.fits                     = utils.normalize_optional_path(fits)
         self.outdir                   = outdir
 
         self.fake_NR_modes            = injection_modes_list
@@ -743,7 +743,7 @@ class NR_simulation():
             self.download  = download
             self.q, self.chi1, self.chi2, self.tilt1, self.tilt2, self.ecc, self.Mf, self.af = self.read_SXS_metadata()
             
-            if self.additional_NR_properties is not None:
+            if self.additional_NR_properties:
                 self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = self.load_SXS_addn_metadata(csv_path=self.additional_NR_properties, ID_str=self.NR_ID)
             else:
                 self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = None, None, None, None

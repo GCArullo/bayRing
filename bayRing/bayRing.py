@@ -19,6 +19,7 @@ import bayRing.initialise         as initialise
 import bayRing.QNM_utils          as QNM_utils
 import bayRing.inference          as inference
 import bayRing.template_waveforms as template_waveforms
+import bayRing.utils              as utils
 import bayRing.waveform_utils     as wf_utils
 
 # Constants
@@ -79,6 +80,8 @@ def main():
 
     print_section('NR data loading')
     parameters['Injection-data']['modes-list'] = NR_waveforms.read_fake_NR(parameters['NR-data']['catalog'], parameters['Injection-data']['modes'])
+    for optional_path in ['properties-file', 'fits-file']:
+        parameters['NR-data'][optional_path] = utils.normalize_optional_path(parameters['NR-data'][optional_path])
 
     #NR simulation object
     NR_sim      = NR_waveforms.NR_simulation(parameters['NR-data']['catalog']                       , 
@@ -111,7 +114,7 @@ def main():
     print_section('Simulation metadata')
     for key in NR_metadata.keys(): print('{}: {}'.format(key.ljust(len('omg_peak_22')), NR_metadata[key]))
 
-    if parameters['NR-data']['fits-file'] is not '':
+    if parameters['NR-data']['fits-file']:
         import pandas as pd
         fit_data = pd.read_csv(parameters['NR-data']['fits-file'])
         fit_metadata = fit_data.iloc[0].to_dict()
