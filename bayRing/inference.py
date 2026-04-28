@@ -1,4 +1,4 @@
-import itertools as it, numpy as np, os, pandas as pd, traceback
+import importlib, itertools as it, numpy as np, os, pandas as pd, traceback
 from scipy.optimize  import least_squares as l_s
 
 try:                import configparser
@@ -12,6 +12,54 @@ import bayRing.utils       as utils
 
 twopi                  = 2.*np.pi
 max_parameter_name_len = len('ln_A_tail_22')
+
+# CPNest workers using the spawn start method must pickle the inference model.
+# Register the factory-built classes as module globals so pickle can import them.
+_DYNAMIC_INFERENCE_MODEL_PREFIX  = 'DynamicInferenceModel_'
+_DYNAMIC_INFERENCE_MODEL_CLASSES = {}
+
+def _base_class_descriptor(base):
+
+    return '{}:{}'.format(base.__module__, base.__qualname__)
+
+def _dynamic_inference_model_class_name(base):
+
+    return _DYNAMIC_INFERENCE_MODEL_PREFIX + _base_class_descriptor(base).encode('utf-8').hex()
+
+def _resolve_base_class(descriptor):
+
+    module_name, qualname = descriptor.split(':', 1)
+    base = importlib.import_module(module_name)
+    for attr in qualname.split('.'):
+        base = getattr(base, attr)
+
+    return base
+
+def _register_dynamic_inference_model(base, model_class):
+
+    class_name = _dynamic_inference_model_class_name(base)
+
+    model_class.__name__    = class_name
+    model_class.__qualname__ = class_name
+    model_class.__module__  = __name__
+
+    globals()[class_name] = model_class
+    _DYNAMIC_INFERENCE_MODEL_CLASSES[class_name] = model_class
+
+    return model_class
+
+def __getattr__(name):
+
+    if name.startswith(_DYNAMIC_INFERENCE_MODEL_PREFIX):
+        try:
+            descriptor = bytes.fromhex(name[len(_DYNAMIC_INFERENCE_MODEL_PREFIX):]).decode('utf-8')
+            base       = _resolve_base_class(descriptor)
+        except Exception as exc:
+            raise AttributeError("module '{}' has no attribute '{}'".format(__name__, name)) from exc
+
+        return Dynamic_InferenceModel(base)
+
+    raise AttributeError("module '{}' has no attribute '{}'".format(__name__, name))
 
 def read_parameter_bounds(Config, configparser, basename, fullname, default_bounds):
     
@@ -238,6 +286,10 @@ def UNUSED_build_a_grid(self, x_max, x_min, delta_x, n_grid):
     return y_tt
 
 def Dynamic_InferenceModel(base):
+
+    class_name = _dynamic_inference_model_class_name(base)
+    if class_name in _DYNAMIC_INFERENCE_MODEL_CLASSES:
+        return _DYNAMIC_INFERENCE_MODEL_CLASSES[class_name]
 
     class InferenceModel(base):
 
@@ -619,7 +671,7 @@ def Dynamic_InferenceModel(base):
 
             return 0.0
     
-    return InferenceModel
+    return _register_dynamic_inference_model(base, InferenceModel)
             
         
 class Minimization_Algorithm():

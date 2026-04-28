@@ -370,6 +370,7 @@ if "scipy" not in sys.modules:
     fake_scipy = types.ModuleType("scipy")
     fake_optimize = types.ModuleType("scipy.optimize")
     fake_interpolate = types.ModuleType("scipy.interpolate")
+    fake_linalg = types.ModuleType("scipy.linalg")
     fake_signal = types.ModuleType("scipy.signal")
 
     def _fake_least_squares(*args, **kwargs):
@@ -391,15 +392,74 @@ if "scipy" not in sys.modules:
     fake_optimize.minimize = _fake_minimize
     fake_optimize.fmin = _fake_minimize
     fake_interpolate.interp1d = _fake_interp1d
+    fake_linalg.toeplitz = lambda values: _FakeArray(_FakeArray(values) for _ in values)
+    fake_linalg.solve_toeplitz = lambda acf, values, check_finite=True: values
     fake_signal.find_peaks = _fake_find_peaks
     fake_scipy.optimize = fake_optimize
     fake_scipy.interpolate = fake_interpolate
+    fake_scipy.linalg = fake_linalg
     fake_scipy.signal = fake_signal
 
     sys.modules["scipy"] = fake_scipy
     sys.modules["scipy.optimize"] = fake_optimize
     sys.modules["scipy.interpolate"] = fake_interpolate
+    sys.modules["scipy.linalg"] = fake_linalg
     sys.modules["scipy.signal"] = fake_signal
+
+
+if "pycbc" not in sys.modules:
+    fake_pycbc = types.ModuleType("pycbc")
+    fake_pycbc_psd = types.ModuleType("pycbc.psd")
+    fake_pycbc_types = types.ModuleType("pycbc.types")
+    fake_pycbc_timeseries = types.ModuleType("pycbc.types.timeseries")
+    fake_pycbc_frequencyseries = types.ModuleType("pycbc.types.frequencyseries")
+    fake_pycbc_filter = types.ModuleType("pycbc.filter")
+
+    class _FakeSeries(_FakeArray):
+        def __init__(self, values=None, **kwargs):
+            super().__init__(values or [])
+            self.__dict__.update(kwargs)
+
+        def to_frequencyseries(self, delta_f=None):
+            return _FakeSeries(self, delta_f=delta_f)
+
+    fake_pycbc_psd.from_txt = lambda *args, **kwargs: _FakeSeries()
+    fake_pycbc_timeseries.TimeSeries = _FakeSeries
+    fake_pycbc_frequencyseries.FrequencySeries = _FakeSeries
+    fake_pycbc_types.TimeSeries = _FakeSeries
+    fake_pycbc_types.FrequencySeries = _FakeSeries
+    fake_pycbc_filter.sigma = lambda *args, **kwargs: 0.0
+    fake_pycbc_filter.match = lambda *args, **kwargs: (0.0, 0)
+
+    fake_pycbc.psd = fake_pycbc_psd
+    fake_pycbc.types = fake_pycbc_types
+    fake_pycbc.filter = fake_pycbc_filter
+
+    sys.modules["pycbc"] = fake_pycbc
+    sys.modules["pycbc.psd"] = fake_pycbc_psd
+    sys.modules["pycbc.types"] = fake_pycbc_types
+    sys.modules["pycbc.types.timeseries"] = fake_pycbc_timeseries
+    sys.modules["pycbc.types.frequencyseries"] = fake_pycbc_frequencyseries
+    sys.modules["pycbc.filter"] = fake_pycbc_filter
+
+
+if "lal" not in sys.modules:
+    fake_lal = types.ModuleType("lal")
+    fake_lal_antenna = types.ModuleType("lal.antenna")
+
+    class _FakeAntennaResponse:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    fake_lal.MSUN_SI = 1.0
+    fake_lal.G_SI = 1.0
+    fake_lal.C_SI = 1.0
+    fake_lal.PC_SI = 1.0
+    fake_lal_antenna.AntennaResponse = _FakeAntennaResponse
+    fake_lal.antenna = fake_lal_antenna
+
+    sys.modules["lal"] = fake_lal
+    sys.modules["lal.antenna"] = fake_lal_antenna
 
 
 if "corner" not in sys.modules:
@@ -458,3 +518,16 @@ if "seaborn" not in sys.modules:
     fake_seaborn = types.ModuleType("seaborn")
     fake_seaborn.set_style = lambda *args, **kwargs: None
     sys.modules["seaborn"] = fake_seaborn
+
+
+if "numba" not in sys.modules:
+    fake_numba = types.ModuleType("numba")
+
+    def _fake_decorator(*args, **kwargs):
+        if args and callable(args[0]) and len(args) == 1 and not kwargs:
+            return args[0]
+        return lambda function: function
+
+    fake_numba.njit = _fake_decorator
+    fake_numba.jit = _fake_decorator
+    sys.modules["numba"] = fake_numba
