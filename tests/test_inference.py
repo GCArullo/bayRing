@@ -152,6 +152,127 @@ def test_store_evidence_to_file_writes_expected_content(tmp_path):
     assert content.splitlines() == ["logZ", "12.34"]
 
 
+def test_save_point_estimates_writes_auxiliary_summary(tmp_path):
+    output_dir = tmp_path / "Algorithm"
+    output_dir.mkdir(parents=True)
+
+    results = {"ln_A_220": 1.2, "phi_220": 0.3}
+    errors = {"ln_A_220": 0.04, "phi_220": 0.05}
+
+    summary_path = inference.postprocess.save_point_estimates(results, str(tmp_path), errors=errors)
+
+    summary_file = output_dir / "point_estimates.dat"
+    assert summary_path == os.fspath(summary_file)
+    assert summary_file.read_text(encoding="utf-8").splitlines() == [
+        "# parameter\tvalue\tsigma",
+        "ln_A_220\t1.2\t0.04",
+        "phi_220\t0.3\t0.05",
+    ]
+
+
+def test_save_point_estimate_posterior_writes_gaussian_samples(tmp_path):
+    if not hasattr(inference.np.random, "default_rng"):
+        pytest.skip("requires real numpy random generator")
+
+    output_dir = tmp_path / "Algorithm"
+    output_dir.mkdir(parents=True)
+
+    results = {"ln_A_220": 1.2, "phi_220": 0.3}
+    errors = {"ln_A_220": 0.04, "phi_220": 0.05}
+    covariance = np.array([[0.04**2, 0.0], [0.0, 0.05**2]])
+
+    posterior_path = inference.postprocess.save_point_estimate_posterior(
+        results,
+        str(tmp_path),
+        covariance=covariance,
+        errors=errors,
+        seed=1234,
+        n_samples=64,
+    )
+
+    posterior_file = output_dir / "posterior.dat"
+    assert posterior_path == os.fspath(posterior_file)
+    assert posterior_file.exists()
+    assert not (output_dir / "Minimization_Results.txt").exists()
+
+    posterior = np.genfromtxt(posterior_file, names=True, deletechars="")
+    assert posterior.dtype.names == ("ln_A_220", "phi_220")
+    assert posterior.shape == (64,)
+    assert np.std(posterior["ln_A_220"]) > 0.0
+    assert np.std(posterior["phi_220"]) > 0.0
+    assert np.mean(posterior["ln_A_220"]) == pytest.approx(1.2, abs=0.03)
+    assert np.mean(posterior["phi_220"]) == pytest.approx(0.3, abs=0.03)
+
+
+def test_read_point_estimate_postprocessing_uses_posterior_file(tmp_path):
+    if not hasattr(inference.np, "genfromtxt"):
+        pytest.skip("requires real numpy genfromtxt")
+
+    output_dir = tmp_path / "Algorithm"
+    output_dir.mkdir(parents=True)
+    (output_dir / "posterior.dat").write_text(
+        "# ln_A_220\tphi_220\n1.2\t0.3\n1.3\t0.4\n",
+        encoding="utf-8",
+    )
+    parameters = {"I/O": {"outdir": str(tmp_path)}, "Inference": {"method": "Minimization"}}
+
+    results = inference.postprocess.read_results_object_from_previous_inference(parameters)
+
+    assert results.dtype.names == ("ln_A_220", "phi_220")
+    assert results["ln_A_220"][0] == pytest.approx(1.2)
+    assert results["phi_220"][1] == pytest.approx(0.4)
+
+
+def test_point_estimate_inference_writes_summary_but_returns_posterior(monkeypatch, tmp_path):
+    calls = []
+
+    class FakeModel:
+        names = ["x"]
+
+    class FakeMinimization:
+        errors = {"x": 0.1}
+        covariance = "minimization-covariance"
+
+        def __init__(self, inference_model, parameters):
+            pass
+
+        def minimize_likelihood(self):
+            return [1.0]
+
+    class FakeLinearInversion:
+        errors = {"x": 0.2}
+        covariance = "linear-covariance"
+
+        def __init__(self, inference_model, parameters):
+            pass
+
+        def solve_likelihood(self):
+            return [2.0]
+
+    def fake_save_point_estimates(results, outdir, errors=None):
+        calls.append(("summary", dict(results), outdir, dict(errors)))
+
+    def fake_save_point_estimate_posterior(results, outdir, covariance=None, errors=None, seed=None):
+        calls.append(("posterior", dict(results), outdir, covariance, dict(errors), seed))
+
+    monkeypatch.setattr(inference, "Minimization_Algorithm", FakeMinimization)
+    monkeypatch.setattr(inference, "KerrLinearInversion_Algorithm", FakeLinearInversion)
+    monkeypatch.setattr(inference.postprocess, "save_point_estimates", fake_save_point_estimates)
+    monkeypatch.setattr(inference.postprocess, "save_point_estimate_posterior", fake_save_point_estimate_posterior)
+    monkeypatch.setattr(inference.postprocess, "read_posterior_samples", lambda outdir: {"posterior": outdir})
+
+    for method in ["Minimization", "Linear-inversion"]:
+        parameters = {"I/O": {"outdir": str(tmp_path)}, "Inference": {"method": method, "seed": 1234}}
+        assert inference.run_inference(parameters, FakeModel()) == {"posterior": str(tmp_path)}
+
+    assert calls == [
+        ("summary", {"x": 1.0}, str(tmp_path), {"x": 0.1}),
+        ("posterior", {"x": 1.0}, str(tmp_path), "minimization-covariance", {"x": 0.1}, 1234),
+        ("summary", {"x": 2.0}, str(tmp_path), {"x": 0.2}),
+        ("posterior", {"x": 2.0}, str(tmp_path), "linear-covariance", {"x": 0.2}, 1234),
+    ]
+
+
 def test_dynamic_inference_model_instances_are_pickleable_after_global_lookup_reset():
     model_class = inference.Dynamic_InferenceModel(PickleBase)
     instance = model_class.__new__(model_class)
@@ -314,6 +435,44 @@ def test_minimization_method_rejects_lm():
 
     with pytest.raises(ValueError, match="Available options"):
         minimization._least_squares_method("lm")
+
+
+def test_least_squares_parameter_errors_use_weighted_fisher_inverse():
+    if not hasattr(inference.np, "linalg"):
+        pytest.skip("requires real numpy linear algebra")
+
+    class Result:
+        jac = np.array([[1.0, 0.0], [0.0, 2.0], [0.0, 0.0]])
+
+    errors, covariance, _, _ = inference.estimate_least_squares_parameter_errors(["x", "y"], Result())
+
+    assert covariance[0, 0] == pytest.approx(1.0)
+    assert covariance[1, 1] == pytest.approx(0.25)
+    assert errors["x"] == pytest.approx(1.0)
+    assert errors["y"] == pytest.approx(0.5)
+
+
+def test_kerr_linear_inversion_reports_log_amplitude_and_phase_errors():
+    if not hasattr(inference.np, "linalg"):
+        pytest.skip("requires real numpy linear algebra")
+
+    mode = (2, 2, 0)
+    waveform = FakeLinearKerrWaveform({mode: np.array([1.0 + 0.0j])})
+    model = FakeLinearInferenceModel(
+        waveform,
+        np.array([2.0 + 0.0j]),
+        np.array([1.0 + 1.0j]),
+        ["ln_A_220", "phi_220"],
+    )
+    parameters = {"Inference": {"linear-inversion-eigenvalue-tol": 1e-12}}
+
+    algorithm = inference.KerrLinearInversion_Algorithm(model, parameters)
+    solution = algorithm.solve_likelihood()
+
+    assert solution[0] == pytest.approx(np.log(2.0))
+    assert solution[1] == pytest.approx(0.0)
+    assert algorithm.errors["ln_A_220"] == pytest.approx(0.5)
+    assert algorithm.errors["phi_220"] == pytest.approx(0.5)
 
 
 def test_kerr_linear_inversion_recovers_two_complex_mode_amplitudes():

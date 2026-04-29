@@ -37,6 +37,7 @@ strain_components = ('real', 'imag')
 summary_percentiles = (5, 50, 95)
 plot_percentiles = (50,)
 point_estimate_methods = ('Minimization', 'Linear-inversion')
+point_estimate_posterior_samples = 10000
 window_key_index = {
     'window_DX': 0,
     'window_SX': 1,
@@ -45,9 +46,26 @@ window_key_index = {
     'saturation_SX': 4,
 }
 
+def read_posterior_samples(outdir):
+
+    posterior_path = os.path.join(outdir, 'Algorithm/posterior.dat')
+    delimiter = None
+
+    with open(posterior_path, 'r') as posterior_file:
+        for line in posterior_file:
+            line = line.strip()
+            if(line!=''):
+                delimiter = "," if "," in line else None
+                break
+
+    return np.genfromtxt(posterior_path, names=True, deletechars="", delimiter=delimiter)
+
 def waveform_parameter_samples(results, method=None):
 
-    if method in point_estimate_methods or isinstance(results, dict):
+    if isinstance(results, dict):
+        return [results]
+
+    if(getattr(results, 'shape', None) == ()):
         return [results]
 
     return list(results)
@@ -129,20 +147,12 @@ def read_results_object_from_previous_inference(parameters):
 
     if(parameters['Inference']['method'] in point_estimate_methods):
 
-        results_path = os.path.join(parameters['I/O']['outdir'], 'Algorithm/Minimization_Results.txt')
-        if not(os.path.exists(results_path)):
-            results_path = os.path.join(parameters['I/O']['outdir'], 'Algorithm/Minimization_results.txt')
-        results_object_tmp = np.genfromtxt(results_path, names=True, deletechars="")
-        results_object = {}
-        for key in results_object_tmp.dtype.names:
-            print(results_object_tmp[key])
-            results_object[key] = results_object_tmp[key]
+        results_object = read_posterior_samples(parameters['I/O']['outdir'])
 
     elif(parameters['Inference']['method'] == 'Nested-sampler'):
 
         if(parameters['Inference']['sampler'] == 'cpnest'):
-            try   :   results_object = np.genfromtxt(os.path.join( parameters['I/O']['outdir'],'Algorithm/posterior.dat'), names=True, deletechars="", delimiter = ",")
-            except:   results_object = np.genfromtxt(os.path.join( parameters['I/O']['outdir'],'Algorithm/posterior.dat'), names=True, deletechars="")
+            results_object = read_posterior_samples(parameters['I/O']['outdir'])
         elif(parameters['Inference']['sampler'] == 'raynest'):
             filename        = os.path.join( parameters['I/O']['outdir'],'Algorithm/raynest.h5')
             h5_file         = h5py.File(filename,'r')
@@ -177,9 +187,19 @@ def print_point_estimate(results_object, names, method):
 
     """
 
-    if(method in point_estimate_methods):
+    if(isinstance(results_object, dict)):
         longest_name_length = utils.find_longest_name_length(results_object.keys())
-        for key in results_object.keys(): print('{} : {:.12f}'.format(key.ljust(longest_name_length), results_object[key]))
+        errors = getattr(results_object, 'errors', {})
+        for key in results_object.keys():
+            try:
+                has_finite_error = key in errors and np.isfinite(errors[key])
+            except AttributeError:
+                has_finite_error = key in errors and errors[key] == errors[key]
+
+            if(has_finite_error):
+                print('{} : {:.12f} +/- {:.12f}'.format(key.ljust(longest_name_length), results_object[key], errors[key]))
+            else:
+                print('{} : {:.12f}'.format(key.ljust(longest_name_length), results_object[key]))
     else:
         longest_name_length = utils.find_longest_name_length(names)
         for key in names:
@@ -190,36 +210,87 @@ def print_point_estimate(results_object, names, method):
 
     return
 
-def save_results_minimization(results, outdir):
+def save_point_estimates(results, outdir, errors=None):
 
     """
 
-    Save the results of a minimization algorithm.
+    Save the point estimates and one-sigma errors for point-estimate methods.
 
-    Parameters
-    ----------
-
-    results : dict
-        Dictionary containing the results of the minimization algorithm.
-
-    outdir : str
-        Output directory.
-
-    Returns
-    -------
-
-    Nothing, but saves the results of the minimization algorithm in a text file.
+    This file is an auxiliary summary product. Post-processing and plotting use
+    the posterior samples in Algorithm/posterior.dat.
 
     """
 
-    len_params    = len(results.values())
-    header_string = ''
-    for key in results.keys(): header_string += '{}\t'.format(key)
-    
-    results_output = np.array([np.array(list(results.values())[i]) for i in range(len_params)]).reshape((1,len_params))
-    np.savetxt(os.path.join(outdir,'Algorithm','Minimization_Results.txt'), results_output, header = header_string)
-    
-    return
+    if(errors is None):
+        errors = getattr(results, 'errors', {})
+
+    point_estimates_path = os.path.join(outdir, 'Algorithm', 'point_estimates.dat')
+    missing_error = getattr(np, 'nan', float('nan'))
+
+    with open(point_estimates_path, 'w') as outfile:
+        outfile.write('# parameter\tvalue\tsigma\n')
+        for name in results.keys():
+            outfile.write('{}\t{}\t{}\n'.format(name, results[name], errors.get(name, missing_error)))
+
+    return point_estimates_path
+
+def _point_estimate_covariance(names, covariance=None, errors=None):
+
+    if(errors is None):
+        errors = {}
+
+    if(covariance is None):
+        variances = []
+        for name in names:
+            error = errors.get(name, 0.0)
+            try:
+                error = float(error)
+            except (TypeError, ValueError):
+                error = 0.0
+            if not(np.isfinite(error)):
+                error = 0.0
+            variances.append(error**2)
+        return np.diag(variances)
+
+    covariance = np.asarray(covariance, dtype=float)
+    if(covariance.shape != (len(names), len(names)) or not(np.all(np.isfinite(covariance)))):
+        return _point_estimate_covariance(names, covariance=None, errors=errors)
+
+    covariance = 0.5*(covariance + covariance.T)
+    eigvals, eigvecs = np.linalg.eigh(covariance)
+    eigvals = np.maximum(eigvals, 0.0)
+
+    return np.dot(eigvecs*eigvals, eigvecs.T)
+
+def save_point_estimate_posterior(results, outdir, covariance=None, errors=None, seed=None, n_samples=point_estimate_posterior_samples):
+
+    """
+
+    Save a Gaussian posterior approximation for point-estimate methods.
+
+    The samples are drawn from the multivariate normal distribution centered on
+    the point estimate, using the supplied parameter covariance. If the full
+    covariance is unavailable, the diagonal covariance implied by the stored
+    one-sigma errors is used.
+
+    """
+
+    names = list(results.keys())
+    if(len(names)==0):
+        raise ValueError("Cannot save a point-estimate posterior with no parameters.")
+
+    mean       = np.array([float(results[name]) for name in names], dtype=float)
+    if(errors is None):
+        errors = getattr(results, 'errors', {})
+    covariance = _point_estimate_covariance(names, covariance=covariance, errors=errors)
+
+    rng     = np.random.default_rng(seed)
+    samples = rng.multivariate_normal(mean, covariance, size=n_samples)
+
+    posterior_path = os.path.join(outdir, 'Algorithm', 'posterior.dat')
+    np.savetxt(posterior_path, samples, header='\t'.join(names), delimiter='\t')
+
+    return posterior_path
 
 def store_and_print_amp_phi(amp_name, phi_name, t0, omega, tau, results_object, longest_name_length, outdir):
 
@@ -978,8 +1049,7 @@ def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf,
     whiten_whiten_h_NR, h_NR_h_NR_sqrt = _toeplitz_whitened_norm(acf, NR_data)
 
     # Load waveform template
-    if method == 'Nested-sampler':
-        models_re_list, models_im_list = model_component_lists(results, inference_model, method)
+    models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
     for perc in summary_percentiles:
         # Extract waveform (geometric units)
@@ -1293,18 +1363,12 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     
     if not(inference_model==None):
 
-        if(method=='Nested-sampler'):
-            models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
-            models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
+        models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
         for perc in [50, 5, 95]:
 
-            if(method=='Nested-sampler'):
-                wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
-                wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
-            else:
-                wf_r = np.real(np.array(inference_model.model(results)))
-                wf_i = np.imag(np.array(inference_model.model(results)))
+            wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
+            wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
 
             wf_amp, wf_phi = waveform_utils.amp_phase_from_re_im(wf_r, wf_i)
             wf_f           = np.gradient(wf_phi, t_cut)/(twopi)
@@ -1334,27 +1398,14 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
 
 
         if(tail_flag):
-            # for name_x in results.names:
-            #     if ('ln_A_tail' in name_x):
-            #         results[name_x] = np.log(1e-32)
-            try   : results['ln_A_tail_22'] = np.log(1e-32)
-            except: pass
-            try   : results['ln_A_tail_32'] = np.log(1e-32)
-            except: pass
-
             # Plot QNM waveform reconstruction
-            if(method=='Nested-sampler'):
-                models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
-                models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
+            qnm_samples = [_sample_with_suppressed_tail(sample, template) for sample in waveform_parameter_samples(results, method)]
+            models_re_list, models_im_list = _model_component_lists_from_samples(qnm_samples, inference_model)
             
             for perc in [50, 5, 95]:
 
-                if(method=='Nested-sampler'):
-                    wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
-                    wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
-                else:
-                    wf_r = np.real(np.array(inference_model.model(results)))
-                    wf_i = np.imag(np.array(inference_model.model(results)))
+                wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
+                wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
 
                 wf_amp, wf_phi = waveform_utils.amp_phase_from_re_im(wf_r, wf_i)
                 wf_f           = np.gradient(wf_phi, t_cut)/(twopi)
@@ -1365,8 +1416,6 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
                 else:
                     ax2.semilogy(t_cut - t_peak, wf_amp,                                                       c='royalblue', lw=lw_std,       alpha=alpha_med, ls='--' )
                     ax4.plot(    t_cut - t_peak, wf_f,                                                         c='royalblue', lw=lw_std,       alpha=alpha_med, ls='--' )
-
-                if(method in point_estimate_methods): break
 
     if not(tail_flag):
         ax1.set_ylabel(r'$\mathit{Re(%s)}$'%(label_data)                           , fontsize=fontsize_labels*rescale)
@@ -1418,12 +1467,10 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
 
     for perc in [50, 5, 95]:
     
-        if(method=='Nested-sampler'):
-            wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
-            wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
-        else:
-            wf_r = np.real(np.array(inference_model.model(results)))
-            wf_i = np.imag(np.array(inference_model.model(results)))
+        wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
+        wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
+        wf_amp, wf_phi = waveform_utils.amp_phase_from_re_im(wf_r, wf_i)
+        wf_f           = np.gradient(wf_phi, t_cut)/(twopi)
 
         if(perc==50):
             ax1.plot(t_cut - t_peak, wf_r   - NR_r_cut  ,                                                  c=color_model, lw=lw_large, alpha=alpha_std, ls='-' )
@@ -1435,9 +1482,6 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
             ax2.plot(t_cut - t_peak, wf_amp - NR_amp_cut,                                                  c=color_model, lw=lw_std, alpha=alpha_med, ls='--')
             ax3.plot(t_cut - t_peak, wf_i   - NR_i_cut  ,                                                  c=color_model, lw=lw_std, alpha=alpha_med, ls='--')
             ax4.plot(t_cut - t_peak, wf_f   - NR_f_cut  ,                                                  c=color_model, lw=lw_std, alpha=alpha_med, ls='--')
-            
-        if(method in point_estimate_methods): break
-
     ax1.legend(loc='best', fontsize=fontsize_legend)
     ax3.legend(loc='best', fontsize=fontsize_legend)
 
@@ -1498,224 +1542,477 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
 
     return
 
-def plot_fancy_residual(NR_sim, template, metadata, results, inference_model, outdir, method):
+def _init_fancy_plotting():
 
-    """
+    plt.rcParams['figure.max_open_warning'] = 0
+    plt.rcParams['mathtext.fontset']        = 'stix'
+    plt.rcParams['font.family']             = 'STIXGeneral'
+    plt.rcParams['font.size']               = 17
+    plt.rcParams['axes.linewidth']          = 1
+    plt.rcParams['axes.labelsize']          = 20
+    plt.rcParams['axes.titlesize']          = 1.3*plt.rcParams['font.size']
+    plt.rcParams['legend.fontsize']         = 15
+    plt.rcParams['xtick.labelsize']         = 15
+    plt.rcParams['ytick.labelsize']         = 15
+    plt.rcParams['xtick.major.size']        = 3
+    plt.rcParams['xtick.minor.size']        = 3
+    plt.rcParams['xtick.major.width']       = 1
+    plt.rcParams['xtick.minor.width']       = 1
+    plt.rcParams['ytick.major.size']        = 3
+    plt.rcParams['ytick.minor.size']        = 3
+    plt.rcParams['ytick.major.width']       = 1
+    plt.rcParams['ytick.minor.width']       = 1
+    plt.rcParams['legend.frameon']          = False
+    plt.rcParams['contour.negative_linestyle'] = 'solid'
 
-    Plot the residuals vs the NR error in a single figure.
+def _style_fancy_axes(axes):
 
-    Parameters
-    ----------
+    for ax in np.ravel(axes):
+        ax.grid(True, which='major', color='0.85', lw=0.6, alpha=0.75)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.tick_params(direction='out')
 
-    NR_sim : NR_sim
-        NR simulation object.
+def _as_1d_float_array(values):
 
-    template : template
-        Template object.
+    return np.asarray(values, dtype=float).reshape(-1)
 
-    metadata : dict
-        Dictionary containing the metadata.
+def _fancy_data_label(NR_sim):
 
-    results : dict
-        Dictionary containing the results object.
+    l, m = NR_sim.l, NR_sim.m
+    if(NR_sim.waveform_type=='psi4'):
+        return r'\psi_{4,%d%d}'%(l,m)
+    return r'h_{%d%d}'%(l,m)
 
-    inference_model : inference_model
-        Nested sampling model object.
+def _fancy_tM_end(NR_sim, tM_end, tail_flag):
 
-    outdir : string
-        Output directory.
+    if(not(tail_flag) and not(NR_sim.waveform_type=='psi4') and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')):
+        return 80
+    if(NR_sim.waveform_type=='psi4'):
+        return 120
+    return tM_end
 
-    method : string
-        Method used to fit the waveform.
+def _model_waveform_quantiles(models_re_list, models_im_list, t_cut):
 
-    Returns
-    -------
+    t_cut    = _as_1d_float_array(t_cut)
+    model_re = np.asarray([_as_1d_float_array(model_re) for model_re in models_re_list], dtype=float)
+    model_im = np.asarray([_as_1d_float_array(model_im) for model_im in models_im_list], dtype=float)
 
-    Nothing.
+    model_amp, model_phi = waveform_utils.amp_phase_from_re_im(model_re, model_im)
+    model_f              = np.gradient(model_phi, t_cut, axis=-1)/(twopi)
 
-    """
-    plt.rcParams["mathtext.fontset"]  = "stix"
-    plt.rcParams["font.family"]       = "STIXGeneral"
-    plt.rcParams["font.size"]         = 14
-    plt.rcParams["legend.fontsize"]   = 12
-    plt.rcParams["xtick.labelsize"]   = 10
-    plt.rcParams["ytick.labelsize"]   = 10
-    plt.rcParams["xtick.major.size"]  = 3
-    plt.rcParams["xtick.minor.size"]  = 3
-    plt.rcParams["xtick.major.width"] = 1
-    plt.rcParams["xtick.minor.width"] = 1
-    plt.rcParams["ytick.major.size"]  = 3
-    plt.rcParams["ytick.minor.size"]  = 3
-    plt.rcParams["ytick.major.width"] = 1
-    plt.rcParams["ytick.minor.width"] = 1
+    quantiles = {}
+    for perc in [5, 50, 95]:
+        quantiles[perc] = {
+            'real': np.percentile(model_re , perc, axis=0),
+            'imag': np.percentile(model_im , perc, axis=0),
+            'amp' : np.percentile(model_amp, perc, axis=0),
+            'freq': np.percentile(model_f  , perc, axis=0),
+        }
 
-    t_peak =  NR_sim.t_peak
-    t_cut, tM_start, tM_end, NR_r_cut, NR_i_cut, NR_r_err_cut, NR_i_err_cut = NR_sim.t_NR_cut, NR_sim.tM_start, NR_sim.tM_end, NR_sim.NR_r_cut, NR_sim.NR_i_cut, np.real(NR_sim.NR_cpx_err_cut), np.imag(NR_sim.NR_cpx_err_cut)
+    return quantiles
 
-    l,m = NR_sim.l, NR_sim.m
+def _plot_series_with_band(ax, x, median, lower=None, upper=None, color='firebrick',
+                           label=None, lw=1.8, alpha=0.18, linestyle='-', semilogy=False):
 
-    lw_small = 0.1
-    lw_std   = 1.0
-    lw_large = 1.5
+    x      = _as_1d_float_array(x)
+    median = _as_1d_float_array(median)
 
-    if not(inference_model==None):
-
-        # Plot waveform reconstruction
-        if(method=='Nested-sampler'):
-            models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
-            models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
-
-    ###########################
-    # Waveform reconstruction #
-    ###########################
-
-    f, [ax1, ax2]   = plt.subplots(nrows = 2, ncols = 1, figsize=(4,7))
-
-    ax1.set_xlim([tM_start, tM_end])
-    ax2.set_xlim(ax1.get_xlim())
-
-    ax1.fill_between(t_cut - t_peak, -np.array(NR_r_err_cut), np.array(NR_r_err_cut), color = 'dimgray', alpha = 0.2, label = r'$\mathrm{Numerical Error} $')
-    ax2.fill_between(t_cut - t_peak, -np.array(NR_i_err_cut), np.array(NR_i_err_cut), color = 'dimgray', alpha = 0.2, label = r'$\mathrm{Numerical Error} $')
-
-    wf_r_m = np.percentile(np.array(models_re_list), [5], axis=0)[0]
-    wf_r   = np.percentile(np.array(models_re_list),[50], axis=0)[0]
-    wf_r_P = np.percentile(np.array(models_re_list),[95], axis=0)[0]
-
-    wf_i_m = np.percentile(np.array(models_im_list), [5], axis=0)[0]
-    wf_i   = np.percentile(np.array(models_im_list),[50], axis=0)[0]
-    wf_i_P = np.percentile(np.array(models_im_list),[95], axis=0)[0]
-
-    ax1.plot(t_cut - t_peak, wf_r - NR_r_cut, label=r'$\mathrm{Residual}$', c='firebrick', lw=lw_std)
-    ax2.plot(t_cut - t_peak, wf_i - NR_i_cut, c='firebrick', lw=lw_std)
-
-    ax1.fill_between(t_cut - t_peak, wf_r_m - NR_r_cut, wf_r_P - NR_r_cut, color = 'firebrick', alpha = 0.2)
-    ax2.fill_between(t_cut - t_peak, wf_i_m - NR_i_cut, wf_i_P - NR_i_cut, color = 'firebrick', alpha = 0.2)
-
-    ax1.legend(loc='best')
-    if(NR_sim.catalog == 'Teukolsky'):
-        ax1.set_ylabel(r'$\Re(\Psi_{4,%i%i})$'%(l,m))
-        ax2.set_ylabel(r'$\Im(\Psi_{4,%i%i})$'%(l,m))
+    if(semilogy):
+        ax.semilogy(x, median, c=color, lw=lw, label=label, ls=linestyle)
     else:
-        ax1.set_ylabel(r'$\Re(h_{%i%i})$'%(l,m))
-        ax2.set_ylabel(r'$\Im(h_{%i%i})$'%(l,m))
-    ax2.set_xlabel(r'$t/M$')
-    for ax in [ax1, ax2]: ax.set_xlim([tM_start, 80])
-    plt.suptitle('{}-{} residuals'.format(NR_sim.NR_catalog, NR_sim.NR_ID), size=28)
-    plt.tight_layout(rect=[0,0,1,0.95])
-    plt.savefig(os.path.join(outdir, 'Plots/Comparisons/Fancy_Residuals.pdf'), bbox_inches='tight')
+        ax.plot(x, median, c=color, lw=lw, label=label, ls=linestyle)
+
+    if(lower is None or upper is None):
+        return
+
+    lower = _as_1d_float_array(lower)
+    upper = _as_1d_float_array(upper)
+    band_low  = np.minimum(lower, upper)
+    band_high = np.maximum(lower, upper)
+
+    if(semilogy):
+        mask = (band_low > 0.0) & (band_high > 0.0) & np.isfinite(band_low) & np.isfinite(band_high)
+        if(np.any(mask)):
+            ax.fill_between(x[mask], band_low[mask], band_high[mask], color=color, alpha=alpha, lw=0)
+    else:
+        ax.fill_between(x, band_low, band_high, color=color, alpha=alpha, lw=0)
+
+def _copy_parameter_sample(sample):
+
+    if(isinstance(sample, dict)):
+        return sample.copy()
+    if(hasattr(sample, 'to_dict')):
+        return sample.to_dict()
+    if(hasattr(sample, 'dtype') and sample.dtype.names is not None):
+        return {name: sample[name] for name in sample.dtype.names}
+    try:
+        return sample.copy()
+    except AttributeError:
+        return sample
+
+def _sample_with_suppressed_tail(sample, template):
+
+    sample_qnm = _copy_parameter_sample(sample)
+    tail_modes = getattr(template, 'tail_modes', None) or [(2,2), (3,2)]
+
+    for mode in tail_modes:
+        try:
+            l_ring, m_ring = mode[:2]
+        except TypeError:
+            continue
+        try:
+            sample_qnm['ln_A_tail_{}{}'.format(l_ring, m_ring)] = np.log(1e-32)
+        except (TypeError, ValueError, IndexError):
+            pass
+
+    return sample_qnm
+
+def _model_component_lists_from_samples(samples, inference_model):
+
+    models_re_list = [np.real(np.array(inference_model.model(p))) for p in samples]
+    models_im_list = [np.imag(np.array(inference_model.model(p))) for p in samples]
+
+    return models_re_list, models_im_list
+
+def _scaled_amplitude(amp, t_rel, tau_rd_fundamental, tail_flag, extract_damping_time_flag):
+
+    if(not(tail_flag) and extract_damping_time_flag):
+        return amp*np.e**(t_rel/tau_rd_fundamental)
+    return amp
+
+def plot_fancy_residual(NR_sim, template, metadata, results, inference_model, outdir, method, tail_flag=False):
+
+    """
+
+    Plot model residuals against the NR error with the same content as the
+    standard residual plot, but using filled uncertainty bands.
+
+    """
+
+    if(inference_model is None):
+        return
+
+    _init_fancy_plotting()
+
+    t_peak = float(NR_sim.t_peak)
+    t_cut, tM_start, tM_end = _as_1d_float_array(NR_sim.t_NR_cut), float(NR_sim.tM_start), float(NR_sim.tM_end)
+    NR_r_cut, NR_i_cut      = _as_1d_float_array(NR_sim.NR_r_cut), _as_1d_float_array(NR_sim.NR_i_cut)
+    NR_r_err_cut            = _as_1d_float_array(np.real(NR_sim.NR_cpx_err_cut))
+    NR_i_err_cut            = _as_1d_float_array(np.imag(NR_sim.NR_cpx_err_cut))
+    NR_amp_cut, NR_f_cut    = _as_1d_float_array(NR_sim.NR_amp_cut), _as_1d_float_array(NR_sim.NR_freq_cut)
+    t_NR, NR_amp            = _as_1d_float_array(NR_sim.t_NR), _as_1d_float_array(NR_sim.NR_amp)
+    l, m                    = NR_sim.l, NR_sim.m
+
+    tM_end     = _fancy_tM_end(NR_sim, tM_end, tail_flag)
+    label_data = _fancy_data_label(NR_sim)
+    x_cut      = t_cut - t_peak
+
+    models_re_list, models_im_list = model_component_lists(results, inference_model, method)
+    quantiles = _model_waveform_quantiles(models_re_list, models_im_list, t_cut)
+    has_band  = len(models_re_list) > 1
+
+    color_model = '#cc0033'
+    color_error = '0.25'
+    lw_std      = 1.8
+
+    fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(11.5, 7.0), sharex='col')
+    ax1, ax2 = axs[0]
+    ax3, ax4 = axs[1]
+    _style_fancy_axes(axs)
+
+    for ax in np.ravel(axs):
+        ax.axhline(0.0, c='0.2', lw=0.8, alpha=0.65, ls=':')
+        ax.set_xlim([tM_start, tM_end])
+
+    ax1.fill_between(x_cut, -NR_r_err_cut, NR_r_err_cut,
+                     color=color_error, alpha=0.16, lw=0, label=r'$\mathrm{NR\ error}$')
+    ax3.fill_between(x_cut, -NR_i_err_cut, NR_i_err_cut,
+                     color=color_error, alpha=0.16, lw=0)
+
+    _plot_series_with_band(
+        ax1, x_cut,
+        quantiles[50]['real'] - NR_r_cut,
+        quantiles[5]['real']  - NR_r_cut if has_band else None,
+        quantiles[95]['real'] - NR_r_cut if has_band else None,
+        color=color_model, label=r'$\mathrm{%s - NR}$'%(template.wf_model), lw=lw_std
+    )
+    _plot_series_with_band(
+        ax2, x_cut,
+        quantiles[50]['amp'] - NR_amp_cut,
+        quantiles[5]['amp']  - NR_amp_cut if has_band else None,
+        quantiles[95]['amp'] - NR_amp_cut if has_band else None,
+        color=color_model, lw=lw_std
+    )
+    _plot_series_with_band(
+        ax3, x_cut,
+        quantiles[50]['imag'] - NR_i_cut,
+        quantiles[5]['imag']  - NR_i_cut if has_band else None,
+        quantiles[95]['imag'] - NR_i_cut if has_band else None,
+        color=color_model, lw=lw_std
+    )
+    _plot_series_with_band(
+        ax4, x_cut,
+        quantiles[50]['freq'] - NR_f_cut,
+        quantiles[5]['freq']  - NR_f_cut if has_band else None,
+        quantiles[95]['freq'] - NR_f_cut if has_band else None,
+        color=color_model, lw=lw_std
+    )
+
+    ax1.set_ylabel(r'$\Delta \mathrm{Re[%s]}$'%(label_data))
+    ax2.set_ylabel(r'$\Delta A_{%d%d}(t)$'%(l,m))
+    ax3.set_ylabel(r'$\Delta \mathrm{Im[%s]}$'%(label_data))
+    ax4.set_ylabel(r'$\Delta f_{%d%d}(t)$'%(l,m))
+    ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$')
+    ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$')
+
+    for ax in [ax1, ax3]:
+        handles, labels = ax.get_legend_handles_labels()
+        if(len(handles)>0):
+            ax.legend(loc='best')
+    fig.suptitle('{}-{} residuals'.format(NR_sim.NR_catalog, NR_sim.NR_ID), size=26)
+    fig.tight_layout(rect=[0,0,1,0.94])
+    fig.subplots_adjust(hspace=0.05, wspace=0.37)
+
+    leg_name_tail = '_tail' if tail_flag else ''
+    fig.savefig(os.path.join(outdir, f'Plots/Comparisons/Residuals_reconstruction{leg_name_tail}.pdf'), bbox_inches='tight')
+    plt.close(fig)
+
+    if(tail_flag):
+        positive_NR  = (t_NR  - t_peak) > 0
+        positive_cut = (t_cut - t_peak) > 0
+
+        if(np.any(positive_NR) and np.any(positive_cut)):
+            fig_decay, ax_decay = plt.subplots(figsize=(6.0, 5.2))
+            _style_fancy_axes([ax_decay])
+
+            log_t_NR         = np.log(t_NR[positive_NR] - t_peak)
+            log_t_cut        = np.log(t_cut[positive_cut] - t_peak)
+            log_A_NR         = np.log(np.clip(NR_amp[positive_NR], np.finfo(float).tiny, None))
+            dlog_A_NR_dlog_t = utils.diff1(log_t_NR, log_A_NR)
+
+            def decay_rate(amp):
+                log_A_wf = np.log(np.clip(amp[positive_cut], np.finfo(float).tiny, None))
+                return utils.diff1(log_t_cut, log_A_wf)
+
+            p_mid = decay_rate(quantiles[50]['amp'])
+            ax_decay.plot(t_cut[positive_cut] - t_peak, p_mid, c=color_model, lw=lw_std, label=r'$\mathrm{%s}$'%(template.wf_model))
+
+            if(has_band):
+                p_low  = decay_rate(quantiles[5]['amp'])
+                p_high = decay_rate(quantiles[95]['amp'])
+                ax_decay.fill_between(t_cut[positive_cut] - t_peak, np.minimum(p_low, p_high), np.maximum(p_low, p_high),
+                                      color=color_model, alpha=0.18, lw=0)
+
+            ax_decay.axhline(0.0 , c='k',              ls='--', lw=0.7)
+            ax_decay.axhline(-1.0, c='mediumseagreen', ls='--', label='Okuzumi+',  lw=1.2)
+            ax_decay.axhline(-1.3, c='crimson',        ls='--', label='Albanesi+', lw=1.7)
+            ax_decay.plot(t_NR[positive_NR] - t_peak, dlog_A_NR_dlog_t, c='k', lw=1.5, alpha=0.8, label=r'$\mathrm{NR}$')
+            ax_decay.set_xlim([75, 100])
+            ax_decay.set_ylim([-3.4, 1.5])
+            ax_decay.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$')
+            ax_decay.set_ylabel(r'$\mathrm{p}$')
+            ax_decay.legend(loc='best')
+            fig_decay.tight_layout()
+            fig_decay.savefig(os.path.join(outdir, 'Plots/Comparisons/Decay_rate.pdf'), bbox_inches='tight')
+            plt.close(fig_decay)
 
     return
 
-def plot_fancy_reconstruction(NR_sim, template, metadata, results, inference_model, outdir, method):
+def plot_fancy_reconstruction(NR_sim, template, metadata, results, inference_model, outdir, method,
+                              tail_flag=False, extract_damping_time_flag=False):
 
     """
 
-    Plot the NR waveform and its reconstruction
-
-    Parameters
-    ----------
-
-    NR_sim : NR_sim
-        NR simulation object.
-
-    template : template
-        Template object.
-
-    metadata : dict
-        Dictionary containing the metadata.
-
-    results : dict
-        Dictionary containing the results object.
-
-    inference_model : inference_model
-        Nested sampling model object.
-
-    outdir : string
-        Output directory.
-
-    method : string
-        Method used to fit the waveform.
-
-    Returns
-    -------
-
-    Nothing.
+    Plot the NR waveform and its reconstruction with the same content as the
+    standard reconstruction plot, but using filled uncertainty bands.
 
     """
-    plt.rcParams["mathtext.fontset"] = "stix"
-    plt.rcParams["font.family"] = "STIXGeneral"
-    plt.rcParams["font.size"] = 14
-    plt.rcParams["legend.fontsize"] = 12
-    plt.rcParams["xtick.labelsize"] = 10
-    plt.rcParams["ytick.labelsize"] = 10
-    plt.rcParams["xtick.major.size"] = 3
-    plt.rcParams["xtick.minor.size"] = 3
-    plt.rcParams["xtick.major.width"] = 1
-    plt.rcParams["xtick.minor.width"] = 1
-    plt.rcParams["ytick.major.size"] = 3
-    plt.rcParams["ytick.minor.size"] = 3
-    plt.rcParams["ytick.major.width"] = 1
-    plt.rcParams["ytick.minor.width"] = 1
 
-    NR_r, NR_i, NR_r_err, NR_i_err, NR_amp, NR_f, t_NR, t_peak                                                = NR_sim.NR_r, NR_sim.NR_i, np.real(NR_sim.NR_err_cmplx), np.imag(NR_sim.NR_err_cmplx), NR_sim.NR_amp, NR_sim.NR_freq, NR_sim.t_NR, NR_sim.t_peak
-    t_cut, tM_start, tM_end, NR_r_cut, NR_i_cut, NR_r_err_cut, NR_i_err_cut, NR_amp_cut, NR_phi_cut, NR_f_cut = NR_sim.t_NR_cut, NR_sim.tM_start, NR_sim.tM_end, NR_sim.NR_r_cut, NR_sim.NR_i_cut, np.real(NR_sim.NR_cpx_err_cut), np.imag(NR_sim.NR_cpx_err_cut), NR_sim.NR_amp_cut, NR_sim.NR_phi_cut, NR_sim.NR_freq_cut
+    _init_fancy_plotting()
 
-    l,m = NR_sim.l, NR_sim.m
+    NR_r, NR_i = _as_1d_float_array(NR_sim.NR_r), _as_1d_float_array(NR_sim.NR_i)
+    NR_amp     = _as_1d_float_array(NR_sim.NR_amp)
+    NR_f       = _as_1d_float_array(NR_sim.NR_freq)
+    t_NR       = _as_1d_float_array(NR_sim.t_NR)
+    t_peak     = float(NR_sim.t_peak)
+    t_cut, tM_start, tM_end = _as_1d_float_array(NR_sim.t_NR_cut), float(NR_sim.tM_start), float(NR_sim.tM_end)
+    NR_r_cut, NR_i_cut      = _as_1d_float_array(NR_sim.NR_r_cut), _as_1d_float_array(NR_sim.NR_i_cut)
+    NR_r_err_cut            = _as_1d_float_array(np.real(NR_sim.NR_cpx_err_cut))
+    NR_i_err_cut            = _as_1d_float_array(np.imag(NR_sim.NR_cpx_err_cut))
 
-    f_rd_fundamental = template.qnm_cached[(2,l,m,0)]['f']
+    l, m       = NR_sim.l, NR_sim.m
+    label_data = _fancy_data_label(NR_sim)
+    tM_end     = _fancy_tM_end(NR_sim, tM_end, tail_flag)
 
+    f_rd_fundamental   = template.qnm_cached[(2,l,m,0)]['f']
+    tau_rd_fundamental = template.qnm_cached[(2,l,m,0)]['tau']
+
+    plot_overtones_flag = 0
+    f_rd_overtones      = {}
     try:
-        m1, m2, chi1, chi2 = metadata['m1'], metadata['m2'], metadata['chi1'], metadata['chi2'],
-        f_peak             = utils.F_mrg_Nagar(m1, m2, chi1, chi2) * (G_SI*C_SI**(-3))
-    except:
-        f_peak             = None
+        for n in [1,3,7,9]:
+            omega_n, _, _     = qnm.modes_cache(s=-2,l=l,m=m,n=n)(a=np.abs(metadata['af']))
+            f_rd_overtones[n] = (np.real(omega_n) / metadata['Mf']) * (1./twopi)
+    except Exception:
+        f_rd_overtones = {}
 
-    lw_small = 0.1
-    lw_std   = 1.0
-    lw_large = 1.2
+    amp_peak = NR_amp[np.argmin(np.abs(t_NR - t_peak))]
+    x_NR     = t_NR  - t_peak
+    x_cut    = t_cut - t_peak
 
-    if not(inference_model==None):
+    color_NR      = 'k'
+    color_model   = '#cc0033'
+    color_qnm     = 'royalblue'
+    color_t_start = 'mediumseagreen'
+    color_t_peak  = 'royalblue'
+    color_f_overt = 'darkorange'
+    color_f_ring  = 'royalblue' if tail_flag else 'forestgreen'
 
-        # Plot waveform reconstruction
-        if(method=='Nested-sampler'):
-            models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
-            models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
+    lw_NR    = 1.8
+    lw_model = 2.0
+    ls_t     = '--'
+    ls_f     = '--'
 
-    f, [ax1, ax2]   = plt.subplots(nrows = 2, ncols = 1, figsize=(4,7))
+    if(tail_flag):
+        fig, (ax2, ax4) = plt.subplots(nrows=2, ncols=1, figsize=(7.2, 8.0), sharex=True)
+        axes = [ax2, ax4]
+    else:
+        fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(10.8, 7.2))
+        ax1, ax2 = axs[0]
+        ax3, ax4 = axs[1]
+        axes = np.ravel(axs)
 
-    ax1.set_xlim([-10, tM_end])
-    ax2.set_xlim(ax1.get_xlim())
+    _style_fancy_axes(axes)
 
-    ax1.plot(t_NR - t_peak, NR_r, color = 'black', label = r'$\mathrm{Numerical Data} $', lw = lw_large)
-    ax2.plot(t_NR - t_peak, NR_i, color = 'black', lw = lw_large)
-    
-    wf_r =  np.percentile(np.array(models_re_list),[50], axis=0)[0]
-    wf_i =  np.percentile(np.array(models_im_list),[50], axis=0)[0]
+    if not(tail_flag):
+        ax1.plot(x_NR, NR_r, c=color_NR, lw=lw_NR, label=r'$\mathrm{NR}$')
+        ax3.plot(x_NR, NR_i, c=color_NR, lw=lw_NR)
+        ax1.fill_between(x_cut, NR_r_cut - NR_r_err_cut, NR_r_cut + NR_r_err_cut,
+                         color=color_NR, alpha=0.10, lw=0)
+        ax3.fill_between(x_cut, NR_i_cut - NR_i_err_cut, NR_i_cut + NR_i_err_cut,
+                         color=color_NR, alpha=0.10, lw=0)
 
-    wf_r_m = np.percentile(np.array(models_re_list),[5], axis=0)[0]
-    wf_r_P = np.percentile(np.array(models_re_list),[95], axis=0)[0]
+        ax1.axvline(tM_start, c=color_t_start, lw=1.5, alpha=1.0, ls=ls_t)
+        ax1.axvline(0.0, label=r'$t_{\rm peak}$', c=color_t_peak, lw=1.5, alpha=1.0, ls=ls_t)
+        ax3.axvline(tM_start, label=r'$t_{\rm start} = t_{\rm peak} \, + %d \mathrm{M}$'%tM_start,
+                    c=color_t_start, lw=1.5, alpha=1.0, ls=ls_t)
+        ax3.axvline(0.0, c=color_t_peak, lw=1.5, alpha=1.0, ls=ls_t)
 
-    wf_i_m = np.percentile(np.array(models_im_list),[5], axis=0)[0]
-    wf_i_P = np.percentile(np.array(models_im_list),[95], axis=0)[0]
+        ax1.set_xlim([-10, tM_end])
+        ax3.set_xlim(ax1.get_xlim())
+        ax1.set_ylabel(r'$\mathrm{Re[%s]}$'%(label_data))
+        ax3.set_ylabel(r'$\mathrm{Im[%s]}$'%(label_data))
+        ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$')
 
-    ax1.plot(t_cut - t_peak, wf_r, label=r'$\mathrm{Reconstruction}$', c='firebrick', lw=lw_std)
-    ax2.plot(t_cut - t_peak, wf_i, c='firebrick', lw=lw_std)
+    NR_amp_plot = _scaled_amplitude(NR_amp, x_NR, tau_rd_fundamental, tail_flag, extract_damping_time_flag)
+    ax2.semilogy(x_NR, NR_amp_plot, label=r'$\mathrm{NR}$', c=color_NR, lw=lw_NR)
+    ax2.axvline(tM_start, c=color_t_start, lw=1.5, alpha=1.0, ls=ls_t)
+    if not(tail_flag):
+        ax2.axvline(0.0, c=color_t_peak, lw=1.5, alpha=1.0, ls=ls_t)
 
-    ax1.fill_between(t_cut - t_peak, wf_r_m , wf_r_P, color = 'firebrick', alpha = 0.2)
-    ax2.fill_between(t_cut - t_peak, wf_i_m , wf_i_P, color = 'firebrick', alpha = 0.2)
+    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')):
+        if(extract_damping_time_flag):
+            ax2.set_ylim([1e-1*amp_peak, 10*amp_peak])
+        else:
+            ax2.set_ylim([1e-3*amp_peak, 2*amp_peak])
+    elif(tail_flag and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')):
+        ax2.set_ylim([2*1e-4, 2*np.max(NR_amp)])
 
-    for ax in [ax1, ax2]:
-        ax.axvline(tM_start,           label=r'$t_{\rm start} = t_{\rm peak} + $' + rf'${np.round(tM_start)}M$', c='darkgreen', lw=lw_large, alpha=1.0, ls=':' )
-        ax.axvline(0.0,                label=r'$t_{\rm peak}$',                                               c='k',         lw=lw_large, alpha=1.0, ls='--')
+    ax4.plot(x_NR, NR_f, c=color_NR, lw=lw_NR, label=r'$\mathrm{NR}$')
+    ax4.axhline(f_rd_fundamental, label=r'$\mathit{f_{%d%d0}}$'%(l,m), c=color_f_ring, lw=1.5, ls=ls_f)
+    if(plot_overtones_flag):
+        for n in [1,3,9]:
+            if(n in f_rd_overtones):
+                leg = r'$\mathit{f_{%d%dn}}$'%(l,m) if n==1 else None
+                ax4.axhline(f_rd_overtones[n], label=leg, c=color_f_overt, lw=0.8, ls=ls_f)
 
-    ax1.legend(loc='best', fontsize= 11)
-    ax1.set_ylabel(r'$\Re(\Psi_4)$')
-    ax2.set_ylabel(r'$\Im(\Psi_4)$')
-    ax2.set_xlabel(r'$t/M$')
-    for ax in [ax1, ax2]:   ax.set_xlim([-10, 80])
-    # plt.suptitle('SXS:BBH:{} (residuals)'.format(NR_sim.NR_ID), size=24)
-    plt.tight_layout(rect=[0,0,1,0.95])
-    plt.savefig(os.path.join(outdir, 'Plots/Comparisons/Fancy_Reconstruction.pdf'), bbox_inches='tight')
+    if(tail_flag):
+        ax4.axhline(0.0, label=r'$\mathit{f_{\rm tail}}$', c=color_model, lw=1.5, ls=ls_t)
+        ax4.axvline(tM_start, label=r'$\mathrm{t_{start} = t_{peak} \, + %d M}$'%tM_start,
+                    c=color_t_start, lw=1.5, alpha=1.0, ls=ls_t)
+        ax4.axvline(0.0, c=color_t_peak, lw=1.5, alpha=1.0, ls=ls_t)
+    else:
+        ax4.axvline(0.0, c=color_t_peak, lw=1.5, alpha=1.0, ls=ls_t)
+
+    ax2.set_xlim([-10, tM_end])
+    ax4.set_xlim(ax2.get_xlim())
+    ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$')
+
+    t_peak_idx = np.argmin(np.abs(t_NR - t_peak))
+    if not(tail_flag):
+        try:
+            ax4.set_ylim([-1.5*NR_f[t_peak_idx], 3.5*NR_f[t_peak_idx]])
+        except Exception:
+            pass
+    else:
+        ax4.set_ylim([-0.08, 0.28])
+
+    if(inference_model is not None):
+        models_re_list, models_im_list = model_component_lists(results, inference_model, method)
+        quantiles = _model_waveform_quantiles(models_re_list, models_im_list, t_cut)
+        has_band  = len(models_re_list) > 1
+
+        model_label = r'$\mathrm{%s}$'%(template.wf_model)
+        amp_50 = _scaled_amplitude(quantiles[50]['amp'], x_cut, tau_rd_fundamental, tail_flag, extract_damping_time_flag)
+        amp_5  = _scaled_amplitude(quantiles[5]['amp'] , x_cut, tau_rd_fundamental, tail_flag, extract_damping_time_flag) if has_band else None
+        amp_95 = _scaled_amplitude(quantiles[95]['amp'], x_cut, tau_rd_fundamental, tail_flag, extract_damping_time_flag) if has_band else None
+
+        if not(tail_flag):
+            _plot_series_with_band(ax1, x_cut, quantiles[50]['real'],
+                                   quantiles[5]['real'] if has_band else None,
+                                   quantiles[95]['real'] if has_band else None,
+                                   color=color_model, label=model_label, lw=lw_model)
+            _plot_series_with_band(ax3, x_cut, quantiles[50]['imag'],
+                                   quantiles[5]['imag'] if has_band else None,
+                                   quantiles[95]['imag'] if has_band else None,
+                                   color=color_model, lw=lw_model)
+
+        _plot_series_with_band(ax2, x_cut, amp_50, amp_5, amp_95,
+                               color=color_model, label=model_label, lw=lw_model, semilogy=True)
+        _plot_series_with_band(ax4, x_cut, quantiles[50]['freq'],
+                               quantiles[5]['freq'] if has_band else None,
+                               quantiles[95]['freq'] if has_band else None,
+                               color=color_model, lw=lw_model)
+
+        if(tail_flag):
+            qnm_samples = [_sample_with_suppressed_tail(sample, template) for sample in waveform_parameter_samples(results, method)]
+            models_re_qnm, models_im_qnm = _model_component_lists_from_samples(qnm_samples, inference_model)
+            qnm_quantiles = _model_waveform_quantiles(models_re_qnm, models_im_qnm, t_cut)
+            qnm_has_band  = len(models_re_qnm) > 1
+
+            _plot_series_with_band(ax2, x_cut, qnm_quantiles[50]['amp'],
+                                   qnm_quantiles[5]['amp'] if qnm_has_band else None,
+                                   qnm_quantiles[95]['amp'] if qnm_has_band else None,
+                                   color=color_qnm, label=r'$\mathrm{%s \,\, QNMs}$'%(template.wf_model),
+                                   lw=lw_model, semilogy=True)
+            _plot_series_with_band(ax4, x_cut, qnm_quantiles[50]['freq'],
+                                   qnm_quantiles[5]['freq'] if qnm_has_band else None,
+                                   qnm_quantiles[95]['freq'] if qnm_has_band else None,
+                                   color=color_qnm, lw=lw_model)
+
+    if(extract_damping_time_flag and not(tail_flag)):
+        ax2.set_ylabel(r'$\mathit{A_{%d%d}(t)} \cdot e^{t/\tau_{%d%d0}}$'%(l,m,l,m))
+    else:
+        ax2.set_ylabel(r'$\mathit{A_{%d%d}(t)}$'%(l,m))
+    ax4.set_ylabel(r'$\mathit{f_{%d%d}\,(t)}$'%(l,m))
+
+    for ax in axes:
+        handles, labels = ax.get_legend_handles_labels()
+        if(len(handles)>0):
+            ax.legend(loc='best')
+
+    if not(tail_flag):
+        ax1.set_xticklabels([])
+        ax2.set_xticklabels([])
+        fig.suptitle('{}-{}'.format(NR_sim.NR_catalog, NR_sim.NR_ID), size=26)
+
+    fig.tight_layout(rect=[0,0,1,0.94] if not(tail_flag) else [0,0,1,1])
+    fig.subplots_adjust(hspace=0.05, wspace=0.27)
+
+    leg_name_tail = '_tail' if tail_flag else ''
+    fig.savefig(os.path.join(outdir, f'Plots/Comparisons/Waveform_reconstruction{leg_name_tail}.pdf'), bbox_inches='tight')
+    plt.close(fig)
 
     return
 
