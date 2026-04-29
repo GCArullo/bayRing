@@ -8,17 +8,15 @@ The `quick` files shows how to obtain quick and dirty results (decreasing the va
 
 `bayRing --config-file config_SXS_0305_Kerr_220_quick.ini`
 
-The corresponding minimisation example can be run with:
+The corresponding minimization example can be run with:
 
-`bayRing --config-file config_SXS_0305_Kerr_220_minimisation.ini`
+`bayRing --config-file config_SXS_0305_Kerr_220_minimization.ini`
 
-This file documents the minimisation-specific settings. Note that the accepted configuration value is `method = Minimization`.
+This file documents the minimization-specific settings. Note that the accepted configuration value is `method = Minimization`.
 
 The corresponding linear-inversion example can be run with:
 
 `bayRing --config-file config_SXS_0305_Kerr_220_linear_inversion.ini`
-
-The accepted configuration value is `method = Linear-inversion`.
 
 The other files instead use default priors (very broad), a large chunk of the time axis, the full NR error and conservative sampler settings useful when exploring a high-dimensional parameter space.
 

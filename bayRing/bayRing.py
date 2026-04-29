@@ -181,9 +181,9 @@ def main():
     tail_flag = wf_model.wf_model=='Kerr' and wf_model.tail==1
     # Plot and terminate execution if plotting only.
     if(parameters['I/O']['run-type']=='plot-NR-only'): 
-        postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, tail_flag, parameters['I/O']['extract-damping-time-flag'])
+        postprocess.plot_fancy_reconstruction(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, tail_flag, parameters['I/O']['extract-damping-time-flag'])
         # In case a tail run is selected, do plots also without tail format
-        if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, False, parameters['I/O']['extract-damping-time-flag'])
+        if(tail_flag): postprocess.plot_fancy_reconstruction(NR_sim, wf_model, NR_metadata, None, None, parameters['I/O']['outdir'], None, False, parameters['I/O']['extract-damping-time-flag'])
         print('\n* NR-only plotting run-type selected. Exiting.\n')
         exit()
 
@@ -199,10 +199,7 @@ def main():
 
     if parameters['I/O']['run-type']=='full':
         import pickle
-        if(inference.is_point_estimate_method(parameters['Inference']['method'])):
-            model_samples = [np.array(inference_model.model(results_object))]
-        else:
-            model_samples = [np.array(inference_model.model(p)) for p in results_object]
+        model_samples = [np.array(inference_model.model(p)) for p in postprocess.waveform_parameter_samples(results_object, parameters['Inference']['method'])]
         with open(os.path.join(parameters['I/O']['outdir'], 'NR_sim.pkl'), 'wb') as f:
             pickle.dump([NR_sim, model_samples, wf_model], f)
         
@@ -219,9 +216,6 @@ def main():
     pyRing_utils.print_subsection('Waveform metrics')
     postprocess.l2norm_residual_vs_nr(results_object, inference_model, NR_sim, parameters['I/O']['outdir'])
 
-    # postprocess.plot_fancy_residual(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'])
-    # postprocess.plot_fancy_reconstruction(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], method)
-
     # Not needed now that we define everything directly at the peak.
     # if(parameters['Model']['template']=='Kerr'): postprocess.post_process_amplitudes(parameters['Inference']['t-start'], results_object, NR_metadata, qnm_cached, Kerr_modes, Kerr_quad_modes, parameters['I/O']['outdir'])
     if(parameters['NR-data']['catalog']=='C2EFT' and 'Damped-sinusoids' in parameters['Model']['template']): postprocess.compare_with_GR_QNMs(results_object, qnm_cached, NR_sim, parameters['I/O']['outdir'])
@@ -237,9 +231,12 @@ def main():
         print('* Execution time (min): {:.2f}\n'.format(execution_time))
 
     try   : 
-        postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], tail_flag, parameters['I/O']['extract-damping-time-flag']) 
+        postprocess.plot_fancy_reconstruction(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], tail_flag, parameters['I/O']['extract-damping-time-flag'])
+        postprocess.plot_fancy_residual(      NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], tail_flag)
         # In case a tail run is selected, do plots also without tail format
-        if(tail_flag): postprocess.plot_NR_vs_model(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], False, parameters['I/O']['extract-damping-time-flag'])
+        if(tail_flag):
+            postprocess.plot_fancy_reconstruction(NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], False, parameters['I/O']['extract-damping-time-flag'])
+            postprocess.plot_fancy_residual(      NR_sim, wf_model, NR_metadata, results_object, inference_model, parameters['I/O']['outdir'], parameters['Inference']['method'], False)
     except Exception as e:
         print(f"Waveform reconstruction plot failed with error: {e}")
         traceback.print_exc()    

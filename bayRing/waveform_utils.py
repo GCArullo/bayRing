@@ -153,9 +153,9 @@ def align_waveforms_with_mismatch(t_NR, NR_amp, NR_phi, t_2, NR_r_2, NR_i_2, t_m
     NR_amp_2, NR_phi_2               = amp_phase_from_re_im(NR_r_2, NR_i_2)
     NR_amp_2_interp, NR_phi_2_interp = interp1d(t_2, NR_amp_2, fill_value=0.0, bounds_error=False), interp1d(t_2, NR_phi_2, fill_value=0.0, bounds_error=False)
     
-    # Initial guess (used in the minimisation algorithm) of dephasing between different resolutions/extrapolation orders. Will use 0 for deltaT
+    # Initial guess (used in the minimization algorithm) of dephasing between different resolutions/extrapolation orders. Will use 0 for deltaT
     rough_deltaPhi_estimate_2        = NR_phi_interp(t_min_mismatch) - NR_phi_2_interp(t_min_mismatch)
-    # Get deltaT and deltaPhi for alignment by minimising the mismatch.
+    # Get deltaT and deltaPhi for alignment by minimizing the mismatch.
     # THE DOCUMENTATION OF THIS FUNCTION SUCKS SO BADLY. To get the actual value of the mismatch, need to add: `full_output=True, disp=False)[1]` at the end of the line.
     deltaT_2, deltaPhi_2             = fmin(mismatch_waveforms, np.array([0.,rough_deltaPhi_estimate_2]), args=(t_NR, NR_amp_interp, NR_amp_2_interp, NR_phi_interp, NR_phi_2_interp, t_min_mismatch, t_max_mismatch), ftol=1e-15)
     

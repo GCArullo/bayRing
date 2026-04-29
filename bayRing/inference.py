@@ -20,6 +20,59 @@ point_estimate_methods   = ['Minimization'] + linear_inversion_methods
 _DYNAMIC_INFERENCE_MODEL_PREFIX  = 'DynamicInferenceModel_'
 _DYNAMIC_INFERENCE_MODEL_CLASSES = {}
 
+def _regularized_symmetric_inverse(matrix, eigenvalue_tol=None):
+
+    matrix = np.asarray(matrix, dtype=float)
+    matrix = 0.5*(matrix + matrix.T)
+
+    eigvals, eigvecs = np.linalg.eigh(matrix)
+
+    if eigenvalue_tol is None:
+        max_eig = np.max(np.abs(eigvals)) if len(eigvals)>0 else 0.0
+        eigenvalue_tol = np.finfo(float).eps * max(matrix.shape) * max(max_eig, 1.0)
+
+    eigvals_regularized = np.maximum(eigvals, eigenvalue_tol)
+    inverse = np.dot(eigvecs/eigvals_regularized, eigvecs.T)
+
+    return inverse, eigvals, eigvals_regularized
+
+def _errors_from_covariance(names, covariance):
+
+    diagonal = np.diag(covariance)
+    errors   = np.sqrt(np.maximum(diagonal, 0.0))
+
+    return dict(zip(names, errors))
+
+def estimate_least_squares_parameter_errors(names, least_squares_result, eigenvalue_tol=None):
+
+    """
+
+    Estimate one-sigma parameter errors from a scipy least_squares result.
+
+    The minimization residuals are already weighted by the configured data
+    errors, so the local covariance estimate is the inverse weighted Fisher
+    matrix J^T J. This is the nonlinear analogue of the linear-inversion
+    covariance used below.
+
+    """
+
+    if not(hasattr(least_squares_result, 'jac')):
+        raise ValueError("Cannot estimate minimization errors because the least_squares result has no Jacobian.")
+
+    jacobian = np.asarray(least_squares_result.jac, dtype=float)
+    if jacobian.ndim != 2 or jacobian.shape[1] != len(names):
+        raise ValueError(
+            "Cannot estimate minimization errors from a Jacobian with shape {} for {} parameters.".format(
+                jacobian.shape, len(names)
+            )
+        )
+
+    fisher = np.dot(jacobian.T, jacobian)
+    covariance, eigvals, eigvals_regularized = _regularized_symmetric_inverse(fisher, eigenvalue_tol=eigenvalue_tol)
+    errors = _errors_from_covariance(names, covariance)
+
+    return errors, covariance, eigvals, eigvals_regularized
+
 def _base_class_descriptor(base):
 
     return '{}:{}'.format(base.__module__, base.__qualname__)
@@ -737,6 +790,9 @@ class Minimization_Algorithm():
         self.bounds_minim    = (np.array([self.bounds[i][0] for i in range(len(self.bounds))]), np.array([self.bounds[i][1] for i in range(len(self.bounds))]))
 
         self.start_values = self._initial_points()
+        self.best_result  = None
+        self.errors       = {}
+        self.covariance   = None
 
     def _least_squares_method(self, requested_method):
 
@@ -796,7 +852,21 @@ class Minimization_Algorithm():
         if not(best_result.success):
             print("* Warning: best minimization result did not satisfy scipy's convergence criterion: {}".format(best_result.message))
 
+        self.best_result = best_result
+        self._estimate_parameter_errors()
+
         return best_result.x
+
+    def _estimate_parameter_errors(self):
+
+        try:
+            self.errors, self.covariance, eigvals, eigvals_regularized = estimate_least_squares_parameter_errors(self.names, self.best_result)
+            print("* Minimized Fisher eigenvalue range before regularization: [{:.12e}, {:.12e}]".format(np.min(eigvals), np.max(eigvals)))
+            print("* Minimized Fisher condition after regularization: {:.12e}".format(np.max(eigvals_regularized)/np.min(eigvals_regularized)))
+        except Exception as exc:
+            self.errors     = dict((name, np.nan) for name in self.names)
+            self.covariance = None
+            print("* Warning: minimization error estimate failed: {}".format(exc))
 
 class KerrLinearInversion_Algorithm():
       
@@ -807,6 +877,8 @@ class KerrLinearInversion_Algorithm():
         self.name_set        = set(self.names)
         self.fixed_params    = inference_model.fixed_params
         self.eigenvalue_tol  = parameters['Inference']['linear-inversion-eigenvalue-tol']
+        self.errors          = {}
+        self.covariance      = None
 
         self._validate_model()
         self.solve_components, self.fixed_components = self._classify_linear_components()
@@ -1006,11 +1078,33 @@ class KerrLinearInversion_Algorithm():
 
     def _regularized_inverse(self, matrix):
 
-        eigvals, eigvecs = np.linalg.eigh(matrix)
-        eigvals_regularized = np.maximum(eigvals, self.eigenvalue_tol)
-        inverse = np.dot(eigvecs/eigvals_regularized, eigvecs.T)
+        return _regularized_symmetric_inverse(matrix, eigenvalue_tol=self.eigenvalue_tol)
 
-        return inverse, eigvals, eigvals_regularized
+    def _parameter_covariance(self, linear_solution, cartesian_covariance):
+
+        transform = np.zeros((len(self.names), len(linear_solution)))
+        name_indices = dict((name, i) for i, name in enumerate(self.names))
+
+        for i, component in enumerate(self.solve_components):
+            real_index = 2*i
+            imag_index = real_index + 1
+
+            amplitude_real = linear_solution[real_index]
+            amplitude_imag = linear_solution[imag_index]
+            amplitude_norm_squared = max(amplitude_real**2 + amplitude_imag**2, 1e-300)
+
+            ln_A_index = name_indices[component['ln_A_name']]
+            phi_index  = name_indices[component['phi_name']]
+
+            transform[ln_A_index, real_index] =  amplitude_real/amplitude_norm_squared
+            transform[ln_A_index, imag_index] =  amplitude_imag/amplitude_norm_squared
+            transform[phi_index , real_index] = -amplitude_imag/amplitude_norm_squared
+            transform[phi_index , imag_index] =  amplitude_real/amplitude_norm_squared
+
+        covariance = np.dot(transform, np.dot(cartesian_covariance, transform.T))
+        covariance = 0.5*(covariance + covariance.T)
+
+        return covariance
 
     def solve_likelihood(self):
 
@@ -1034,6 +1128,9 @@ class KerrLinearInversion_Algorithm():
         print("* Fisher eigenvalue tolerance: {:.12e}".format(self.eigenvalue_tol))
         print("* Fisher condition after regularization: {:.12e}".format(np.max(eigvals_regularized)/np.min(eigvals_regularized)))
 
+        self.covariance = self._parameter_covariance(linear_solution, fisher_inv)
+        self.errors     = _errors_from_covariance(self.names, self.covariance)
+
         results = {}
         for i, component in enumerate(self.solve_components):
             complex_amplitude = linear_solution[2*i] + 1j*linear_solution[2*i+1]
@@ -1051,8 +1148,10 @@ def run_inference(parameters, inference_model):
         minimization         = Minimization_Algorithm(inference_model, parameters)
         minimization_results = minimization.minimize_likelihood()
         
-        results_object = dict(zip(inference_model.names, minimization_results))
-        postprocess.save_results_minimization(results_object, parameters['I/O']['outdir'])
+        point_estimate = dict(zip(inference_model.names, minimization_results))
+        postprocess.save_point_estimates(point_estimate, parameters['I/O']['outdir'], errors=minimization.errors)
+        postprocess.save_point_estimate_posterior(point_estimate, parameters['I/O']['outdir'], covariance=minimization.covariance, errors=minimization.errors, seed=parameters['Inference']['seed'])
+        results_object = postprocess.read_posterior_samples(parameters['I/O']['outdir'])
 
     elif(is_linear_inversion_method(parameters['Inference']['method'])):
 
@@ -1061,8 +1160,10 @@ def run_inference(parameters, inference_model):
         linear_inversion         = KerrLinearInversion_Algorithm(inference_model, parameters)
         linear_inversion_results = linear_inversion.solve_likelihood()
         
-        results_object = dict(zip(inference_model.names, linear_inversion_results))
-        postprocess.save_results_minimization(results_object, parameters['I/O']['outdir'])
+        point_estimate = dict(zip(inference_model.names, linear_inversion_results))
+        postprocess.save_point_estimates(point_estimate, parameters['I/O']['outdir'], errors=linear_inversion.errors)
+        postprocess.save_point_estimate_posterior(point_estimate, parameters['I/O']['outdir'], covariance=linear_inversion.covariance, errors=linear_inversion.errors, seed=parameters['Inference']['seed'])
+        results_object = postprocess.read_posterior_samples(parameters['I/O']['outdir'])
 
     elif(parameters['Inference']['method'] == 'Nested-sampler'):
         

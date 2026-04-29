@@ -790,7 +790,7 @@ class NR_simulation():
                 try              : 
                     if(self.res_level-counter==0): raise ValueError("Only a single resolution available.")
                     t_res, NR_r_res, NR_i_res = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level-counter)
-                    print('\n* Resolution error constructed with resolution level {}'.format(self.res_level-counter))
+                    print('* Resolution error constructed with resolution level {}'.format(self.res_level-counter))
                     counter = 0
                 except ValueError: 
                     counter += 1
@@ -866,7 +866,7 @@ class NR_simulation():
 
             else:
 
-                # Align the waveforms minimising the mismatch over a [t_min, t_max] interval.
+                # Align the waveforms minimizing the mismatch over a [t_min, t_max] interval.
                 if('align-with-mismatch' in NR_error):
                     
                     # Resolution error. 
@@ -912,7 +912,7 @@ class NR_simulation():
 
             else:
 
-                # Align the waveforms minimising the mismatch over a [t_min, t_max] interval.
+                # Align the waveforms minimizing the mismatch over a [t_min, t_max] interval.
                 if('align-with-mismatch' in NR_error):
                     
                     # Resolution error.
@@ -983,7 +983,7 @@ class NR_simulation():
                 error_value                = float(NR_error.split('-')[-1])
                 self.NR_err_cmplx          = self.generate_constant_error(error_value)
         
-            # Align the waveforms minimising the mismatch over a [t_min, t_max] interval.
+            # Align the waveforms minimizing the mismatch over a [t_min, t_max] interval.
             if('align-with-mismatch' in NR_error):
                 
                 # Resolution error.
