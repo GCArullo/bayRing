@@ -8,7 +8,7 @@ import bayRing.utils   as utils
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_NR_fit = 0, TEOB_template = 'qc', TEOB_qc_fit_type = None):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_template = 'RatExp', TEOB_merger_data = 1, TEOB_global_fit = 0):
 
         self.t_NR                      = t_NR
         self.t_start                   = tM_start
@@ -27,9 +27,9 @@ class WaveformModel(cpnest.model.Model):
         self.tail_modes                = tail_modes
         self.KerrBinary_version        = KerrBinary_version
         self.KerrBinary_amp_nc_version = KerrBinary_amp_nc_version
-        self.TEOB_NR_fit               = TEOB_NR_fit
         self.TEOB_template             = TEOB_template
-        self.TEOB_qc_fit_type          = TEOB_qc_fit_type
+        self.TEOB_merger_data          = TEOB_merger_data
+        self.TEOB_global_fit           = TEOB_global_fit
 
         if not(const_params==None):
             self.const_r = [const_params[0]*np.cos(const_params[1])]
@@ -174,6 +174,13 @@ class WaveformModel(cpnest.model.Model):
 
     def TEOBPM_waveform(self, params, fixed_params):
 
+        if self.TEOB_template=='HypTan':
+            template_index = 0
+        elif self.TEOB_template=='RatExp':
+            template_index = 1
+        else:
+            raise ValueError("Unknown TEOB template: {}".format(self.TEOB_template))
+        
         TGR_parameters = {}
         
         modes          = [(self.l_NR,self.m_NR)]
@@ -181,95 +188,50 @@ class WaveformModel(cpnest.model.Model):
 
         nu = (self.metadata['m1']*self.metadata['m2'])/(self.metadata['m1']+self.metadata['m2'])**2
 
-        if(self.TEOB_NR_fit):
-            
-            if(self.TEOB_template=='qc'):
-                NR_fit_coeffs = {
-                                (self.l_NR,self.m_NR): {
-                                                        'c3A'           : params[             'c3A_{}{}'.format(self.l_NR,self.m_NR)]            ,
-                                                        'c3p'           : params[             'c3p_{}{}'.format(self.l_NR,self.m_NR)]            ,
-                                                        'c4p'           : params[             'c4p_{}{}'.format(self.l_NR,self.m_NR)]            ,
-                                                        }
-                                }
-            elif(self.TEOB_template=='nc'):
-                NR_fit_coeffs = {
-                                (self.l_NR,self.m_NR): {
-                                                        'c2A'                 : params[       'c2A_{}{}'.format(self.l_NR,self.m_NR)]            ,
-                                                        'c3A'                 : params[       'c3A_{}{}'.format(self.l_NR,self.m_NR)]            ,
-                                                        'c2p'                 : params[       'c2p_{}{}'.format(self.l_NR,self.m_NR)]            ,
-                                                        'c3p'                 : params[       'c3p_{}{}'.format(self.l_NR,self.m_NR)]            ,
-                                                        'c4p'                 : params[       'c4p_{}{}'.format(self.l_NR,self.m_NR)]            ,
-                                                        'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]       ,
-                                                        'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu      ,
-                                                        'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR,self.m_NR)]/nu,
-                                                        }
-                                }
-            else:
-                raise ValueError("Unknown TEOB template selected: {}".format(self.TEOB_template))
+        if(self.TEOB_merger_data):
+            NR_fit_coeffs = {
+                            (self.l_NR,self.m_NR): {
+                                                    'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]       ,
+                                                    'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu      ,
+                                                    }
+                            }
+            if(self.TEOB_template=='RatExp'):
+                NR_fit_coeffs[(self.l_NR,self.m_NR)]['A_peakdotdot_over_nu'] = self.metadata['A_peak{}{}dotdot'.format(self.l_NR,self.m_NR)]/nu
+
+        if not(self.TEOB_global_fit):
+            NR_fit_coeffs[(self.l_NR,self.m_NR)]['c3A'] = params['c3A_{}{}'.format(self.l_NR,self.m_NR)]
+            NR_fit_coeffs[(self.l_NR,self.m_NR)]['c3p'] = params['c3p_{}{}'.format(self.l_NR,self.m_NR)]
+            NR_fit_coeffs[(self.l_NR,self.m_NR)]['c4p'] = params['c4p_{}{}'.format(self.l_NR,self.m_NR)]
+
+            if(self.TEOB_template=='RatExp'):
+                NR_fit_coeffs[(self.l_NR,self.m_NR)]['c2A'] = params['c2A_{}{}'.format(self.l_NR,self.m_NR)]
+                NR_fit_coeffs[(self.l_NR,self.m_NR)]['c2p'] = params['c2p_{}{}'.format(self.l_NR,self.m_NR)]
             
             NR_fit_coeffs['Mf'] = self.Mf
             NR_fit_coeffs['af'] = self.af
 
         else:
-            try:
-                NR_fit_coeffs = {
-                    (self.l_NR, self.m_NR): {
-                        'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR, self.m_NR)],
-                        'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR, self.m_NR)] / nu,
-                        'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR, self.m_NR)] / nu,
-                        'ecc'                 : self.metadata['ecc'],
-                        'bmrg'                : self.metadata['bmrg'],
-                        'Jmrg'                : self.metadata['Jmrg'],
-                        'Emrg'                : self.metadata['Emrg'],
-                        'TEOB_qc_fit_type'    : self.fit_metadata['TEOB_qc_fit_type'],
-                        'TEOB_qc_fit_order'   : self.fit_metadata['TEOB_qc_fit_order'],
-                    }
-                }
+            NR_fit_coeffs['ecc'] = self.metadata['ecc']
+            NR_fit_coeffs['bmrg'] = self.metadata['bmrg']
+            NR_fit_coeffs['Jmrg'] = self.metadata['Jmrg']
+            NR_fit_coeffs['Emrg'] = self.metadata['Emrg']
 
+            if self.fit_metadata is not None:
                 fit_coeffs = {key: val for key, val in self.fit_metadata.items() if key.startswith(('c_2_', 'c_3_', 'c_4_'))}
                 NR_fit_coeffs[(self.l_NR, self.m_NR)].update(fit_coeffs)
+
                 for key in ['nu', 'ecc', 'bmrg', 'jmrg', 'emrg']:
                     norm_scale_key, norm_shift_key = 'norm_{}_scale'.format(key), 'norm_{}_shift'.format(key)
                     if norm_scale_key in self.fit_metadata:
                         NR_fit_coeffs[norm_scale_key] = self.fit_metadata[norm_scale_key]
                     if norm_shift_key in self.fit_metadata:
                         NR_fit_coeffs[norm_shift_key] = self.fit_metadata[norm_shift_key]
-            except:
-                NR_fit_coeffs = {
-                                (self.l_NR,self.m_NR): {
-                                                        'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]       ,
-                                                        'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu      ,
-                                                        'A_peakdotdot_over_nu': self.metadata['A_peak{}{}dotdot'.format(self.l_NR,self.m_NR)]/nu ,
-                                                        'TEOB_qc_fit_type'    : None                                                            ,
-                                                        }
-                                }
+
+            else:
+                raise ValueError("TEOB global fit is enabled but no fit metadata provided.")
             
             NR_fit_coeffs['Mf'] = self.Mf
             NR_fit_coeffs['af'] = self.af
-
-        if(  self.TEOB_template=='qc'): ecc_par = 0
-        elif(self.TEOB_template=='nc'): ecc_par = 1
-
-        if(ecc_par==0):
-            if (self.TEOB_qc_fit_type=='non-spinning'): 
-                order_nu = 111
-                order_S_hat = 0
-            elif(self.TEOB_qc_fit_type=='equal-mass'): 
-                order_S_hat = 342
-                order_nu = 0
-            else:
-                order_S_hat = 0
-                order_nu = 0
-        elif(ecc_par==1):
-            if(self.TEOB_qc_fit_type=='non-spinning'): 
-                order_nu = 11111
-                order_S_hat = 0
-            elif(self.TEOB_qc_fit_type=='equal-mass'): 
-                order_S_hat = 33333
-                order_nu = 0
-            else: 
-                order_S_hat = 0
-                order_nu = 0
 
         TGR_parameters = {}
         ringdown_model = wf.TEOBPM(self.t_peak                  ,
@@ -284,9 +246,9 @@ class WaveformModel(cpnest.model.Model):
                                    modes                        ,
                                    TGR_parameters               ,
                                    geom          = 1            ,
-                                   ecc_par       = ecc_par      ,
-                                   order_nu      = order_nu     ,
-                                   order_S_hat   = order_S_hat    ,
+                                   template      = self.TEOB_template ,
+                                   merger_data   = self.TEOB_merger_data ,
+                                   global_fit    = self.TEOB_global_fit ,
                                    NR_fit_coeffs = NR_fit_coeffs)
         return ringdown_model
 

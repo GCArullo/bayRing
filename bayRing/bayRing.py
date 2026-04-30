@@ -148,9 +148,9 @@ def main():
                                                 const_params              = parameters['NR-data']['add-const']                     , 
                                                 KerrBinary_version        = parameters['Model']['KerrBinary-version']              ,
                                                 KerrBinary_amp_nc_version = parameters['Model']['KerrBinary-amplitudes-nc-version'],
-                                                TEOB_NR_fit               = parameters['Model']['TEOB-NR-fit']                     ,
                                                 TEOB_template             = parameters['Model']['TEOB-template']                   ,
-                                                TEOB_qc_fit_type          = parameters['Model']['TEOB-qc-fit-type']                ,
+                                                TEOB_global_fit           = parameters['Model']['TEOB-global-fit']                 ,
+                                                TEOB_merger_data          = parameters['Model']['TEOB-merger-data']                ,
                                                 )
 
     # ===============#

@@ -130,8 +130,9 @@ def read_config(Config):
         'KerrBinary-version'               : 'London2018' ,
         'KerrBinary-amplitudes-nc-version' : ''           ,
         'TEOB-NR-fit'                      : 0            ,
-        'TEOB-template'                    : 'qc'         ,
-        'TEOB-qc-fit-type'                 : 'equal-mass' , 
+        'TEOB-template'                    : 'RatExp'     ,
+        'TEOB-global-fit'                  : 1            ,
+        'TEOB-merger-data'                 : 1            ,
         },
 
         'Inference':
@@ -393,10 +394,13 @@ A dot is present at the end of each description line and is not to be intended a
 
         TEOB-NR-fit                      Boolean to fit also for NR calibration coefficients within TEOB model, otherwise, use default fits.                              Default: 0.
         
-        TEOB-template                    TEOB template to be used. Available options: ['qc', 'nc']. The 'qc' version is defined in  \
-                                         arXiv:1904.09550, arXiv:2001.09082, while the 'nc' in II.C of arXiv:2305.19336.                                                  Default: 'qc'.
+        TEOB-template                    TEOB template to be used. Available options: ['HypTan', 'RatExp']. The 'HypTan' version is defined in  \
+                                         arXiv:1904.09550, arXiv:2001.09082, while the 'RatExp' in II.C of arXiv:2305.19336.                                              Default: 'RatExp'.
 
-        TEOB-qc-fit-type                 Type of fit to be used. Available options: ['non_spinning', 'equal_mass'].                                                       Default: None.
+        TEOB-global-fit                  Boolean to use the NR-calibrated global fits of the TEOB model. To be set to 1 if fit-files is provided.                         Default: 0.
+
+        TEOB-merger-data                 Flag to switch between using the values of the amplitude and frequency at the peak of the modes as given \ 
+                                         by the NR merger data (TEOB-merger-data = 1) or by the QC fits (TEOB-merger-data = 0)                                            Default: 1.
 
     *******************************************************
     * Parameters to be passed to the [Inference] section. *
