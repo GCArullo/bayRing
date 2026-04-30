@@ -89,7 +89,7 @@ def read_default_bounds(wf_model, TEOB_template=''):
                                 'c3p'    : [-10.0, 10.0 ]       ,
                                 'c4p'    : [-10.0, 10.0 ]       ,
                                 }
-    if not(TEOB_template=='qc'):
+    if not(TEOB_template=='HypTan'):
         default_bounds_TEOBPM['c2A']          = [-10.0, 10.0]
         default_bounds_TEOBPM['c2p']          = [-10.0, 10.0]
 
@@ -274,8 +274,9 @@ def Dynamic_InferenceModel(base):
             self.kind          = likelihood_kind
             self.Kerr_modes    = self.wf_model.Kerr_modes
             self.N_ds_modes    = self.wf_model.N_ds_modes
-            self.TEOB_NR_fit   = self.wf_model.TEOB_NR_fit
             self.TEOB_template = self.wf_model.TEOB_template
+            self.TEOB_global_fit = self.wf_model.TEOB_global_fit
+            self.TEOB_merger_data = self.wf_model.TEOB_merger_data 
             self.min_method    = min_method
             self.Config        = Config
 
@@ -408,12 +409,13 @@ def Dynamic_InferenceModel(base):
                         single_bounds = read_parameter_bounds(Config, configparser, name, name, default_bounds)
                         self.names.append(name)
                         self.bounds.append(single_bounds)
-
+ 
             elif(self.wf_model.wf_model=='TEOBPM'):
 
                 default_bounds_TEOBPM = read_default_bounds(self.wf_model.wf_model, TEOB_template=self.TEOB_template)   
                 for name in default_bounds_TEOBPM.keys():
-                    if(not(self.TEOB_NR_fit) and not(name=='phi_mrg')): continue
+                    if self.TEOB_global_fit and name != 'phi_mrg':
+                        continue
                     fullname = '{}_{}{}'.format(name, self.wf_model.l_NR, self.wf_model.m_NR)
                     try:
                         self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)

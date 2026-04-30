@@ -197,6 +197,8 @@ class WaveformModel(cpnest.model.Model):
                             }
             if(self.TEOB_template=='RatExp'):
                 NR_fit_coeffs[(self.l_NR,self.m_NR)]['A_peakdotdot_over_nu'] = self.metadata['A_peak{}{}dotdot'.format(self.l_NR,self.m_NR)]/nu
+        else:
+            NR_fit_coeffs = {(self.l_NR,self.m_NR): {}}
 
         if not(self.TEOB_global_fit):
             NR_fit_coeffs[(self.l_NR,self.m_NR)]['c3A'] = params['c3A_{}{}'.format(self.l_NR,self.m_NR)]
@@ -220,6 +222,9 @@ class WaveformModel(cpnest.model.Model):
                 fit_coeffs = {key: val for key, val in self.fit_metadata.items() if key.startswith(('c_2_', 'c_3_', 'c_4_'))}
                 NR_fit_coeffs[(self.l_NR, self.m_NR)].update(fit_coeffs)
 
+                NR_fit_coeffs[(self.l_NR, self.m_NR)]['fit_type'] = self.fit_metadata['fit_type']
+                NR_fit_coeffs[(self.l_NR, self.m_NR)]['fit_order'] = self.fit_metadata['fit_order']
+
                 for key in ['nu', 'ecc', 'bmrg', 'jmrg', 'emrg']:
                     norm_scale_key, norm_shift_key = 'norm_{}_scale'.format(key), 'norm_{}_shift'.format(key)
                     if norm_scale_key in self.fit_metadata:
@@ -228,7 +233,8 @@ class WaveformModel(cpnest.model.Model):
                         NR_fit_coeffs[norm_shift_key] = self.fit_metadata[norm_shift_key]
 
             else:
-                raise ValueError("TEOB global fit is enabled but no fit metadata provided.")
+                if(self.TEOB_template=='RatExp'):
+                    raise ValueError("TEOB global fit is enabled but no fit metadata provided.")
             
             NR_fit_coeffs['Mf'] = self.Mf
             NR_fit_coeffs['af'] = self.af
@@ -246,7 +252,7 @@ class WaveformModel(cpnest.model.Model):
                                    modes                        ,
                                    TGR_parameters               ,
                                    geom          = 1            ,
-                                   template      = self.TEOB_template ,
+                                   template      = template_index ,
                                    merger_data   = self.TEOB_merger_data ,
                                    global_fit    = self.TEOB_global_fit ,
                                    NR_fit_coeffs = NR_fit_coeffs)
