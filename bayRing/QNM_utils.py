@@ -4,7 +4,31 @@ import qnm
 import pyRing.utils as pyRing_utils
 
 twopi = 2.*np.pi
-qnm.download_data()
+
+def qnm_data_available():
+
+    try:
+        qnm_cached = qnm.cached
+        qnm_cache_dir = qnm_cached.get_cachedir()
+    except AttributeError:
+        return False
+
+    if qnm_cache_dir is None:
+        return True
+
+    qnm_data_dir = qnm_cache_dir / 'data'
+    if qnm_data_dir.exists() and any(qnm_data_dir.glob('*.pickle')):
+        return True
+
+    try:
+        qnm_data_filename = qnm_cached._data_url.split('/')[-1]
+    except AttributeError:
+        return False
+
+    return (qnm_cache_dir / qnm_data_filename).exists()
+
+if not qnm_data_available():
+    qnm.download_data()
 
 def read_quad_modes(QQNM_modes, l_NR, m):  
 
@@ -30,7 +54,7 @@ def read_quad_modes(QQNM_modes, l_NR, m):
 
     """
 
-    quad_modes_list   = QQNM_modes[0].split(',')
+    quad_modes_list = QQNM_modes.split(',')
 
     quad_modes        = {'sum': [], 'diff': []}
     for i in range(len(quad_modes_list)):

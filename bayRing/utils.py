@@ -1,4 +1,4 @@
-import io, numpy as np, re, tarfile
+import io, numpy as np, os, re, tarfile, warnings
 
 #FIXME: implement fixed params reading for all models
 def get_param_override(fixed_params, x, name):
@@ -12,6 +12,52 @@ def get_param_override(fixed_params, x, name):
     """
     if name in fixed_params: return fixed_params[name]
     else:                    return x[name]
+
+def normalize_optional_path(path):
+
+    """
+    Normalize optional path-like configuration values.
+
+    Empty strings in config files mean the optional file was not supplied.
+    """
+
+    if path is None:
+        return None
+    if isinstance(path, str):
+        path = path.strip()
+        if path == '':
+            return None
+
+    return path
+
+def set_prefix(warning_message=True):
+    
+    """
+        Set the prefix path for the data files.
+
+        Parameters
+        ----------
+
+        warning_message : bool
+            If True, a warning message is printed if the environment variable is not set.
+
+        Returns
+        -------
+
+        prefix : str
+            Path to the data files.
+
+    """
+    
+    # Check environment
+    try:
+        prefix = os.path.join(os.environ['BAYRING_PREFIX'])
+    except KeyError:
+        prefix = ''
+        if(warning_message):
+            warnings.warn("The requested functionality requires data not included in the package. Please set a $BAYRING_PREFIX variable which contains the path to such data. This can be done by setting 'export BAYRING_PREFIX= yourpath' in your ~/.bashrc file. Typically, BAYRING_PREFIX contains the path to the clone of the repository containing the source code.")
+    
+    return prefix
 
 def filter_dict_by_key(a, target_key):
 
@@ -68,14 +114,6 @@ def find_longest_name_length(names):
         if(len(key)>longest_name_length): longest_name_length = len(key)
 
     return longest_name_length
-
-def minimisation_compatibility_check(parameters):
-
-    if not(parameters['template']=='Kerr'): raise ValueError("Minimization algorithm only works for Kerr parameters['template']." )
-    if not(parameters['QQNM_modes']==None): raise ValueError("Minimization algorithm does not work with QQNM modes.")
-    if not(parameters['tail']==0)         : raise ValueError("Minimization algorithm does not work with Kerr tail." )
-
-    return
 
 # Function taken from watpy (https://git.tpi.uni-jena.de/core/watpy).
 
