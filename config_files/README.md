@@ -18,6 +18,10 @@ The corresponding linear-inversion example can be run with:
 
 `bayRing --config-file config_SXS_0305_Kerr_220_linear_inversion.ini`
 
+The SXS precessing-spin example can be run with:
+
+`bayRing --config-file config_SXS_1389_precessing_Kerr_220_quick.ini`
+
 The other files instead use default priors (very broad), a large chunk of the time axis, the full NR error and conservative sampler settings useful when exploring a high-dimensional parameter space.
 
 Usage of NR catalogs beyond the SXS is considered to be "developer" level, i.e. it requires the user to: i) download the corresponding NR simulations and placing them in the directory structure expected from the code (see the `NR_waveforms.py` module); ii) use the NR error option best suited to the simulation under consideration. Some of the simulations classes implemented might not yet be publicly available.
