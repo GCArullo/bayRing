@@ -993,11 +993,15 @@ def global_corner(x, names, output, truths=None):
     for xy in names: samples.append(np.array(x[xy]))
     samples = np.transpose(samples)
     mask    = [i for i in range(samples.shape[-1]) if not all(samples[:,i]==samples[0,i]) ]
+    labels  = list(np.array(names)[mask])
+
+    if not(truths is None):
+        truths = [truths[i] for i in mask]
 
     fig = plt.figure(figsize=(10,10))
     C   = corner.corner(samples[:,mask],
                         quantiles     = [0.05, 0.5, 0.95],
-                        labels        = names,
+                        labels        = labels,
                         color         = 'darkred',
                         show_titles   = True,
                         title_kwargs  = {"fontsize": 12},
@@ -1007,3 +1011,14 @@ def global_corner(x, names, output, truths=None):
     plt.savefig(os.path.join(output, 'Plots', 'Results', 'corner.png'), bbox_inches='tight')
 
     return
+
+def read_injection_truths(names, NR_sim):
+
+    if not(hasattr(NR_sim, 'injection_truths')) or NR_sim.injection_truths is None:
+        return None
+
+    truths = []
+    for name in names:
+        truths.append(NR_sim.injection_truths.get(name, None))
+
+    return truths

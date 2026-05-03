@@ -32,6 +32,34 @@ def read_fake_NR(NR_catalog, fake_NR_modes):
 
     return fake_NR_modes_string, injection_modes_list
 
+def _read_kerr_injection_from_dict(injection_parameters):
+
+    required_scalars = ['t_start', 't_end', 'dt', 'q', 'Mf', 'af']
+    missing_scalars  = [name for name in required_scalars if not name in injection_parameters]
+    if len(missing_scalars):
+        raise ValueError(f"Missing mandatory Kerr injection parameters: {missing_scalars}")
+
+    A_dict, phi_dict, tail_dict = {}, {}, {}
+    for key, value in injection_parameters.items():
+        if key.startswith('A_'):
+            A_dict[key] = float(value)
+        elif key.startswith('phi_') and not(key.startswith('phi_tail_')):
+            phi_dict[key] = float(value)
+        elif key.endswith('_tail'):
+            tail_dict[key] = float(value)
+
+    return (
+        float(injection_parameters['t_start']),
+        float(injection_parameters['t_end']),
+        float(injection_parameters['dt']),
+        float(injection_parameters['q']),
+        float(injection_parameters['Mf']),
+        float(injection_parameters['af']),
+        A_dict,
+        phi_dict,
+        tail_dict,
+    )
+
 def read_RWZ_env_simulation_parameters(sim_file):
 
     """
@@ -537,6 +565,7 @@ class NR_simulation():
                  injection_times                                , 
                  injection_noise                                , 
                  injection_tail                                 , 
+                 injection_kerr_parameters                      , 
                  l                                              , 
                  m                                              , 
                  outdir                                         , 
@@ -571,6 +600,8 @@ class NR_simulation():
         self.fake_NR_modes            = injection_modes_list
         self.injection_noise          = injection_noise
         self.injection_tail           = injection_tail
+        self.injection_kerr_parameters = injection_kerr_parameters
+        self.injection_truths         = None
 
         self.tM_start                 = tM_start
         self.tM_end                   = tM_end
@@ -584,8 +615,11 @@ class NR_simulation():
         
         #IMPROVEME: work in progress for template injections.
         if(self.NR_catalog=='fake_NR'):
-            
-            t_start, t_end, dt, self.q, self.Mf, self.af, self.A_dict, self.phi_dict, self.tail_dict = self.read_fake_NR_metadata()
+
+            if self.injection_kerr_parameters is None:
+                t_start, t_end, dt, self.q, self.Mf, self.af, self.A_dict, self.phi_dict, self.tail_dict = self.read_fake_NR_metadata()
+            else:
+                t_start, t_end, dt, self.q, self.Mf, self.af, self.A_dict, self.phi_dict, self.tail_dict = _read_kerr_injection_from_dict(self.injection_kerr_parameters)
 
             if(injection_times=='from-metadata'):
 
@@ -626,6 +660,10 @@ class NR_simulation():
                     print("Mode not present in the metadata. Please update the metadata or change the input modes to be included in the template for the fake NR data.")
                     exit()
 
+            tail_parameters = {}
+            if int(self.injection_tail)==1:
+                tail_parameters = self.tail_dict
+
             ringdown_fun = wf.KerrBH(self.t_start                         ,
                                      self.Mf                              ,
                                      self.af                              ,
@@ -641,7 +679,7 @@ class NR_simulation():
                                     
                                      Spheroidal          = 0              , # Spheroidal harmonics, overrun by geom
                                      amp_non_prec_sym    = 1              ,
-                                     tail_parameters     = {}             ,
+                                     tail_parameters     = tail_parameters,
                                      quadratic_modes     = {}             ,
                                      quad_lin_prop       = 0              ,
                                      qnm_cached          = self.qnm_cached,
@@ -651,6 +689,18 @@ class NR_simulation():
                                      )
             
             _, _, _, self.NR_r, self.NR_i = ringdown_fun.waveform(self.t_NR)
+            self.injection_truths = {
+                **{f'ln_A_{mode}': np.log(self.A_dict[f'A_{mode}']) for mode in [f'{l_ring}{m_ring}{n}' for (l_ring, m_ring, n) in self.fake_NR_modes] if f'A_{mode}' in self.A_dict},
+                **{f'phi_{mode}': self.phi_dict[f'phi_{mode}'] for mode in [f'{l_ring}{m_ring}{n}' for (l_ring, m_ring, n) in self.fake_NR_modes] if f'phi_{mode}' in self.phi_dict},
+            }
+            if int(self.injection_tail)==1:
+                tail_mode = f'{self.l}{self.m}'
+                if f'A_{tail_mode}_tail' in self.tail_dict:
+                    self.injection_truths[f'ln_A_tail_{tail_mode}'] = np.log(self.tail_dict[f'A_{tail_mode}_tail'])
+                if f'phi_{tail_mode}_tail' in self.tail_dict:
+                    self.injection_truths[f'phi_tail_{tail_mode}'] = self.tail_dict[f'phi_{tail_mode}_tail']
+                if f'p_{tail_mode}_tail' in self.tail_dict:
+                    self.injection_truths[f'p_tail_{tail_mode}'] = self.tail_dict[f'p_{tail_mode}_tail']
 
             self.NR_r = -self.NR_r
 

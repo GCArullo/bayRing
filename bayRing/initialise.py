@@ -114,6 +114,7 @@ def read_config(Config):
         'times'            : 'from-SXS-NR',
         'noise'            : None,
         'tail'             : 0.0,
+        'Kerr-parameters'  : '',
         },
 
         'Model':
@@ -196,6 +197,10 @@ def read_config(Config):
     else                                                                                                : parameters['Model']['charge'] = 0
 
     if not(parameters['NR-data']['add-const']==None): parameters['NR-data']['add-const'] = [float(value) for value in parameters['NR-data']['add-const'].split(',')]
+    if not(parameters['Injection-data']['Kerr-parameters']==''):
+        parameters['Injection-data']['Kerr-parameters'] = ast.literal_eval(parameters['Injection-data']['Kerr-parameters'])
+    else:
+        parameters['Injection-data']['Kerr-parameters'] = None
 
     if ((parameters['Model']['template']=='KerrBinary' or parameters['Model']['template']=='TEOBPM') and not(parameters['NR-data']['l-NR']==2 and parameters['NR-data']['m']==2) and parameters['NR-data']['t-peak-22']==0.0): raise ValueError("The time of the peak of the 22 mode must be provided for the KerrBinary and TEOBPM models when fitting the HMs, to correctly rescale the NR-calibrated quantities.")
 
@@ -285,6 +290,9 @@ A dot is present at the end of each description line and is not to be intended a
             if '1', the noise is added to the data. Options: None, '1'.                                                      Default: None.
         tail             Option to add the tail to the simulated Kerr QNMs data; if '1', the tail is added to the data. \
             Options: None, '1'.                                                                                              Default: None.
+        Kerr-parameters  Dictionary used to generate a Kerr injection from config values when catalog='fake_NR'. \
+                         Required keys are: `t_start`, `t_end`, `dt`, `q`, `Mf`, `af`, and one pair `A_lmn`, `phi_lmn` \
+                         for each injected mode. Optional keys for tails are `A_lm_tail`, `phi_lm_tail`, `p_lm_tail`.     Default: ''.
 
     ***************************************************
     * Parameters to be passed to the [Model] section. *

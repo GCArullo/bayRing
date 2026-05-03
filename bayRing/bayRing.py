@@ -81,6 +81,7 @@ def main():
                                              parameters['Injection-data']['times']                  , 
                                              parameters['Injection-data']['noise']                  , 
                                              parameters['Injection-data']['tail']                   , 
+                                             parameters['Injection-data']['Kerr-parameters']        , 
                                              parameters['NR-data']['l-NR']                          , 
                                              parameters['NR-data']['m']                             , 
                                              parameters['I/O']['outdir']                            ,
@@ -205,7 +206,10 @@ def main():
         traceback.print_exc()
 
     try                  : 
-        postprocess.global_corner(results_object, inference_model.names, parameters['I/O']['outdir'])
+        postprocess.global_corner(results_object,
+                                  inference_model.names,
+                                  parameters['I/O']['outdir'],
+                                  truths=postprocess.read_injection_truths(inference_model.names, NR_sim))
     except Exception as e: 
         print(f"Corner plot failed with error: {e}")
         traceback.print_exc()
