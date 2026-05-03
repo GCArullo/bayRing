@@ -511,6 +511,7 @@ if "matplotlib" not in sys.modules:
 if "qnm" not in sys.modules:
     fake_qnm = types.ModuleType("qnm")
     fake_qnm.modes_cache = lambda *args, **kwargs: (lambda **inner_kwargs: types.SimpleNamespace())
+    fake_qnm.download_data = lambda: None
     sys.modules["qnm"] = fake_qnm
 
 

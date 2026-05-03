@@ -1,8 +1,13 @@
 # General python imports
-import h5py, numpy as np, os, pandas as pd, subprocess
+import h5py, math, numpy as np, os, pandas as pd, subprocess
 from scipy import interpolate
 
-import sxs
+try:
+    import sxs
+    SXS_IMPORT_ERROR = None
+except Exception as exc:
+    sxs = None
+    SXS_IMPORT_ERROR = exc
 try   : from cbhdb import simulation
 except: pass
 
@@ -13,6 +18,49 @@ import pyRing.utils           as pyRing_utils
 import pyRing.waveform        as wf
 
 twopi = 2.*np.pi
+SXS_CHRISTODOULOU_MASS_KEYS = (
+    ('reference_mass1', 'reference_mass2'),
+    ('reference-mass1', 'reference-mass2'),
+    ('initial_mass1', 'initial_mass2'),
+    ('initial-mass1', 'initial-mass2'),
+)
+
+def _metadata_float(metadata, key):
+
+    value = metadata[key]
+    if isinstance(value, str) and value.startswith('<'):
+        value = value[1:]
+
+    return float(value)
+
+def SXS_christodoulou_mass_scale(metadata):
+
+    """
+
+    Return the SXS total Christodoulou mass used to scale waveform times.
+
+    SXS asymptotic waveforms are tabulated in units of the combined
+    Christodoulou mass of the binary. QNM tables use the convention where
+    this mass unit is exactly one, so waveform times must be multiplied by
+    the metadata value before comparing against tabulated QNM frequencies.
+
+    """
+
+    for mass1_key, mass2_key in SXS_CHRISTODOULOU_MASS_KEYS:
+        try:
+            mass_scale = _metadata_float(metadata, mass1_key) + _metadata_float(metadata, mass2_key)
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        if math.isfinite(mass_scale) and mass_scale > 0.0:
+            return mass_scale
+
+    return 1.0
+
+def _require_sxs():
+
+    if sxs is None:
+        raise ImportError("The SXS catalog requires a working `sxs` installation.") from SXS_IMPORT_ERROR
 
 def read_fake_NR(NR_catalog, fake_NR_modes):
 
@@ -392,6 +440,8 @@ def read_NR_metadata(NR_sim, NR_catalog):
                         'ecc'  : NR_sim.ecc,
                         'Mf'   : NR_sim.Mf,
                         'af'   : NR_sim.af,
+                        'M_christodoulou_total': getattr(NR_sim, 'M_christodoulou_total', 1.0),
+                        'time_scale'           : getattr(NR_sim, 'christodoulou_mass_scale', 1.0),
                         'A_peak_22'     : NR_sim.A_peak_22,
                         'omg_peak_22'   : NR_sim.omg_peak_22,
                         'A_nr_error'    : NR_sim.A_nr_error,
@@ -410,6 +460,8 @@ def read_NR_metadata(NR_sim, NR_catalog):
                         'ecc'  : NR_sim.ecc,
                         'Mf'   : NR_sim.Mf,
                         'af'   : NR_sim.af,
+                        'M_christodoulou_total': getattr(NR_sim, 'M_christodoulou_total', 1.0),
+                        'time_scale'           : getattr(NR_sim, 'christodoulou_mass_scale', 1.0),
                     }
             
     elif(NR_catalog=='cbhdb'):
@@ -612,6 +664,8 @@ class NR_simulation():
         self.tM_end                   = tM_end
         self.t_delay_scd              = t_delay_scd
         self.t_peak_22                = t_peak_22
+        self.M_christodoulou_total    = 1.0
+        self.christodoulou_mass_scale = 1.0
 
 
         ######################
@@ -745,6 +799,8 @@ class NR_simulation():
             
             if self.additional_NR_properties:
                 self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = self.load_SXS_addn_metadata(csv_path=self.additional_NR_properties, ID_str=self.NR_ID)
+                self.omg_peak_22    = self._rescale_SXS_frequency(self.omg_peak_22)
+                self.A_peak22dotdot = self._rescale_SXS_second_time_derivative(self.A_peak22dotdot)
             else:
                 self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = None, None, None, None
 
@@ -1044,8 +1100,8 @@ class NR_simulation():
             self.t_peak = self.t_peak + self.t_delay_scd
 
         if not(self.t_peak_22==0.0):
-            print("\n* The peak time has been set to the peak of the 22 mode: {}.".format(self.t_peak_22))
-            self.t_peak = self.t_peak_22
+            self.t_peak = self._rescale_SXS_time(self.t_peak_22)
+            print("\n* The peak time has been set to the peak of the 22 mode: {}.".format(self.t_peak))
 
         self.NR_freq  = np.gradient(self.NR_phi, self.t_NR)/(twopi)
         
@@ -1066,6 +1122,34 @@ class NR_simulation():
         print("\n* The peak time is t_peak = {}".format(self.t_peak))
         np.savetxt(os.path.join(self.outdir,'Peak_quantities/Peak_time.txt'), np.array([self.t_peak]), header = "t_peak [sim units]")
        
+    def _set_SXS_christodoulou_mass_scale(self, metadata):
+
+        self.M_christodoulou_total    = SXS_christodoulou_mass_scale(metadata)
+        self.christodoulou_mass_scale = self.M_christodoulou_total
+
+    def _rescale_SXS_time(self, time):
+
+        try:
+            iter(time)
+        except TypeError:
+            return float(time) * self.christodoulou_mass_scale
+
+        return np.asarray(time) * self.christodoulou_mass_scale
+
+    def _rescale_SXS_frequency(self, frequency):
+
+        if frequency is None:
+            return None
+
+        return frequency / self.christodoulou_mass_scale
+
+    def _rescale_SXS_second_time_derivative(self, second_derivative):
+
+        if second_derivative is None:
+            return None
+
+        return second_derivative / (self.christodoulou_mass_scale**2)
+
     def extract_data_NR(self, t_min_mismatch, t_max_mismatch):
 
         # Build NR time axis.
@@ -1332,10 +1416,12 @@ class NR_simulation():
 
         """
         
+        _require_sxs()
         sim      = sxs.load("SXS:BBH:{}".format(self.NR_ID), download=self.download, auto_supersede=True)
         metadata = sim.metadata
         
         tilt1, tilt2  = 0.0, 0.0
+        self._set_SXS_christodoulou_mass_scale(metadata)
 
         q, Mf            = metadata['reference_mass_ratio'], metadata['remnant_mass']
         chi1, chi2, chif = metadata['reference_dimensionless_spin1'][2], metadata['reference_dimensionless_spin2'][2], metadata['remnant_dimensionless_spin'][2]
@@ -1588,10 +1674,15 @@ class NR_simulation():
 
         """
         
+        _require_sxs()
         sim = sxs.load("SXS:BBH:{}/Lev{}".format(self.NR_ID, LevRes), download=self.download, extrapolation_order=ExtOrd, auto_supersede=True)
         waveform = sim.h
+        try:
+            self._set_SXS_christodoulou_mass_scale(sim.metadata)
+        except AttributeError:
+            pass
         
-        time        = waveform.t
+        time        = self._rescale_SXS_time(waveform.t)
         mode_index  = waveform.index(self.l, self.m)
         waveform_lm = waveform[:, mode_index]
         
