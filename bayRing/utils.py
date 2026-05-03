@@ -1,4 +1,4 @@
-import io, numpy as np, pkg_resources, os, re, tarfile, warnings
+import io, numpy as np, os, re, tarfile, warnings
 
 #FIXME: implement fixed params reading for all models
 def get_param_override(fixed_params, x, name):
@@ -12,6 +12,23 @@ def get_param_override(fixed_params, x, name):
     """
     if name in fixed_params: return fixed_params[name]
     else:                    return x[name]
+
+def normalize_optional_path(path):
+
+    """
+    Normalize optional path-like configuration values.
+
+    Empty strings in config files mean the optional file was not supplied.
+    """
+
+    if path is None:
+        return None
+    if isinstance(path, str):
+        path = path.strip()
+        if path == '':
+            return None
+
+    return path
 
 def set_prefix(warning_message=True):
     
@@ -97,14 +114,6 @@ def find_longest_name_length(names):
         if(len(key)>longest_name_length): longest_name_length = len(key)
 
     return longest_name_length
-
-def minimisation_compatibility_check(parameters):
-
-    if not(parameters['template']=='Kerr'): raise ValueError("Minimization algorithm only works for Kerr parameters['template']." )
-    if not(parameters['QQNM_modes']==None): raise ValueError("Minimization algorithm does not work with QQNM modes.")
-    if not(parameters['tail']==0)         : raise ValueError("Minimization algorithm does not work with Kerr tail." )
-
-    return
 
 # Function taken from watpy (https://git.tpi.uni-jena.de/core/watpy).
 

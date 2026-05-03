@@ -1,4 +1,4 @@
-import itertools as it, numpy as np, os, pandas as pd, traceback
+import importlib, itertools as it, numpy as np, os, pandas as pd, traceback
 from scipy.optimize  import least_squares as l_s
 
 try:                import configparser
@@ -12,6 +12,109 @@ import bayRing.utils       as utils
 
 twopi                  = 2.*np.pi
 max_parameter_name_len = len('ln_A_tail_22')
+linear_inversion_methods = ['Linear-inversion']
+point_estimate_methods   = ['Minimization'] + linear_inversion_methods
+
+# CPNest workers using the spawn start method must pickle the inference model.
+# Register the factory-built classes as module globals so pickle can import them.
+_DYNAMIC_INFERENCE_MODEL_PREFIX  = 'DynamicInferenceModel_'
+_DYNAMIC_INFERENCE_MODEL_CLASSES = {}
+
+def _regularized_symmetric_inverse(matrix, eigenvalue_tol=None):
+
+    matrix = np.asarray(matrix, dtype=float)
+    matrix = 0.5*(matrix + matrix.T)
+
+    eigvals, eigvecs = np.linalg.eigh(matrix)
+
+    if eigenvalue_tol is None:
+        max_eig = np.max(np.abs(eigvals)) if len(eigvals)>0 else 0.0
+        eigenvalue_tol = np.finfo(float).eps * max(matrix.shape) * max(max_eig, 1.0)
+
+    eigvals_regularized = np.maximum(eigvals, eigenvalue_tol)
+    inverse = np.dot(eigvecs/eigvals_regularized, eigvecs.T)
+
+    return inverse, eigvals, eigvals_regularized
+
+def _errors_from_covariance(names, covariance):
+
+    diagonal = np.diag(covariance)
+    errors   = np.sqrt(np.maximum(diagonal, 0.0))
+
+    return dict(zip(names, errors))
+
+def estimate_least_squares_parameter_errors(names, least_squares_result, eigenvalue_tol=None):
+
+    """
+
+    Estimate one-sigma parameter errors from a scipy least_squares result.
+
+    The minimization residuals are already weighted by the configured data
+    errors, so the local covariance estimate is the inverse weighted Fisher
+    matrix J^T J. This is the nonlinear analogue of the linear-inversion
+    covariance used below.
+
+    """
+
+    if not(hasattr(least_squares_result, 'jac')):
+        raise ValueError("Cannot estimate minimization errors because the least_squares result has no Jacobian.")
+
+    jacobian = np.asarray(least_squares_result.jac, dtype=float)
+    if jacobian.ndim != 2 or jacobian.shape[1] != len(names):
+        raise ValueError(
+            "Cannot estimate minimization errors from a Jacobian with shape {} for {} parameters.".format(
+                jacobian.shape, len(names)
+            )
+        )
+
+    fisher = np.dot(jacobian.T, jacobian)
+    covariance, eigvals, eigvals_regularized = _regularized_symmetric_inverse(fisher, eigenvalue_tol=eigenvalue_tol)
+    errors = _errors_from_covariance(names, covariance)
+
+    return errors, covariance, eigvals, eigvals_regularized
+
+def _base_class_descriptor(base):
+
+    return '{}:{}'.format(base.__module__, base.__qualname__)
+
+def _dynamic_inference_model_class_name(base):
+
+    return _DYNAMIC_INFERENCE_MODEL_PREFIX + _base_class_descriptor(base).encode('utf-8').hex()
+
+def _resolve_base_class(descriptor):
+
+    module_name, qualname = descriptor.split(':', 1)
+    base = importlib.import_module(module_name)
+    for attr in qualname.split('.'):
+        base = getattr(base, attr)
+
+    return base
+
+def _register_dynamic_inference_model(base, model_class):
+
+    class_name = _dynamic_inference_model_class_name(base)
+
+    model_class.__name__    = class_name
+    model_class.__qualname__ = class_name
+    model_class.__module__  = __name__
+
+    globals()[class_name] = model_class
+    _DYNAMIC_INFERENCE_MODEL_CLASSES[class_name] = model_class
+
+    return model_class
+
+def __getattr__(name):
+
+    if name.startswith(_DYNAMIC_INFERENCE_MODEL_PREFIX):
+        try:
+            descriptor = bytes.fromhex(name[len(_DYNAMIC_INFERENCE_MODEL_PREFIX):]).decode('utf-8')
+            base       = _resolve_base_class(descriptor)
+        except Exception as exc:
+            raise AttributeError("module '{}' has no attribute '{}'".format(__name__, name)) from exc
+
+        return Dynamic_InferenceModel(base)
+
+    raise AttributeError("module '{}' has no attribute '{}'".format(__name__, name))
 
 def read_parameter_bounds(Config, configparser, basename, fullname, default_bounds):
     
@@ -26,16 +129,25 @@ def read_parameter_bounds(Config, configparser, basename, fullname, default_boun
 
     return single_bounds
 
-def read_parameter_start_minimization(Config, configparser, fullname, bounds, nseeds):
+def is_linear_inversion_method(method):
+
+    return str(method) in linear_inversion_methods
+
+def is_point_estimate_method(method):
+
+    return str(method) in point_estimate_methods
+
+def read_parameter_start_minimization(Config, configparser, fullname, bounds, nseeds=1, rng=None):
     
     
     try:                                                                                                     start_value = Config.getfloat("Priors", fullname+'-start')
     except (KeyError, configparser.NoOptionError, configparser.NoSectionError, configparser.NoSectionError): 
-        start_values = np.random.uniform(bounds[0], bounds[1], nseeds)
-        results      = []
-        # Be careful, you should minimize across all parameters
-        for start_value in start_values:
-            l_s(self.fun, param_0, method = self.min_method)
+        if rng is None:
+            rng = np.random.default_rng()
+        start_values = rng.uniform(bounds[0], bounds[1], int(nseeds))
+        if int(nseeds)>1:
+            start_values[0] = 0.5*(bounds[0] + bounds[1])
+        start_value  = start_values[0] if int(nseeds)==1 else start_values
 
     print(('{} : {}'.format(fullname.ljust(max_parameter_name_len), start_value)))
 
@@ -234,6 +346,10 @@ def UNUSED_build_a_grid(self, x_max, x_min, delta_x, n_grid):
 
 def Dynamic_InferenceModel(base):
 
+    class_name = _dynamic_inference_model_class_name(base)
+    if class_name in _DYNAMIC_INFERENCE_MODEL_CLASSES:
+        return _DYNAMIC_INFERENCE_MODEL_CLASSES[class_name]
+
     class InferenceModel(base):
 
         """
@@ -348,6 +464,7 @@ def Dynamic_InferenceModel(base):
 
                 self.tail            = self.wf_model.tail
                 self.quadratic_modes = self.wf_model.quadratic_modes
+                self.tail_modes      = self.wf_model.tail_modes
 
                 default_bounds_Kerr = read_default_bounds('Kerr')   
                 for (l_ring, m_ring, n) in self.Kerr_modes:
@@ -424,9 +541,8 @@ def Dynamic_InferenceModel(base):
                         self.names.append(fullname)
                         self.bounds.append(single_bounds)
 
-            self.residuals_tt = []
-            self.grid_x       = []
-            self.grid_y       = []
+            else:
+                raise ValueError("Unknown template selected: {}".format(self.wf_model.wf_model))
 
             pyRing_utils.print_subsection('Fixed')
             pyRing_utils.print_fixed_parameters(self.fixed_params)
@@ -531,21 +647,55 @@ def Dynamic_InferenceModel(base):
         def log_likelihood_ToMin(self,x):
         
             x_dict  = dict(zip(self.names, x))
-            
-            if self.min_method == 'lm':
-                
-                fun_min = (np.real(self.data)-np.real(self.model(x_dict)))/np.real(self.error)+(np.imag(self.data)-np.imag(self.model(x_dict)))/np.imag(self.error)
-                
-            else:
+            model   = self.model(x_dict)
+            err     = 1e-16
+            res_r   = (np.real(self.data)-np.real(model))/(np.real(self.error)+err)
+            res_i   = (np.imag(self.data)-np.imag(model))/(np.imag(self.error)+err)
+            fun_min = np.concatenate((res_r, res_i))
+            constraint_residuals = self.minimization_constraint_residuals(x_dict)
+            if len(constraint_residuals)>0:
+                fun_min = np.concatenate((fun_min, constraint_residuals))
 
-                lh_r    = -0.5 * np.sum(((np.real(self.data)-np.real(self.model(x_dict)))/np.real(self.error))**2)
-                lh_i    = -0.5 * np.sum(((np.imag(self.data)-np.imag(self.model(x_dict)))/np.imag(self.error))**2)
-                self.residuals_tt.append(lh_r + lh_i)
-                self.grid_x.append(x[0])
-                self.grid_y.append(x[1])
-                fun_min = lh_r + lh_i
-            
             return fun_min
+
+        def minimization_constraint_residuals(self, x):
+
+            """
+
+            Return penalty residuals for non-rectangular priors used by the nested sampler.
+
+            `least_squares` enforces the rectangular parameter bounds directly; these residuals
+            make the minimization respect the additional ordering constraints implemented in
+            `log_prior`.
+
+            """
+
+            penalty_scale = 1e6
+            residuals = []
+
+            if('Damped-sinusoids' in self.wf_model.wf_model):
+                # Order the frequencies per given polarisation (same as m1>m2 in LAL).
+                for i in range(1, self.wf_model.N_ds_modes):
+                    try:
+                        f_i      = utils.get_param_override(self.fixed_params, x, 'f_{}'.format(i  ))
+                        f_prev_i = utils.get_param_override(self.fixed_params, x, 'f_{}'.format(i-1))
+                        violation = f_prev_i - f_i
+                        if violation > 0.0: residuals.append(penalty_scale*violation)
+                    except(KeyError):
+                        pass
+
+            if(('Kerr' in self.wf_model.wf_model) and self.wf_model.tail==1):
+                tail_modes = getattr(self, 'tail_modes', self.wf_model.tail_modes)
+                for (l_ring, m_ring) in tail_modes:
+                    try:
+                        p_tail_i    = utils.get_param_override(self.fixed_params, x, 'p_tail_{}{}'.format(l_ring            , m_ring            ))
+                        p_tail_base = utils.get_param_override(self.fixed_params, x, 'p_tail_{}{}'.format(self.wf_model.l_NR, self.wf_model.m_NR))
+                        violation   = p_tail_base - p_tail_i
+                        if violation > 0.0: residuals.append(penalty_scale*violation)
+                    except(KeyError):
+                        pass
+
+            return np.array(residuals)
         
         def log_prior(self,x):
 
@@ -571,7 +721,7 @@ def Dynamic_InferenceModel(base):
 
             if not self.in_bounds(x): return -np.inf
 
-            if(self.wf_model.wf_model=='Damped-sinusoids'):
+            if('Damped-sinusoids' in self.wf_model.wf_model):
                 # Order the frequencies per given polarisation (same as m1>m2 in LAL).
                 for i in range(self.wf_model.N_ds_modes):
                     try:
@@ -582,8 +732,9 @@ def Dynamic_InferenceModel(base):
                         pass
 
             # In the case of Kerr tails, order the tails by exponent
-            if(self.wf_model.wf_model=='Kerr' and self.wf_model.tail==1):
-                for (l_ring, m_ring) in self.tail_modes:
+            if(('Kerr' in self.wf_model.wf_model) and self.wf_model.tail==1):
+                tail_modes = getattr(self, 'tail_modes', self.wf_model.tail_modes)
+                for (l_ring, m_ring) in tail_modes:
                     # FIXME: temporarily valid only for two modes. Eventually do it for an arbitrary number of modes.
                     p_tail_1 = utils.get_param_override(self.fixed_params,x,'p_tail_{}{}'.format(l_ring            , m_ring            ))
                     p_tail_2 = utils.get_param_override(self.fixed_params,x,'p_tail_{}{}'.format(self.wf_model.l_NR, self.wf_model.m_NR))
@@ -592,7 +743,7 @@ def Dynamic_InferenceModel(base):
 
             return 0.0
     
-    return InferenceModel
+    return _register_dynamic_inference_model(base, InferenceModel)
             
         
 class Minimization_Algorithm():
@@ -600,19 +751,50 @@ class Minimization_Algorithm():
     def __init__(self, inference_model, parameters):
 
         self.inference_model = inference_model
-        self.min_method      = inference_model.min_method
         self.bounds          = inference_model.access_bounds()
         self.names           = inference_model.access_names()
 
-        self.iter_min        = parameters['Inference']['min-iter-min']
         self.iter_max        = parameters['Inference']['min-iter-max']
+        self.n_random_seeds  = max(1, parameters['Inference']['n-random-seeds'])
+        self.rng             = np.random.default_rng(parameters['Inference']['seed'])
+        self.min_method      = self._least_squares_method(inference_model.min_method)
 
         # Convert bounds to a format compatible with `least_squares` arguments
-        self.bounds_minim    = ([self.bounds[i][0] for i in range(len(self.bounds))], [self.bounds[i][1] for i in range(len(self.bounds))])
+        self.bounds_minim    = (np.array([self.bounds[i][0] for i in range(len(self.bounds))]), np.array([self.bounds[i][1] for i in range(len(self.bounds))]))
 
-        self.start_values = []
+        self.start_values = self._initial_points()
+        self.best_result  = None
+        self.errors       = {}
+        self.covariance   = None
+
+    def _least_squares_method(self, requested_method):
+
+        if requested_method is None or str(requested_method).lower() in ['', 'none']:
+            requested_method = 'trf'
+
+        requested_method = str(requested_method).lower()
+        if requested_method not in ['trf', 'dogbox']:
+            raise ValueError("Unknown minimization method: {}. Available options are: ['trf', 'dogbox'].".format(requested_method))
+
+        return requested_method
+
+    def _initial_points(self):
+
+        print('\n* Minimization starting values:')
+
+        start_columns = []
         for i,name_x in enumerate(self.names):
-            self.start_values.append(read_parameter_start_minimization(inference_model.Config, configparser, name_x, self.bounds[i]))
+            start_values = read_parameter_start_minimization(self.inference_model.Config, configparser, name_x, self.bounds[i], self.n_random_seeds, rng=self.rng)
+            start_values = np.asarray(start_values, dtype=float)
+
+            if start_values.ndim == 0:
+                start_values = np.full(self.n_random_seeds, float(start_values))
+            else:
+                start_values = np.array(start_values, dtype=float)
+
+            start_columns.append(start_values)
+
+        return np.column_stack(start_columns)
 
     def fun(self, x):
     
@@ -622,92 +804,339 @@ class Minimization_Algorithm():
 
     def minimize_likelihood(self):
 
-        # Initialize the structures
-        j_min    = self.iter_min
-        j_max    = self.iter_max
-        j        = 0
-        x_min_tt = []
-        res_tt   = []
+        best_result = None
 
-        # Initial parameters and corresponding residuals
-        x0_0, res_0 = l_s(self.fun, self.start_values, method = self.min_method)
-        x_min       = x0_0
-        x_min_tt.append(x_min)
-        res_tt.append(  res_0)
+        for i,x0 in enumerate(self.start_values):
+            result = l_s(self.fun,
+                         x0,
+                         bounds   = self.bounds_minim,
+                         method   = self.min_method,
+                         max_nfev = self.iter_max)
 
-        # Start the minimimization loop using the initial parameters
-        min_fun_i = l_s(self.fun, x0_0, method = self.min_method)
-        res_i     = min_fun_i.cost
-        x0_i      = min_fun_i.x
+            print("* Minimization seed {}/{}: cost = {:.12e}, nfev = {}, success = {}".format(i+1, self.n_random_seeds, result.cost, result.nfev, result.success))
 
-        # Iterate until all of these conditions are met:
-        # 1. The cost function is smaller than the *previous* step
-        # 2. All the value are within the bounds
-        # 3. The cost function is larger than the previous one but the number of iterations is smaller than j_min. Forces to do at least jmin iterations
+            if best_result is None or result.cost < best_result.cost:
+                best_result = result
 
-        condition_1  = (np.abs(res_i) < np.abs(res_0))
-        condition_2a = not(all([x_min[i] < self.bounds[i][1] for i in range(len(self.bounds))]))
-        condition_2b = not(all([x_min[i] > self.bounds[i][0] for i in range(len(self.bounds))]))
-        condition_2  = (condition_2a or condition_2b)
-        condition_3  = (np.abs(res_i) >= np.abs(res_0) and j < j_min)
+        if best_result is None:
+            raise RuntimeError("Minimization failed before producing a result.")
 
-        while (condition_1 or condition_2 or condition_3):
-            
-            min_fun_tmp = l_s(self.fun, x0_i, method = self.min_method)
-            res_0       = res_i
-            res_i       = min_fun_tmp.cost
-            
-            condition_1  = (np.abs(res_i) < np.abs(res_0))
-            condition_2  = all([x0_i[i] < self.bounds[i][1] for i in range(len(self.bounds))])
-            condition_3  = all([x0_i[i] > self.bounds[i][0] for i in range(len(self.bounds))])
+        print("\n* Best minimization cost: {:.12e}".format(best_result.cost))
+        if not(best_result.success):
+            print("* Warning: best minimization result did not satisfy scipy's convergence criterion: {}".format(best_result.message))
 
-            if condition_1 and condition_2 and condition_3:
-                
-                x_min = x0_i
-                x0_i  = min_fun_tmp.x
-                x_min_tt.append(x_min)
-                res_tt.append(  res_0)
-                
+        self.best_result = best_result
+        self._estimate_parameter_errors()
+
+        return best_result.x
+
+    def _estimate_parameter_errors(self):
+
+        try:
+            self.errors, self.covariance, eigvals, eigvals_regularized = estimate_least_squares_parameter_errors(self.names, self.best_result)
+            print("* Minimized Fisher eigenvalue range before regularization: [{:.12e}, {:.12e}]".format(np.min(eigvals), np.max(eigvals)))
+            print("* Minimized Fisher condition after regularization: {:.12e}".format(np.max(eigvals_regularized)/np.min(eigvals_regularized)))
+        except Exception as exc:
+            self.errors     = dict((name, np.nan) for name in self.names)
+            self.covariance = None
+            print("* Warning: minimization error estimate failed: {}".format(exc))
+
+class KerrLinearInversion_Algorithm():
+      
+    def __init__(self, inference_model, parameters):
+
+        self.inference_model = inference_model
+        self.names           = inference_model.access_names()
+        self.name_set        = set(self.names)
+        self.fixed_params    = inference_model.fixed_params
+        self.eigenvalue_tol  = parameters['Inference']['linear-inversion-eigenvalue-tol']
+        self.errors          = {}
+        self.covariance      = None
+
+        self._validate_model()
+        self.solve_components, self.fixed_components = self._classify_linear_components()
+
+        if len(self.solve_components)==0:
+            raise ValueError("Linear inversion needs at least one free Kerr complex-amplitude pair.")
+
+        solved_names = set()
+        for component in self.solve_components:
+            solved_names.add(component['ln_A_name'])
+            solved_names.add(component['phi_name'])
+
+        if self.name_set != solved_names:
+            unresolved_names = sorted(self.name_set - solved_names)
+            raise ValueError(
+                "Linear inversion cannot solve non-linear or unsupported free parameters: {}. "
+                "Fix these parameters in [Priors] or use Minimization.".format(', '.join(unresolved_names))
+            )
+
+    def _validate_model(self):
+
+        if not(self.inference_model.wf_model.wf_model=='Kerr'):
+            raise ValueError("Linear inversion is currently implemented only for the Kerr template.")
+
+        if self.inference_model.kind != 'gaussian':
+            raise ValueError("Linear inversion is available only with the gaussian likelihood.")
+
+    def _component_status(self, ln_A_name, phi_name):
+
+        ln_A_free = ln_A_name in self.name_set
+        phi_free  = phi_name  in self.name_set
+
+        if ln_A_free != phi_free:
+            raise ValueError(
+                "Linear inversion requires both `{}` and `{}` to be either free or fixed.".format(ln_A_name, phi_name)
+            )
+
+        return 'free' if ln_A_free else 'fixed'
+
+    def _fixed_complex_amplitude(self, ln_A_name, phi_name):
+
+        ln_A_value = self.fixed_params[ln_A_name]
+        phi_value  = self.fixed_params[phi_name]
+
+        return np.exp(ln_A_value) * np.exp(1j*phi_value)
+
+    def _quadratic_name(self, quad_term, modes):
+
+        (l, m, n), (l1, m1, n1), (l2, m2, n2) = modes
+
+        return '{}_{}{}{}_{}{}{}_{}{}{}'.format(quad_term, l,m,n, l1,m1,n1, l2,m2,n2)
+
+    def _classify_linear_components(self):
+
+        solve_components  = []
+        fixed_components  = {
+            'linear'   : {},
+            'tail'     : {'amplitudes': {}, 'exponents': {}},
+            'quadratic': {},
+        }
+
+        for mode in self.inference_model.wf_model.Kerr_modes:
+            l_ring, m_ring, n = mode
+            mode_string = '{}{}{}'.format(l_ring, m_ring, n)
+            ln_A_name   = 'ln_A_{}'.format(mode_string)
+            phi_name    = 'phi_{}'.format(mode_string)
+            status      = self._component_status(ln_A_name, phi_name)
+
+            if status == 'free':
+                solve_components.append({'kind': 'linear', 'mode': mode, 'ln_A_name': ln_A_name, 'phi_name': phi_name})
             else:
-                delta_A = read_jumps_from_user()
-                # If you have not improved wrt to x0_i, try to change the initial guess
-                x0_i  = []
-                shrinkage_ratio = params['shrinkage_ratio']
-                for i in range(0,len(self.Kerr_modes)):
-                    epsilon_A = np.random.uniform(-1, 1)*2*delta_A[i]/shrinkage_ratio
-                    x0_tmp    = min_fun_tmp.x[i] + epsilon_A
-                    i_test    = 0
-                    while x0_tmp > self.bounds[i][1] and x0_tmp < self.bounds[i][0]:
-                        epsilon_A = np.random.uniform(-1, 1)*2*delta_A[i]/shrinkage_ratio
-                        x0_tmp    = min_fun_tmp.x[i] + epsilon_A
-                        i_test   += 1
-                        if i_test > 100:
-                            print('failure')
-                            exit()
-                    x0_i.append(x0_tmp)
-                
-                min_fun_tmp = l_s(self.fun, x0_i, method = self.min_method)
-                x0_i        = min_fun_tmp.x
-                res_i       = min_fun_tmp.cost
-                j          += 1
+                fixed_components['linear'][mode] = self._fixed_complex_amplitude(ln_A_name, phi_name)
 
-            if(j > j_max): break
-        
-        return x_min_tt[np.argmin(res_tt)]
+        if self.inference_model.wf_model.quadratic_modes is not None:
+            for quad_term in self.inference_model.wf_model.quadratic_modes:
+                for modes in self.inference_model.wf_model.quadratic_modes[quad_term]:
+                    quad_string = self._quadratic_name(quad_term, modes)
+                    ln_A_name   = 'ln_A_{}'.format(quad_string)
+                    phi_name    = 'phi_{}'.format(quad_string)
+                    status      = self._component_status(ln_A_name, phi_name)
+                    key         = (quad_term, modes)
+
+                    if status == 'free':
+                        solve_components.append({'kind': 'quadratic', 'key': key, 'ln_A_name': ln_A_name, 'phi_name': phi_name})
+                    else:
+                        fixed_components['quadratic'][key] = self._fixed_complex_amplitude(ln_A_name, phi_name)
+
+        if self.inference_model.wf_model.tail:
+            for tail_mode in self.inference_model.wf_model.tail_modes:
+                l_ring, m_ring = tail_mode
+                if (l_ring, m_ring, 0) not in self.inference_model.wf_model.Kerr_modes:
+                    raise ValueError(
+                        "Linear inversion needs tail mode `{}{}0` in QNM-modes so the tail basis can be built.".format(l_ring, m_ring)
+                    )
+
+                tail_string    = '{}{}'.format(l_ring, m_ring)
+                ln_A_name      = 'ln_A_tail_{}'.format(tail_string)
+                phi_name       = 'phi_tail_{}'.format(tail_string)
+                p_name         = 'p_tail_{}'.format(tail_string)
+
+                if p_name in self.name_set:
+                    raise ValueError(
+                        "Linear inversion can solve tail amplitudes only at fixed `{}`. "
+                        "Fix `{}` in [Priors] or use Minimization.".format(p_name, p_name)
+                    )
+
+                try:
+                    fixed_components['tail']['exponents'][tail_mode] = self.fixed_params[p_name]
+                except KeyError as exc:
+                    raise ValueError(
+                        "Linear inversion needs fixed `{}` for Kerr tails. "
+                        "Add `fix-{} = value` to [Priors] or use Minimization.".format(p_name, p_name)
+                    ) from exc
+
+                status = self._component_status(ln_A_name, phi_name)
+                if status == 'free':
+                    solve_components.append(
+                        {'kind': 'tail', 'tail_mode': tail_mode, 'ln_A_name': ln_A_name, 'phi_name': phi_name}
+                    )
+                else:
+                    fixed_components['tail']['amplitudes'][tail_mode] = self._fixed_complex_amplitude(ln_A_name, phi_name)
+
+        return solve_components, fixed_components
+
+    def _waveform_from_components(self, components, include_const=False):
+
+        return self.inference_model.wf_model.kerr_waveform_from_components(
+            amplitudes           = components.get('linear', {}),
+            tail_amplitudes      = components.get('tail', {}).get('amplitudes', {}),
+            tail_exponents       = components.get('tail', {}).get('exponents', {}),
+            quadratic_amplitudes = components.get('quadratic', {}),
+            include_const        = include_const,
+        )
+
+    def _component_amplitudes(self, component, amplitude):
+
+        amplitudes = {
+            'linear'   : {},
+            'tail'     : {'amplitudes': {}, 'exponents': self.fixed_components['tail']['exponents']},
+            'quadratic': {},
+        }
+
+        if component['kind'] == 'linear':
+            amplitudes['linear'][component['mode']] = amplitude
+        elif component['kind'] == 'quadratic':
+            amplitudes['quadratic'][component['key']] = amplitude
+        elif component['kind'] == 'tail':
+            amplitudes['tail']['amplitudes'][component['tail_mode']] = amplitude
+        else:
+            raise ValueError("Unknown linear-inversion component kind: {}".format(component['kind']))
+
+        return amplitudes
+
+    def _fixed_waveform(self):
+
+        if (
+            len(self.fixed_components['linear'])==0
+            and len(self.fixed_components['tail']['amplitudes'])==0
+            and len(self.fixed_components['quadratic'])==0
+        ):
+            return np.zeros(len(self.inference_model.data), dtype=np.complex128)
+
+        return self._waveform_from_components(self.fixed_components, include_const=False)
+
+    def _constant_waveform(self):
+
+        waveform_model = self.inference_model.wf_model
+        const_waveform = np.zeros(len(self.inference_model.data), dtype=np.complex128)
+
+        if not(waveform_model.const_params==None):
+            const_value = waveform_model.const_params[0]*np.cos(waveform_model.const_params[1])
+            const_value = -const_value + 1j*waveform_model.const_params[0]*np.sin(waveform_model.const_params[1])
+            const_waveform += const_value
+
+        return const_waveform
+
+    def _weighted_vector(self, waveform):
+
+        err = 1e-16
+        sigma_r = np.real(self.inference_model.error) + err
+        sigma_i = np.imag(self.inference_model.error) + err
+
+        return np.concatenate((np.real(waveform)/sigma_r, np.imag(waveform)/sigma_i))
+
+    def _component_basis(self, component, amplitude):
+
+        return self._waveform_from_components(self._component_amplitudes(component, amplitude), include_const=False)
+
+    def _design_matrix(self):
+
+        columns = []
+        for component in self.solve_components:
+            columns.append(self._weighted_vector(self._component_basis(component, 1.0 + 0.0j)))
+            columns.append(self._weighted_vector(self._component_basis(component, 0.0 + 1.0j)))
+
+        return np.column_stack(columns)
+
+    def _regularized_inverse(self, matrix):
+
+        return _regularized_symmetric_inverse(matrix, eigenvalue_tol=self.eigenvalue_tol)
+
+    def _parameter_covariance(self, linear_solution, cartesian_covariance):
+
+        transform = np.zeros((len(self.names), len(linear_solution)))
+        name_indices = dict((name, i) for i, name in enumerate(self.names))
+
+        for i, component in enumerate(self.solve_components):
+            real_index = 2*i
+            imag_index = real_index + 1
+
+            amplitude_real = linear_solution[real_index]
+            amplitude_imag = linear_solution[imag_index]
+            amplitude_norm_squared = max(amplitude_real**2 + amplitude_imag**2, 1e-300)
+
+            ln_A_index = name_indices[component['ln_A_name']]
+            phi_index  = name_indices[component['phi_name']]
+
+            transform[ln_A_index, real_index] =  amplitude_real/amplitude_norm_squared
+            transform[ln_A_index, imag_index] =  amplitude_imag/amplitude_norm_squared
+            transform[phi_index , real_index] = -amplitude_imag/amplitude_norm_squared
+            transform[phi_index , imag_index] =  amplitude_real/amplitude_norm_squared
+
+        covariance = np.dot(transform, np.dot(cartesian_covariance, transform.T))
+        covariance = 0.5*(covariance + covariance.T)
+
+        return covariance
+
+    def solve_likelihood(self):
+
+        baseline = self._constant_waveform() + self._fixed_waveform()
+        data_vec = self._weighted_vector(self.inference_model.data - baseline)
+        design   = self._design_matrix()
+
+        fisher = np.dot(design.T, design)
+        fisher = 0.5*(fisher + fisher.T)
+        rhs    = np.dot(design.T, data_vec)
+
+        fisher_inv, eigvals, eigvals_regularized = self._regularized_inverse(fisher)
+        linear_solution = np.dot(fisher_inv, rhs)
+
+        residual = data_vec - np.dot(design, linear_solution)
+        cost     = 0.5*np.dot(residual, residual)
+
+        print("* Linear inversion solved {} complex Kerr amplitudes.".format(len(self.solve_components)))
+        print("* Linear inversion cost: {:.12e}".format(cost))
+        print("* Fisher eigenvalue range before regularization: [{:.12e}, {:.12e}]".format(np.min(eigvals), np.max(eigvals)))
+        print("* Fisher eigenvalue tolerance: {:.12e}".format(self.eigenvalue_tol))
+        print("* Fisher condition after regularization: {:.12e}".format(np.max(eigvals_regularized)/np.min(eigvals_regularized)))
+
+        self.covariance = self._parameter_covariance(linear_solution, fisher_inv)
+        self.errors     = _errors_from_covariance(self.names, self.covariance)
+
+        results = {}
+        for i, component in enumerate(self.solve_components):
+            complex_amplitude = linear_solution[2*i] + 1j*linear_solution[2*i+1]
+            results[component['ln_A_name']] = np.log(max(np.abs(complex_amplitude), 1e-300))
+            results[component['phi_name']]  = np.angle(complex_amplitude) % twopi
+
+        return np.array([results[name] for name in self.names])
 
 def run_inference(parameters, inference_model):
 
     if(parameters['Inference']['method'] == 'Minimization'):
-        
-        utils.minimisation_compatibility_check(parameters)
 
         print('\nStarting minimization algorithm using `scipy.optimize.least_squares`.\n')
         
         minimization         = Minimization_Algorithm(inference_model, parameters)
         minimization_results = minimization.minimize_likelihood()
         
-        results_object = dict(zip(inference_model.names, minimization_results))
-        postprocess.save_results_minimization(results_object, parameters['I/O']['outdir'])
+        point_estimate = dict(zip(inference_model.names, minimization_results))
+        postprocess.save_point_estimates(point_estimate, parameters['I/O']['outdir'], errors=minimization.errors)
+        postprocess.save_point_estimate_posterior(point_estimate, parameters['I/O']['outdir'], covariance=minimization.covariance, errors=minimization.errors, seed=parameters['Inference']['seed'])
+        results_object = postprocess.read_posterior_samples(parameters['I/O']['outdir'])
+
+    elif(is_linear_inversion_method(parameters['Inference']['method'])):
+
+        print('\nStarting Kerr linear inversion using weighted normal equations.\n')
+        
+        linear_inversion         = KerrLinearInversion_Algorithm(inference_model, parameters)
+        linear_inversion_results = linear_inversion.solve_likelihood()
+        
+        point_estimate = dict(zip(inference_model.names, linear_inversion_results))
+        postprocess.save_point_estimates(point_estimate, parameters['I/O']['outdir'], errors=linear_inversion.errors)
+        postprocess.save_point_estimate_posterior(point_estimate, parameters['I/O']['outdir'], covariance=linear_inversion.covariance, errors=linear_inversion.errors, seed=parameters['Inference']['seed'])
+        results_object = postprocess.read_posterior_samples(parameters['I/O']['outdir'])
 
     elif(parameters['Inference']['method'] == 'Nested-sampler'):
         
