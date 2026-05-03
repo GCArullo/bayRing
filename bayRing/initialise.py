@@ -472,6 +472,8 @@ A dot is present at the end of each description line and is not to be intended a
         
         Prior default bounds can be changed by adding 'param-min=value' or 'param-max=value' to this section, where `param` is the name of the parameter under consideration.
 
+        Parameters can be fixed by adding 'fix-param=value' to this section, where `param` is the name of the parameter under consideration.
+
         User-controlled starting values for the minimization can be set by adding`'param-start=value` to the [Priors] section, where `param` is the name of the parameter under consideration. User-defined starting values overrun the `seeding` option for that parameter.
         
     *******************************************************************
