@@ -334,6 +334,7 @@ if "pyRing" not in sys.modules:
     fake_pyRing = types.ModuleType("pyRing")
     fake_pyRing_utils = types.ModuleType("pyRing.utils")
     fake_pyRing_waveform = types.ModuleType("pyRing.waveform")
+    fake_pyRing_initialise = types.ModuleType("pyRing.initialise")
 
     def _fake_print_section(message):
         return message
@@ -350,6 +351,7 @@ if "pyRing" not in sys.modules:
     }
 
     fake_pyRing_utils.print_section = _fake_print_section
+    fake_pyRing_utils.print_subsection = _fake_print_section
     fake_pyRing_utils.railing_check = _fake_railing_check
     fake_pyRing_utils.compute_KerrBinary_binary_quantities = _fake_compute_binary_quantities
     fake_pyRing_utils.available_modes_dict_KerrBinary = {"London2018": fake_modes, "noncircular": fake_modes}
@@ -357,13 +359,16 @@ if "pyRing" not in sys.modules:
     fake_pyRing_waveform.KerrBH = lambda *args, **kwargs: {"args": args, "kwargs": kwargs}
     fake_pyRing_waveform.damped_sinusoid = lambda *args, **kwargs: 0j
     fake_pyRing_waveform.KerrBinary = lambda *args, **kwargs: {"args": args, "kwargs": kwargs}
+    fake_pyRing_initialise.store_git_info = lambda *args, **kwargs: None
 
     fake_pyRing.utils = fake_pyRing_utils
     fake_pyRing.waveform = fake_pyRing_waveform
+    fake_pyRing.initialise = fake_pyRing_initialise
 
     sys.modules["pyRing"] = fake_pyRing
     sys.modules["pyRing.utils"] = fake_pyRing_utils
     sys.modules["pyRing.waveform"] = fake_pyRing_waveform
+    sys.modules["pyRing.initialise"] = fake_pyRing_initialise
 
 
 if "scipy" not in sys.modules:
@@ -392,6 +397,7 @@ if "scipy" not in sys.modules:
     fake_optimize.minimize = _fake_minimize
     fake_optimize.fmin = _fake_minimize
     fake_interpolate.interp1d = _fake_interp1d
+    fake_interpolate.CubicSpline = _fake_interp1d
     fake_linalg.toeplitz = lambda values: _FakeArray(_FakeArray(values) for _ in values)
     fake_linalg.solve_toeplitz = lambda acf, values, check_finite=True: values
     fake_signal.find_peaks = _fake_find_peaks
@@ -511,7 +517,13 @@ if "matplotlib" not in sys.modules:
 if "qnm" not in sys.modules:
     fake_qnm = types.ModuleType("qnm")
     fake_qnm.modes_cache = lambda *args, **kwargs: (lambda **inner_kwargs: types.SimpleNamespace())
+    fake_qnm.download_data = lambda *args, **kwargs: None
     sys.modules["qnm"] = fake_qnm
+
+
+if "sxs" not in sys.modules:
+    fake_sxs = types.ModuleType("sxs")
+    sys.modules["sxs"] = fake_sxs
 
 
 if "seaborn" not in sys.modules:
