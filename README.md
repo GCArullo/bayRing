@@ -14,7 +14,7 @@ Relies on [pyRing](https://git.ligo.org/lscsoft/pyring) for waveform interfacing
 
 # Documentation
 
-The documentation is expected at [https://gcarullo.github.io/bayRing/](https://gcarullo.github.io/bayRing/).
+The documentation can be found at [https://gcarullo.github.io/bayRing/](https://gcarullo.github.io/bayRing/).
 
 # Citing
 
