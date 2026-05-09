@@ -47,6 +47,13 @@ HERE = Path(__file__).parent
 with open(HERE / "pypi_description.rst", encoding='utf-8') as f:
     long_description = f.read()
 
+with open(HERE / "docs" / "requirements.txt") as docs_requires_file:
+    docs_requirements = [
+        requirement.strip()
+        for requirement in docs_requires_file
+        if requirement.strip() and not requirement.startswith("#")
+    ]
+
 setup(
     # metadata
     name="bayRing",
@@ -54,6 +61,9 @@ setup(
     # contents
     packages=find_packages(),
     long_description=long_description,
+    extras_require={
+        "docs": docs_requirements,
+    },
 )
 
 try:
