@@ -339,6 +339,173 @@ a:hover,
   padding: 0.35rem 1rem;
 }
 
+.citation-list {
+  display: grid;
+  gap: 0.7rem;
+  margin: 1rem 0 1.6rem;
+}
+
+.citation-prose p {
+  margin-bottom: 0.95rem;
+}
+
+.citation-card {
+  align-items: flex-start;
+  background: #f8fafc;
+  border: 1px solid var(--bayring-line);
+  border-left: 0.28rem solid #b31b1b;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(17, 24, 32, 0.04);
+  color: #16212d !important;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.82rem 0.95rem;
+  text-decoration: none !important;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.citation-card:hover {
+  border-color: #d7b7b7;
+  box-shadow: 0 12px 28px rgba(17, 24, 32, 0.08);
+  transform: translateY(-1px);
+}
+
+.citation-card-featured {
+  background: linear-gradient(180deg, #ffffff 0, #f8fafc 100%);
+}
+
+.citation-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.citation-title {
+  color: #16212d;
+  font-size: 0.98rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.citation-meta {
+  color: var(--bayring-muted);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.citation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  margin-top: 0.48rem;
+}
+
+.arxiv-mark {
+  align-self: flex-start;
+  background: var(--chip-accent, #b31b1b);
+  border-radius: 4px;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+  color: #ffffff;
+  display: inline-flex;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  padding: 0.23rem 0.31rem 0.25rem;
+  white-space: nowrap;
+}
+
+.arxiv-chip {
+  --chip-accent: #b31b1b;
+  --chip-border: #ead1d1;
+  --chip-hover-bg: #fff6f6;
+  --chip-hover-border: #d9a8a8;
+  --chip-text: #6d1717;
+  --chip-hover-text: #4e0e0e;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--chip-border);
+  border-radius: 5px;
+  color: var(--chip-text) !important;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 800;
+  gap: 0.25rem;
+  line-height: 1.1;
+  padding: 0.14rem 0.34rem 0.14rem 0.14rem;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+
+.arxiv-chip:hover {
+  background: var(--chip-hover-bg);
+  border-color: var(--chip-hover-border);
+  color: var(--chip-hover-text) !important;
+}
+
+.citation-list .citation-card:nth-child(6n+1) .arxiv-chip,
+.arxiv-chip.chip-red {
+  --chip-accent: #b31b1b;
+  --chip-border: #ead1d1;
+  --chip-hover-bg: #fff6f6;
+  --chip-hover-border: #d9a8a8;
+  --chip-text: #6d1717;
+  --chip-hover-text: #4e0e0e;
+}
+
+.citation-list .citation-card:nth-child(6n+2) .arxiv-chip,
+.arxiv-chip.chip-orange {
+  --chip-accent: #c65a15;
+  --chip-border: #efd4bf;
+  --chip-hover-bg: #fff7f0;
+  --chip-hover-border: #dda778;
+  --chip-text: #74360f;
+  --chip-hover-text: #512509;
+}
+
+.citation-list .citation-card:nth-child(6n+3) .arxiv-chip,
+.arxiv-chip.chip-amber {
+  --chip-accent: #8a5b13;
+  --chip-border: #ead9b9;
+  --chip-hover-bg: #fff9ed;
+  --chip-hover-border: #d3b678;
+  --chip-text: #68440e;
+  --chip-hover-text: #4a3009;
+}
+
+.citation-list .citation-card:nth-child(6n+4) .arxiv-chip,
+.arxiv-chip.chip-green {
+  --chip-accent: #2d7a58;
+  --chip-border: #c8e1d4;
+  --chip-hover-bg: #f3fbf6;
+  --chip-hover-border: #9fc8b4;
+  --chip-text: #1e5940;
+  --chip-hover-text: #173f2f;
+}
+
+.citation-list .citation-card:nth-child(6n+5) .arxiv-chip,
+.arxiv-chip.chip-blue {
+  --chip-accent: #2868a9;
+  --chip-border: #c9dcf0;
+  --chip-hover-bg: #f4f9ff;
+  --chip-hover-border: #9ebfe2;
+  --chip-text: #164a7f;
+  --chip-hover-text: #0e345b;
+}
+
+.citation-list .citation-card:nth-child(6n) .arxiv-chip,
+.arxiv-chip.chip-violet {
+  --chip-accent: #6f5aa8;
+  --chip-border: #d9d1ef;
+  --chip-hover-bg: #f8f6ff;
+  --chip-hover-border: #b9abe2;
+  --chip-text: #514083;
+  --chip-hover-text: #372b5e;
+}
+
 .resource-chips {
   display: flex;
   flex-wrap: wrap;
@@ -347,23 +514,90 @@ a:hover,
 }
 
 .resource-chip {
+  --resource-border: #ead1d1;
+  --resource-hover-bg: #fff6f6;
+  --resource-hover-border: #d9a8a8;
+  --resource-hover-text: #4e0e0e;
+  --resource-mark-bg: #b31b1b;
   align-items: center;
   background: #ffffff;
-  border: 1px solid #c9dcf0;
+  border: 1px solid var(--resource-border);
   border-radius: 7px;
-  color: #164a7f !important;
+  color: #16212d !important;
   display: inline-flex;
   font-size: 0.86rem;
   font-weight: 800;
+  gap: 0.38rem;
   line-height: 1.2;
-  padding: 0.32rem 0.5rem;
+  padding: 0.22rem 0.5rem 0.22rem 0.22rem;
   text-decoration: none !important;
 }
 
 .resource-chip:hover {
-  background: #f4f9ff;
-  border-color: #9ebfe2;
-  color: #0e345b !important;
+  background: var(--resource-hover-bg);
+  border-color: var(--resource-hover-border);
+  color: var(--resource-hover-text) !important;
+}
+
+.resource-mark {
+  background: var(--resource-mark-bg);
+  border-radius: 4px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+  padding: 0.23rem 0.31rem 0.25rem;
+  white-space: nowrap;
+}
+
+.resource-chips .resource-chip:nth-child(6n+1) {
+  --resource-border: #ead1d1;
+  --resource-hover-bg: #fff6f6;
+  --resource-hover-border: #d9a8a8;
+  --resource-hover-text: #4e0e0e;
+  --resource-mark-bg: #b31b1b;
+}
+
+.resource-chips .resource-chip:nth-child(6n+2) {
+  --resource-border: #efd4bf;
+  --resource-hover-bg: #fff7f0;
+  --resource-hover-border: #dda778;
+  --resource-hover-text: #512509;
+  --resource-mark-bg: #c65a15;
+}
+
+.resource-chips .resource-chip:nth-child(6n+3) {
+  --resource-border: #ead9b9;
+  --resource-hover-bg: #fff9ed;
+  --resource-hover-border: #d3b678;
+  --resource-hover-text: #4a3009;
+  --resource-mark-bg: #8a5b13;
+}
+
+.resource-chips .resource-chip:nth-child(6n+4) {
+  --resource-border: #c8e1d4;
+  --resource-hover-bg: #f3fbf6;
+  --resource-hover-border: #9fc8b4;
+  --resource-hover-text: #173f2f;
+  --resource-mark-bg: #2d7a58;
+}
+
+.resource-chips .resource-chip:nth-child(6n+5) {
+  --resource-border: #c9dcf0;
+  --resource-hover-bg: #f4f9ff;
+  --resource-hover-border: #9ebfe2;
+  --resource-hover-text: #0e345b;
+  --resource-mark-bg: #2868a9;
+}
+
+.resource-chips .resource-chip:nth-child(6n) {
+  --resource-border: #d9d1ef;
+  --resource-hover-bg: #f8f6ff;
+  --resource-hover-border: #b9abe2;
+  --resource-hover-text: #372b5e;
+  --resource-mark-bg: #6f5aa8;
 }
 
 @media screen and (max-width: 920px) {

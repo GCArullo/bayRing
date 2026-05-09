@@ -20,6 +20,7 @@ incorporating time-dependent numerical relativity uncertainties.
      <a href="introduction.html">Introduction</a>
      <a href="install_and_run.html">Install</a>
      <a href="tutorials.html">Examples</a>
+     <a href="publications.html">Publications</a>
      <a href="waveform_models.html">Waveforms</a>
      <a href="nr_data.html">NR data</a>
      <a href="inference_methods.html">Inference</a>
@@ -32,6 +33,7 @@ incorporating time-dependent numerical relativity uncertainties.
    introduction
    install_and_run
    tutorials
+   publications
 
 .. toctree::
    :maxdepth: 2
