@@ -8,7 +8,8 @@ need local edits.
 Developer Installation
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Clone the repository and expose its location through ``BAYRING_PREFIX``:
+Clone the `bayRing repository <https://github.com/GCArullo/bayRing>`_ and
+expose its location through ``BAYRING_PREFIX``:
 
 .. code-block:: bash
 
