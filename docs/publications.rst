@@ -1,5 +1,5 @@
-Scientific Publications
-=======================
+Scientific Publications and Citation
+====================================
 
 ``bayRing`` was used in several scientific publications, to infer new physical
 components of gravitational waveforms, perform Bayesian fits of
@@ -13,6 +13,26 @@ numerical-relativity ringdown data, or evaluate model accuracy.
        <a class="arxiv-chip chip-red" href="https://arxiv.org/abs/2505.23895"><span class="arxiv-mark" aria-hidden="true">arXiv</span><span>2505.23895</span></a>.
      </p>
    </div>
+
+Citing ``bayRing``
+------------------
+
+When referencing ``bayRing`` in your publications, please cite the software
+Zenodo release:
+
+.. code-block:: bibtex
+
+   @software{carullo_gregorio_2023_8284026,
+     author       = {Carullo, Gregorio and De Amicis, Marina and Redondo-Yuste, Jaime},
+     title        = {bayRing},
+     month        = aug,
+     year         = 2023,
+     publisher    = {Zenodo},
+     version      = {1.0.0},
+     doi          = {10.5281/zenodo.8284026},
+     url          = {https://doi.org/10.5281/zenodo.8284026},
+     howpublished = "\href{https://github.com/GCArullo/bayRing}{github.com/GCArullo/bayRing}",
+   }
 
 Publications Using ``bayRing``
 ------------------------------
