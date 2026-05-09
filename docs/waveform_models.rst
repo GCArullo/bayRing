@@ -15,6 +15,10 @@ NR multipole.
 For an introduction to the models used, see the `pyRing waveforms page
 <https://lscsoft.docs.ligo.org/pyring/#ringdown-models>`_.
 
+.. image:: _static/bayring_waveform_models.svg
+   :width: 850
+   :alt: bayRing waveform template choices and their shared complex model output
+
 Model Selection Summary
 ~~~~~~~~~~~~~~~~~~~~~~~
 

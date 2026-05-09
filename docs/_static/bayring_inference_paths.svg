@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="960" height="470" viewBox="0 0 960 470" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="470" rx="18" fill="#f8fbff"/>
+  <rect x="28" y="28" width="904" height="414" rx="14" fill="#ffffff" stroke="#dce5ef" stroke-width="2"/>
+
+  <text x="56" y="72" font-family="Lato, Helvetica, Arial, sans-serif" font-size="28" font-weight="800" fill="#111820">Inference paths</text>
+  <rect x="64" y="153" width="185" height="86" rx="8" fill="#edf7f8" stroke="#83c9cf" stroke-width="2"/>
+  <text x="156" y="184" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="18" font-weight="800" fill="#0b5057">NR data</text>
+  <text x="156" y="208" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#315961">complex multipole</text>
+  <text x="156" y="226" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#315961">and error vector</text>
+
+  <rect x="64" y="257" width="185" height="86" rx="8" fill="#fff4e4" stroke="#e2ad5c" stroke-width="2"/>
+  <text x="156" y="288" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="18" font-weight="800" fill="#7d3d00">Model</text>
+  <text x="156" y="312" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#7d3d00">template waveform</text>
+  <text x="156" y="330" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#7d3d00">on the NR grid</text>
+
+  <rect x="325" y="185" width="236" height="126" rx="10" fill="#fbfdff" stroke="#dce5ef" stroke-width="2"/>
+  <text x="443" y="218" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="19" font-weight="800" fill="#29313d">Inference model</text>
+  <text x="443" y="244" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#5f6572">residual: d - h(theta)</text>
+  <text x="443" y="265" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#5f6572">weighted Gaussian likelihood</text>
+  <text x="443" y="286" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#5f6572">bounds and fixed values</text>
+
+  <path d="M249 196 C286 196 292 222 323 222" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M314 214 L325 222 L314 230" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M249 300 C286 300 292 274 323 274" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M314 266 L325 274 L314 282" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="640" y="128" width="230" height="72" rx="8" fill="#f5f1ff" stroke="#b7a6e8" stroke-width="2"/>
+  <text x="755" y="157" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="17" font-weight="800" fill="#514083">Nested sampling</text>
+  <text x="755" y="181" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#514083">posterior samples and evidence</text>
+
+  <rect x="640" y="222" width="230" height="72" rx="8" fill="#f3fbf6" stroke="#9fc8b4" stroke-width="2"/>
+  <text x="755" y="251" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="17" font-weight="800" fill="#1e5940">Minimization</text>
+  <text x="755" y="275" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#1e5940">bounded least squares</text>
+
+  <rect x="640" y="316" width="230" height="72" rx="8" fill="#fff4e4" stroke="#e2ad5c" stroke-width="2"/>
+  <text x="755" y="345" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="17" font-weight="800" fill="#7d3d00">Linear inversion</text>
+  <text x="755" y="369" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#7d3d00">direct Kerr amplitudes</text>
+
+  <path d="M561 248 C595 248 595 164 638 164" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M628 155 L640 164 L628 173" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M561 248 H638" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M628 239 L640 248 L628 257" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M561 248 C595 248 595 352 638 352" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M628 343 L640 352 L628 361" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+</svg>

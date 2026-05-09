@@ -5,6 +5,18 @@ Numerical-Relativity Data
 selects the catalogue, simulation, resolution, waveform type, fitted
 multipole, local paths and NR error prescription.
 
+.. figure:: _static/bayring_nr_picture.svg
+   :width: 850
+   :alt: NR multipole picture with peak time, fit interval and error bars
+
+   The catalogue reader keeps the full multipole available for context, while
+   inference uses only the highlighted interval and the corresponding error
+   vector.
+
+.. image:: _static/bayring_nr_data_flow.svg
+   :width: 850
+   :alt: bayRing numerical-relativity data loading, peak reference, fit interval and error model
+
 Catalogue Selection
 ~~~~~~~~~~~~~~~~~~~
 

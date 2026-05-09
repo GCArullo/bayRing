@@ -11,6 +11,17 @@ Inference Methods
 Allowed values are ``Nested-sampler``, ``Minimization`` and
 ``Linear-inversion``.
 
+.. figure:: _static/bayring_inference_residual_picture.svg
+   :width: 850
+   :alt: Weighted residual picture for bayRing likelihood evaluations
+
+   The inference target is the weighted residual between the selected NR
+   multipole and the model evaluated on the same time samples.
+
+.. image:: _static/bayring_inference_paths.svg
+   :width: 850
+   :alt: bayRing inference paths from NR data and waveform model to nested sampling, minimization and linear inversion
+
 .. toctree::
    :maxdepth: 1
 
