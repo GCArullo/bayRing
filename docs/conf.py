@@ -9,7 +9,7 @@ sys.path.insert(0, repo_root)
 # -- Project information -----------------------------------------------------
 
 project = 'bayRing'
-copyright = '2023 onwards, Gregorio Carullo'
+copyright = '2023 onwards, Gregorio Carullo, Marina De Amicis, Jaime Redondo Yuste'
 author = 'Gregorio Carullo, Marina De Amicis, Jaime Redondo-Yuste'
 
 try:

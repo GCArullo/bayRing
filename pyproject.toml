@@ -1,6 +1,48 @@
+[project]
+requires-python = ">=3"
+name = "bayRing"
+description = "bayRing: Bayesian modelling of Ringdown waveforms with Nested Sampling."
+dynamic = ["version", "readme"]
+dependencies = [
+    "corner",
+    "cpnest",
+    "matplotlib",
+    "numpy",
+    "pycbc",
+    "pyRingGW",
+    "qnm",
+    "seaborn",
+    "scipy",
+    "sxs",
+]
+authors = [
+    {name = "Gregorio Carullo", email = "gregorio.carullo@ligo.org"},
+    {name = "Marina De Amicis"},
+    {name = "Jaime Redondo Yuste"},
+]
+license = "MIT"
+classifiers = [
+    "Operating System :: OS Independent",
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+]
+
+[project.urls]
+"Bug Tracker" = "https://github.com/GCArullo/bayRing/issues"
+"Source Code" = "https://github.com/GCArullo/bayRing"
+
+[project.scripts]
+bayRing = "bayRing.bayRing:main"
+
 [build-system]
 requires = [
-    "setuptools>=42",
+    "setuptools>=60",
+    "setuptools_scm>=8.0",
     "wheel",
 ]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
