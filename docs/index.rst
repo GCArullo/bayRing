@@ -55,6 +55,4 @@ incorporating time-dependent numerical relativity uncertainties.
 Indices & Tables
 ----------------
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+:ref:`genindex` | :ref:`modindex` | :ref:`search`
