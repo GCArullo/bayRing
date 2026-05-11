@@ -267,11 +267,6 @@ def read_config(Config):
         parameters['Model']['QNM-modes']     = '220,221,210,211,330,331,320,321,310,311,440,441,430,431,420,421,410,411,550,551'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4  or parameters['NR-data']['l-NR']==5): raise ValueError("The TEOBPM template is only available for l=2,3,4,5")
         
-        if parameters['Model']['TEOB-NR-fit'] == 0:
-            keytype = type(parameters['Model']['TEOB-qc-fit-type'])
-            try                                                     : parameters['Model']['TEOB-qc-fit-type'] = keytype(Config.get('Model', 'TEOB-qc-fit-type'))
-            except (KeyError, configparser.NoOptionError, TypeError): pass
-
     print('\n\n\nFIXME: print updated vars\n\n\n')
 
     return parameters
