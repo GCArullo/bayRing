@@ -2,7 +2,6 @@ import ast, json, os, sys
 try:                import configparser
 except ImportError: import ConfigParser as configparser
 
-import bayRing.QNM_utils as QNM_utils
 import pyRing.utils    as pyRing_utils
 from pyRing.initialise import store_git_info
 
@@ -22,7 +21,7 @@ def set_output(outdir, screen_output, method, config_file, run_type):
         If True, the output is printed on the screen.
 
     method : str
-        Method used to obtain the results with which the results will be obtained. Can be either 'Minimization' or 'Nested-sampler'.
+        Method used to obtain the results with which the results will be obtained.
     
     Returns
     -------
@@ -149,9 +148,10 @@ def read_config(Config):
         't-end'            : 140.0,
         'dt-scd'           : 0.0  ,
         
-        'min-method'       : 'lm',
-        'min-iter-min'     : 1   ,
+        'min-method'       : 'trf',
         'min-iter-max'     : 1000,
+        'n-random-seeds'   : 16  ,
+        'linear-inversion-eigenvalue-tol': 1e-10,
         },
 
         'Mismatch-PSD-settings':
@@ -230,13 +230,14 @@ def read_config(Config):
         if not(parameters['Injection-data']['times']=='from-SXS-NR'):
             raise ValueError("When the error is taken from the corresponding SXS simulation, the times must be taken from the simulation as well.")
     
-    if (parameters['Inference']['method']=='Minimization'): raise ValueError("Minimization is still a work in progress and is not supported yet. Please use the `Nested-sampler` method.")
-
-    if not(parameters['Inference']['method']=='Nested-sampler'):
+    if(parameters['Inference']['method'] in ['Minimization', 'Linear-inversion']):
 
         parameters['Inference']['nlive']   = None
         parameters['Inference']['maxmcmc'] = None
-        parameters['Inference']['nGuess']  = {'A' : parameters['Inference']['nGuess-A'], 'phi' : parameters['Inference']['nGuess-phi']}
+
+    elif not(parameters['Inference']['method']=='Nested-sampler'):
+
+        raise ValueError("Unknown inference method: {}.".format(parameters['Inference']['method']))
 
     if(parameters['NR-data']['catalog'] == 'cbhdb' or parameters['NR-data']['catalog'] == 'charged_raw'): parameters['Model']['charge'] = 1
     else                                                                                                : parameters['Model']['charge'] = 0
@@ -247,20 +248,30 @@ def read_config(Config):
 
     if  (parameters['Model']['template']=='Damped-sinusoids'): 
         parameters['Model']['QNM-modes'] = '{}{}0'.format(parameters['NR-data']['l-NR'], parameters['NR-data']['m']) 
+
     elif(parameters['Model']['template']=='KerrBinary'          ): 
+
         if  (parameters['Model']['KerrBinary-version']=='London2018'): 
             parameters['Model']['QNM-modes'] = '220,221,210,330,331,320,440,430,2-20,2-21,2-10,3-30,3-31,3-20,4-40,4-30'
             if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4): raise ValueError("The KerrBinary-London template is only available for l=2,3,4")
+        
         elif(parameters['Model']['KerrBinary-version']=='Cheung2023'): 
             parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,440,430,550,2-20,2-10'
             if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4 or parameters['NR-data']['l-NR']==5): raise ValueError("The KerrBinary-Cheung template is only available for l=2,3,4,5")
+        
         elif  (parameters['Model']['KerrBinary-version']=='noncircular'): 
             parameters['Model']['QNM-modes'] = '220,210,330'
             if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4): raise ValueError("The KerrBinary-noncircular template is only available for l=2,3")  
+    
     elif(parameters['Model']['template']=='TEOBPM'      ):
-        parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,321,310,311,440,441,430,431,420,421,410,411,550,551'
+        parameters['Model']['QNM-modes']     = '220,221,210,211,330,331,320,321,310,311,440,441,430,431,420,421,410,411,550,551'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4  or parameters['NR-data']['l-NR']==5): raise ValueError("The TEOBPM template is only available for l=2,3,4,5")
         
+        if parameters['Model']['TEOB-NR-fit'] == 0:
+            keytype = type(parameters['Model']['TEOB-qc-fit-type'])
+            try                                                     : parameters['Model']['TEOB-qc-fit-type'] = keytype(Config.get('Model', 'TEOB-qc-fit-type'))
+            except (KeyError, configparser.NoOptionError, TypeError): pass
+
     print('\n\n\nFIXME: print updated vars\n\n\n')
 
     return parameters
@@ -408,7 +419,7 @@ A dot is present at the end of each description line and is not to be intended a
 
         For more information about the sampling algorithm, see the respective samplers documentation.
 
-        method           Inference method to be used. Available options: ['Nested-sampler', 'Minimization'].                 Default: 'Nested-sampler'.
+        method           Inference method to be used. Available options: ['Nested-sampler', 'Minimization', 'Linear-inversion']. Default: 'Nested-sampler'.
         
         t-start          Start time of the fit and reference time of amplitudes [M units]. \
             Relative to complex strain amplitude peak time.                                                                  Default: 20.
@@ -437,25 +448,31 @@ A dot is present at the end of each description line and is not to be intended a
                          of live points being substituted at each NS step. Requires N_ev << nlive. \
                          Also n_cpu = nnest+nensemble.                                                                       Default: 1.
 
-        *************************************
-        * Minimization specific parameters. *
-        *************************************  
+        *****************************************
+        * Point-estimate specific parameters.   *
+        *****************************************  
 
             The minimization:
 
                 - is bounded within the selected prior bounds;
                 - is seeded by a starting value, which can be either set by the user, or will be randomly selected within \
                   the prior bounds. In the latter case, a user-given number of seeds will be used and the best one will
-                  be kept to initialize the main minimization loop;
-                - is forced to run for a minimum number of iterations, and to stop after a maximum number of iterations; 
+                  be kept as the point estimate;
+                - is stopped after a maximum number of function evaluations per seed; 
         
-            min-method       Method to be used in the scipy.least_squares() function. Available options: ['lm', 'None'].         Default: 'lm'.
-            
-            min-iter-min     Minimum number of iterations for the minimization algorithm.                                        Default: 1.
+            min-method       Method to be used in the scipy.least_squares() function. Available options: ['trf', 'dogbox']. Default: 'trf'.
             
             min-iter-max     Maximum number of iterations for the minimization algorithm.                                        Default: 1000.
             
-            n-random-seeds   Number of random seeds to be used to initialize the minimization.                                   Default: 1.
+            n-random-seeds   Number of random seeds to be used to initialize the minimization.                                   Default: 16.
+
+            The linear inversion:
+
+                - solves directly for Kerr QNM, quadratic-mode, and fixed-exponent tail complex amplitudes;
+                - requires each tail exponent p_tail_* to be fixed, since tail exponents are nonlinear;
+
+            linear-inversion-eigenvalue-tol
+                             Absolute floor applied to Fisher-matrix eigenvalues in the Kerr linear inversion.                    Default: 1e-10.
 
         
     ****************************************************
@@ -465,6 +482,8 @@ A dot is present at the end of each description line and is not to be intended a
         Parameters names and default bounds for all available models are documented in the `read_default_bounds` function of the `inference.py` module.
         
         Prior default bounds can be changed by adding 'param-min=value' or 'param-max=value' to this section, where `param` is the name of the parameter under consideration.
+
+        Parameters can be fixed by adding 'fix-param=value' to this section, where `param` is the name of the parameter under consideration.
 
         User-controlled starting values for the minimization can be set by adding`'param-start=value` to the [Priors] section, where `param` is the name of the parameter under consideration. User-defined starting values overrun the `seeding` option for that parameter.
         

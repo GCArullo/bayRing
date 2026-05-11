@@ -35,7 +35,7 @@ Then, the bayRing source code can be installed through:
   pip install .
   ```
 
-An alternative to the latter instruction is `python setup.py install`.
+For development installs, use `pip install -e .`.
 
 ### pip version
 

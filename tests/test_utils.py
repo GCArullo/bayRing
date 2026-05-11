@@ -19,6 +19,15 @@ def test_get_param_override_returns_sample_when_not_fixed():
     assert utils.get_param_override(params, sample, "spin") == 0.1
 
 
+@pytest.mark.parametrize("path", [None, "", "   "])
+def test_normalize_optional_path_returns_none_for_missing_values(path):
+    assert utils.normalize_optional_path(path) is None
+
+
+def test_normalize_optional_path_strips_config_values():
+    assert utils.normalize_optional_path("  metadata.csv  ") == "metadata.csv"
+
+
 def test_filter_dict_by_key_extracts_per_category():
     data = {
         "linear": {"mass": [1, 2], "spin": [3, 4]},
@@ -36,29 +45,6 @@ def test_filter_dict_by_key_extracts_per_category():
 def test_find_longest_name_length():
     names = ["a", "longer", "longest_name"]
     assert utils.find_longest_name_length(names) == len("longest_name")
-
-
-def test_minimisation_compatibility_check_rejects_non_kerr():
-    parameters = {"template": "non-kerr", "QQNM_modes": None, "tail": 0}
-    with pytest.raises(ValueError):
-        utils.minimisation_compatibility_check(parameters)
-
-
-def test_minimisation_compatibility_check_rejects_qqnm_modes():
-    parameters = {"template": "Kerr", "QQNM_modes": [1, 2], "tail": 0}
-    with pytest.raises(ValueError):
-        utils.minimisation_compatibility_check(parameters)
-
-
-def test_minimisation_compatibility_check_rejects_tail():
-    parameters = {"template": "Kerr", "QQNM_modes": None, "tail": 1}
-    with pytest.raises(ValueError):
-        utils.minimisation_compatibility_check(parameters)
-
-
-def test_minimisation_compatibility_check_accepts_valid_configuration():
-    parameters = {"template": "Kerr", "QQNM_modes": None, "tail": 0}
-    utils.minimisation_compatibility_check(parameters)
 
 
 def test_diff1_central_difference_with_padding():
