@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="960" height="500" viewBox="0 0 960 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="500" rx="18" fill="#f8fbff"/>
+  <rect x="28" y="28" width="904" height="444" rx="14" fill="#ffffff" stroke="#dce5ef" stroke-width="2"/>
+
+  <text x="56" y="72" font-family="Lato, Helvetica, Arial, sans-serif" font-size="28" font-weight="800" fill="#111820">Numerical-relativity data path</text>
+  <text x="58" y="101" font-family="Lato, Helvetica, Arial, sans-serif" font-size="16" fill="#5f6572">Catalogue data are loaded, aligned to the selected peak convention, cropped, and paired with an NR error vector.</text>
+
+  <rect x="65" y="146" width="190" height="74" rx="8" fill="#edf7f8" stroke="#83c9cf" stroke-width="2"/>
+  <text x="160" y="175" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="17" font-weight="800" fill="#0b5057">Catalogue</text>
+  <text x="160" y="199" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#315961">SXS, RIT, local data</text>
+
+  <rect x="65" y="248" width="190" height="74" rx="8" fill="#fff4e4" stroke="#e2ad5c" stroke-width="2"/>
+  <text x="160" y="277" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="17" font-weight="800" fill="#7d3d00">Config</text>
+  <text x="160" y="301" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#7d3d00">ID, l-m, resolution</text>
+
+  <rect x="322" y="178" width="214" height="112" rx="10" fill="#fbfdff" stroke="#dce5ef" stroke-width="2"/>
+  <text x="429" y="211" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="19" font-weight="800" fill="#29313d">NR_simulation</text>
+  <text x="429" y="237" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#5f6572">reader and metadata</text>
+  <text x="429" y="258" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#5f6572">selected complex multipole</text>
+
+  <path d="M255 183 C284 183 293 206 320 206" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M311 198 L322 206 L311 214" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M255 285 C284 285 293 262 320 262" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M311 254 L322 262 L311 270" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="615" y="120" width="238" height="64" rx="8" fill="#f5f1ff" stroke="#b7a6e8" stroke-width="2"/>
+  <text x="734" y="146" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" fill="#514083">Peak reference</text>
+  <text x="734" y="166" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#514083">time origin for the fit</text>
+
+  <rect x="615" y="205" width="238" height="64" rx="8" fill="#fff4e4" stroke="#e2ad5c" stroke-width="2"/>
+  <text x="734" y="231" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" fill="#7d3d00">Fit interval</text>
+  <text x="734" y="251" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#7d3d00">t-start to t-end</text>
+
+  <rect x="615" y="290" width="238" height="64" rx="8" fill="#f3fbf6" stroke="#9fc8b4" stroke-width="2"/>
+  <text x="734" y="316" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" fill="#1e5940">NR error model</text>
+  <text x="734" y="336" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#1e5940">weights for Re and Im data</text>
+
+  <rect x="615" y="375" width="238" height="64" rx="8" fill="#edf7f8" stroke="#83c9cf" stroke-width="2"/>
+  <text x="734" y="401" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" fill="#0b5057">Inference-ready data</text>
+  <text x="734" y="421" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#315961">cropped d(t), sigma(t), t</text>
+
+  <path d="M536 234 C574 234 574 152 613 152" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M603 143 L615 152 L603 161" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M536 234 H613" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M603 225 L615 234 L603 243" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M536 234 C574 234 574 322 613 322" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M603 313 L615 322 L603 331" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M734 354 V373" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M725 363 L734 375 L743 363" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="87" y="390" width="420" height="38" rx="8" fill="#f8fafc" stroke="#dce5ef" stroke-width="2"/>
+  <text x="297" y="415" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" font-weight="800" fill="#29313d">only the cropped interval enters the likelihood</text>
+</svg>
