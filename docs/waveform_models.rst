@@ -310,8 +310,9 @@ TEOBPM
 
    [Model]
    template = TEOBPM
-   TEOB-template = qc
-   TEOB-NR-fit = 0
+   TEOB-template = HypTan
+   TEOB-global-fit = 1
+   TEOB-merger-data = 0
 
 ``TEOB-template`` can be:
 
@@ -321,10 +322,42 @@ TEOBPM
 
    * - Value
      - Meaning
-   * - ``qc``
-     - Quasi-circular template.
-   * - ``nc``
-     - Noncircular template.
+   * - ``HypTan``
+     - Hyperbolic-tangent amplitude template for quasi-circular TEOBPM fits.
+   * - ``RatExp``
+     - Rational-exponential amplitude template used for noncircular TEOBPM
+       fits.
+
+``TEOB-global-fit`` controls whether TEOB calibration coefficients come from
+global fits or are sampled locally:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 60
+
+   * - Value
+     - Meaning
+   * - ``1``
+     - Use calibrated global fits. For ``HypTan``, this selects the internal
+       quasi-circular pyRing fits. For ``RatExp``, provide global-fit
+       coefficients through ``[NR-data] fits-file``.
+   * - ``0``
+     - Sample local amplitude and phase calibration coefficients.
+
+``TEOB-merger-data`` controls the peak quantities used by TEOBPM:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 60
+
+   * - Value
+     - Meaning
+   * - ``0``
+     - Use quasi-circular peak fits.
+   * - ``1``
+     - Use NR merger peak quantities from ``[NR-data] properties-file``.
+       ``RatExp`` runs require this option and the corresponding NR merger
+       metadata.
 
 For all TEOBPM runs, the merger phase for the fitted multipole is sampled:
 
@@ -332,8 +365,9 @@ For all TEOBPM runs, the merger phase for the fitted multipole is sampled:
 
    phi_mrg_lm
 
-where ``lm`` is the selected NR multipole. If ``TEOB-NR-fit = 1``, additional
-NR calibration coefficients are sampled. The default coefficient bounds are:
+where ``lm`` is the selected NR multipole. If ``TEOB-global-fit = 0``,
+additional NR calibration coefficients are sampled. The default coefficient
+bounds are:
 
 .. list-table::
    :header-rows: 1
@@ -350,13 +384,9 @@ NR calibration coefficients are sampled. The default coefficient bounds are:
    * - ``c4p``
      - ``[-10.0, 10.0]``
    * - ``c2A``
-     - ``[-10.0, 10.0]`` for non-``qc`` templates.
+     - ``[-10.0, 10.0]`` for ``RatExp``.
    * - ``c2p``
-     - ``[-10.0, 10.0]`` for non-``qc`` templates.
-
-``TEOB-qc-fit-type`` selects the fit family used when default TEOB
-coefficients are needed. The current parser recognises ``non-spinning`` and
-``equal-mass`` paths in the waveform constructor.
+     - ``[-10.0, 10.0]`` for ``RatExp``.
 
 Constant Offset
 ~~~~~~~~~~~~~~~

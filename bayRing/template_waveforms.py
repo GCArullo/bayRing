@@ -279,10 +279,6 @@ class WaveformModel(cpnest.model.Model):
             if(self.TEOB_template=='RatExp'):
                 NR_fit_coeffs[(self.l_NR,self.m_NR)]['c2A'] = params['c2A_{}{}'.format(self.l_NR,self.m_NR)]
                 NR_fit_coeffs[(self.l_NR,self.m_NR)]['c2p'] = params['c2p_{}{}'.format(self.l_NR,self.m_NR)]
-            
-            NR_fit_coeffs['Mf'] = self.Mf
-            NR_fit_coeffs['af'] = self.af
-
         else:
             NR_fit_coeffs['ecc'] = self.metadata['ecc']
             NR_fit_coeffs['bmrg'] = self.metadata['bmrg']
@@ -306,9 +302,9 @@ class WaveformModel(cpnest.model.Model):
             else:
                 if(self.TEOB_template=='RatExp'):
                     raise ValueError("TEOB global fit is enabled but no fit metadata provided.")
-            
-            NR_fit_coeffs['Mf'] = self.Mf
-            NR_fit_coeffs['af'] = self.af
+
+        NR_fit_coeffs['Mf'] = self.Mf
+        NR_fit_coeffs['af'] = self.af
 
         TGR_parameters = {}
         ringdown_model = wf.TEOBPM(self.t_peak                  ,

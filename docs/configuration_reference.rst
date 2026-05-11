@@ -167,15 +167,17 @@ fixed values or minimization start values.
    * - ``KerrBinary-amplitudes-nc-version``
      - empty string
      - Noncircular amplitude-correction variables.
-   * - ``TEOB-NR-fit``
-     - ``0``
-     - Sample TEOB NR calibration coefficients.
    * - ``TEOB-template``
-     - ``qc``
-     - TEOB template branch, for example ``qc`` or ``nc``.
-   * - ``TEOB-qc-fit-type``
-     - ``equal-mass``
-     - Fit type used by TEOBPM when default coefficients are needed.
+     - ``HypTan``
+     - TEOB post-merger template branch, either ``HypTan`` or ``RatExp``.
+   * - ``TEOB-global-fit``
+     - ``1``
+     - Use calibrated TEOB global fits. If ``0``, sample local TEOB
+       calibration coefficients.
+   * - ``TEOB-merger-data``
+     - ``0``
+     - Use NR merger peak quantities from ``properties-file`` instead of the
+       quasi-circular peak fits.
 
 Some templates override ``QNM-modes`` internally. For example ``KerrBinary``
 and ``TEOBPM`` set their calibrated mode lists based on the selected template
