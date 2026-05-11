@@ -129,9 +129,9 @@ def read_config(Config):
         'Kerr-tail-modes'                  : '22'         ,
         'KerrBinary-version'               : 'London2018' ,
         'KerrBinary-amplitudes-nc-version' : ''           ,
-        'TEOB-template'                    : 'RatExp'     ,
+        'TEOB-template'                    : 'HypTan'     ,
         'TEOB-global-fit'                  : 1            ,
-        'TEOB-merger-data'                 : 1            ,
+        'TEOB-merger-data'                 : 0            ,
         },
 
         'Inference':
@@ -333,10 +333,10 @@ A dot is present at the end of each description line and is not to be intended a
         add-const               Parameter of the complex constant to be added to the fit template. Required to account for spurious \
                                 effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.
         
-        properties-file  Path to the file containing additional properties of the NR simulation in `.csv` format. \
-                         Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
+        properties-file         Path to the file containing additional properties of the NR simulation in `.csv` format. \
+                                Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
 
-        fits-file       Path to the file containing the fits of the NR simulation.                                           Default: ''.
+        fits-file               Path to the file containing the fits of the NR simulation. Used for 'RatExp' template global fits.  Default: ''.
         
         t-peak-22               Time of the peak of the 22 mode. Used as reference time in KerrBinary model. Must be passed when \
                                 fitting HMs with KerrBinary.                                                                        Default: 0.0.                         
@@ -387,12 +387,20 @@ A dot is present at the end of each description line and is not to be intended a
                                          Can also pass a single variable instead of two, but not less than one or more than two.                                          Default: ''.
         
         TEOB-template                    TEOB template to be used. Available options: ['HypTan', 'RatExp']. The 'HypTan' version is defined in  \
-                                         arXiv:1904.09550, arXiv:2001.09082, while the 'RatExp' in II.C of arXiv:2305.19336.                                              Default: 'RatExp'.
+                                         arXiv:1904.09550, arXiv:2001.09082, while the 'RatExp' in II.C of arXiv:2305.19336. 
+                                         
+                                         Additionally, if 'RatExp' template is selected, the TEOB-merger-data flag has to be set to 1, and NR merger data has \
+                                         to be provided in [NR-data][properties-file].                                                                                    Default: 'HypTan'.
 
-        TEOB-global-fit                  Boolean to use the NR-calibrated global fits of the TEOB model. To be set to 1 if fit-files is provided.                         Default: 0.
+        TEOB-global-fit                  Boolean to use the NR-calibrated global fits of the TEOB model. 
+                                         If 1: 
+                                            - For 'HypTan' template, this selects the internally coded quasi-circular fits in pyRing.
+                                            - For 'RatExp' template, fits-file containing global fit coefficients have to be provided in [NR-data][fits-file].
+                                         If 0: Runs local fits for the amplitude and phase coefficients.                                                                  Default: 1.
 
-        TEOB-merger-data                 Flag to switch between using the values of the amplitude and frequency at the peak of the modes as given \ 
-                                         by the NR merger data (TEOB-merger-data = 1) or by the QC fits (TEOB-merger-data = 0)                                            Default: 1.
+        TEOB-merger-data                 Boolean flag to switch between using the values of the amplitude and frequency at the peak of the modes as given \ 
+                                         by the NR merger data (TEOB-merger-data = 1, to be provided in [NR-data][properties-file]) or by the quasi-circular fits \
+                                         (TEOB-merger-data = 0).                                                                                                          Default: 0.
 
     *******************************************************
     * Parameters to be passed to the [Inference] section. *
