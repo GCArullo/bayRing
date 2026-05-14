@@ -127,7 +127,20 @@ def main():
     # Load Kerr modes. #
     # =================#
     
-    Kerr_modes, Kerr_quad_modes, qnm_cached = QNM_utils.read_Kerr_modes(parameters['Model']['QNM-modes'], parameters['Model']['QQNM-modes'], parameters['Model']['charge'], parameters['NR-data']['l-NR'], parameters['NR-data']['m'], NR_metadata)
+    cache_negative_m_qnms = (
+        parameters['Model']['template'] == 'KerrBinary'
+        and parameters['Model']['KerrBinary-version'] == 'Cheung2023'
+        and NR_metadata['af'] < 0.0
+    )
+    Kerr_modes, Kerr_quad_modes, qnm_cached = QNM_utils.read_Kerr_modes(
+        parameters['Model']['QNM-modes'],
+        parameters['Model']['QQNM-modes'],
+        parameters['Model']['charge'],
+        parameters['NR-data']['l-NR'],
+        parameters['NR-data']['m'],
+        NR_metadata,
+        cache_negative_m_qnms=cache_negative_m_qnms,
+    )
     Kerr_tail_modes                         = QNM_utils.read_tail_modes(parameters['Model']['Kerr-tail-modes'])
 
     # ============#
