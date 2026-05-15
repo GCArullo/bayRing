@@ -47,8 +47,9 @@ pyRing Dependency
 ~~~~~~~~~~~~~~~~~
 
 ``bayRing`` uses ``pyRing`` waveform classes and utilities. The README
-recommends installing the ``hm_nc_fit`` branch of ``pyRing`` for source-based
-development; see the `pyRing installation documentation
+recommends installing the ``generalise_NR_informed_models`` branch of
+``pyRing`` for source-based development; see the `pyRing installation
+documentation
 <https://lscsoft.docs.ligo.org/pyring/#install-and-run>`_.
 
 First Run

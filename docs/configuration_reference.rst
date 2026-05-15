@@ -163,7 +163,7 @@ fixed values or minimization start values.
      - Tail mode list written as ``lm`` strings.
    * - ``KerrBinary-version``
      - ``London2018``
-     - ``London2018``, ``Cheung2023`` or ``noncircular``.
+     - ``London2018``, ``Cheung2023`` or ``Carullo2024``.
    * - ``KerrBinary-amplitudes-nc-version``
      - empty string
      - Noncircular amplitude-correction variables.
