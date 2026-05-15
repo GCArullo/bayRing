@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="960" height="500" viewBox="0 0 960 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="500" rx="18" fill="#f8fbff"/>
+  <rect x="28" y="28" width="904" height="444" rx="14" fill="#ffffff" stroke="#dce5ef" stroke-width="2"/>
+
+  <text x="56" y="72" font-family="Lato, Helvetica, Arial, sans-serif" font-size="28" font-weight="800" fill="#111820">Waveform model selection</text>
+  <text x="58" y="101" font-family="Lato, Helvetica, Arial, sans-serif" font-size="16" fill="#5f6572">The template choice determines which parameters are sampled and how the complex model multipole is built.</text>
+
+  <rect x="70" y="149" width="192" height="78" rx="8" fill="#edf7f8" stroke="#83c9cf" stroke-width="2"/>
+  <text x="166" y="179" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="17" font-weight="800" fill="#0b5057">Configuration</text>
+  <text x="166" y="203" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#315961">template and modes</text>
+
+  <rect x="70" y="273" width="192" height="78" rx="8" fill="#fff4e4" stroke="#e2ad5c" stroke-width="2"/>
+  <text x="166" y="303" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="17" font-weight="800" fill="#7d3d00">Metadata</text>
+  <text x="166" y="327" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#7d3d00">remnant and peak data</text>
+
+  <rect x="330" y="174" width="234" height="134" rx="10" fill="#fbfdff" stroke="#dce5ef" stroke-width="2"/>
+  <text x="447" y="208" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="19" font-weight="800" fill="#29313d">WaveformModel</text>
+  <text x="447" y="235" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#5f6572">constructs h_lm(t)</text>
+  <text x="447" y="256" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#5f6572">on the cropped NR time grid</text>
+  <text x="447" y="277" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#5f6572">using pyRing primitives</text>
+
+  <path d="M262 188 H328" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M318 179 L330 188 L318 197" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M262 312 H293 C314 312 314 241 328 241" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M319 233 L330 241 L319 250" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="636" y="128" width="238" height="58" rx="8" fill="#f5f1ff" stroke="#b7a6e8" stroke-width="2"/>
+  <text x="755" y="153" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" fill="#514083">Damped sinusoids</text>
+  <text x="755" y="171" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#514083">free modes</text>
+
+  <rect x="636" y="203" width="238" height="58" rx="8" fill="#edf7f8" stroke="#83c9cf" stroke-width="2"/>
+  <text x="755" y="228" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" fill="#0b5057">Kerr QNM superpositions</text>
+  <text x="755" y="246" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#315961">frequencies from Mf and af</text>
+
+  <rect x="636" y="278" width="238" height="58" rx="8" fill="#fff4e4" stroke="#e2ad5c" stroke-width="2"/>
+  <text x="755" y="303" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" fill="#7d3d00">KerrBinary</text>
+  <text x="755" y="321" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#7d3d00">calibrated amplitudes</text>
+
+  <rect x="636" y="353" width="238" height="58" rx="8" fill="#f3fbf6" stroke="#9fc8b4" stroke-width="2"/>
+  <text x="755" y="378" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" fill="#1e5940">TEOBPM</text>
+  <text x="755" y="396" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#1e5940">post-merger model studies</text>
+
+  <path d="M564 241 C595 241 595 157 634 157" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M624 148 L636 157 L624 166" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M564 241 H634" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M624 232 L636 241 L624 250" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M564 241 C595 241 595 307 634 307" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M624 298 L636 307 L624 316" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M564 241 C595 241 595 382 634 382" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M624 373 L636 382 L624 391" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+</svg>
