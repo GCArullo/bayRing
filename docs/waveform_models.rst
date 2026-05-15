@@ -279,7 +279,7 @@ Allowed versions in the current parser are:
    * - ``Cheung2023``
      - Available for ``l = 2, 3, 4, 5``. The parser supplies a fixed list of
        calibrated modes.
-   * - ``noncircular``
+   * - ``Carullo2024``
      - Uses noncircular metadata such as ``Emrg``, ``Jmrg`` and ``bmrg``.
        Available for the low multipoles supported by the implementation.
 

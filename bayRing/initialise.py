@@ -259,9 +259,9 @@ def read_config(Config):
             parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,440,430,550,2-20,2-10'
             if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4 or parameters['NR-data']['l-NR']==5): raise ValueError("The KerrBinary-Cheung template is only available for l=2,3,4,5")
         
-        elif  (parameters['Model']['KerrBinary-version']=='noncircular'): 
+        elif  (parameters['Model']['KerrBinary-version']=='Carullo2024'):
             parameters['Model']['QNM-modes'] = '220,210,330'
-            if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4): raise ValueError("The KerrBinary-noncircular template is only available for l=2,3")  
+            if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4): raise ValueError("The KerrBinary-Carullo2024 template is only available for l=2,3")
     
     elif(parameters['Model']['template']=='TEOBPM'      ):
         parameters['Model']['QNM-modes']     = '220,221,210,211,330,331,320,321,310,311,440,441,430,431,420,421,410,411,550,551'
@@ -386,7 +386,7 @@ A dot is present at the end of each description line and is not to be intended a
         
         Kerr-tail-modes                  Modes to which a tail will be added in the fitting template. Example format: '22,32'.                                            Default: '22'.
         
-        KerrBinary-version               Option to select the version of the KerrBinary model to be used. Available options: ['London2018', 'Cheung2023', 'noncircular'].     Default: 'London2018'.
+        KerrBinary-version               Option to select the version of the KerrBinary model to be used. Available options: ['London2018', 'Cheung2023', 'Carullo2024'].     Default: 'London2018'.
         
         KerrBinary-amplitudes-nc-version Option to select the version of the KerrBinary model amplitudes noncircular correction fit to be used. Format: `X-Y`, \ 
                                          where each entry selects a noncircular variable to be used for the noncircular fit, among ['bmrg','Emrg', 'Jmrg', 'Mf', 'af']. \

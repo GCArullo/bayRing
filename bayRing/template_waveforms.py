@@ -205,7 +205,7 @@ class WaveformModel(cpnest.model.Model):
         TGR_parameters = {}
         KerrBinary_params  = {}
 
-        if(self.KerrBinary_version=='noncircular'): noncircular_parameters = {'Emrg': self.metadata['Emrg'], 'Jmrg': self.metadata['Jmrg'], 'bmrg': self.metadata['bmrg']}
+        if(self.KerrBinary_version=='Carullo2024'): noncircular_parameters = {'Emrg': self.metadata['Emrg'], 'Jmrg': self.metadata['Jmrg'], 'bmrg': self.metadata['bmrg']}
         else                                  : noncircular_parameters = {}
 
         KerrBinary_params['Mi'], KerrBinary_params['eta'], KerrBinary_params['chis'], KerrBinary_params['chia'] = pyr_utils.compute_KerrBinary_binary_quantities(self.metadata['m1'], self.metadata['m2'], self.metadata['chi1'], self.metadata['chi2'])  
