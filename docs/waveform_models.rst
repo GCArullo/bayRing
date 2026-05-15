@@ -88,6 +88,10 @@ The prior enforces ordered frequencies for damped sinusoids. If
 ``f_i < f_{i-1}``, the nested-sampler prior is zero and the minimization path
 adds a penalty residual.
 
+Set ``N-DS-tails`` to add tail factors to ``Damped-sinusoids``.
+Tail parameters are named ``ln_A_tail_j``, ``phi_tail_j`` and ``p_tail_j``;
+their default bounds are ``[-20, 5]``, ``[0, 2*pi]`` and ``[-10, 3]``.
+
 Kerr QNM Template
 ~~~~~~~~~~~~~~~~~
 
@@ -280,7 +284,7 @@ Allowed versions in the current parser are:
      - Available for ``l = 2, 3, 4, 5``. The parser supplies a fixed list of
        calibrated modes.
    * - ``Carullo2024``
-     - Uses noncircular metadata such as ``Emrg``, ``Jmrg`` and ``bmrg``.
+     - Uses Carullo2024 metadata such as ``Emrg``, ``Jmrg`` and ``bmrg``.
        Available for the low multipoles supported by the implementation.
 
 The only default sampled parameter is:
@@ -292,13 +296,13 @@ The only default sampled parameter is:
 with default bound ``[0, 2*pi]``. Other quantities are read from metadata or
 from calibrated pyRing internals.
 
-For noncircular amplitudes, the option:
+For Carullo2024 amplitudes, the option:
 
 .. code-block:: ini
 
    KerrBinary-amplitudes-nc-version = bmrg-Jmrg
 
-selects one or two noncircular variables used by the correction fit. Allowed
+selects one or two variables used by the correction fit. Allowed
 variable names include ``bmrg``, ``Emrg``, ``Jmrg``, ``Mf`` and ``af``.
 
 TEOBPM

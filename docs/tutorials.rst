@@ -119,7 +119,7 @@ Tracked Config Files
    * - ``config_RIT_1300_Kerr_220_quick.ini``
      - RIT catalogue Kerr ``(2,2,0)`` example.
    * - ``config_RIT_1339_KerrBinary_noncircular_220_quick.ini``
-     - RIT noncircular ``KerrBinary`` example using additional metadata.
+     - RIT ``KerrBinary`` Carullo2024 example using additional metadata.
    * - ``config_RWZ-env_001_DS_2_quick.ini``
      - Not public NR data. RWZ-environment damped-sinusoid example with
        ``m = 0``.

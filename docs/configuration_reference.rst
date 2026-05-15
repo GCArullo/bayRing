@@ -91,7 +91,8 @@ fixed values or minimization start values.
      - SXS extrapolation order.
    * - ``res-level``
      - ``-1``
-     - Resolution level. For SXS, ``-1`` selects the highest available level.
+     - Resolution level. For SXS and RWZ ``RL`` files, ``-1`` selects the
+       highest available level.
    * - ``res-nx``
      - ``0``
      - Teukolsky radial collocation count. Overrides ``res-level`` when paired
@@ -149,6 +150,9 @@ fixed values or minimization start values.
    * - ``N-DS-modes``
      - ``1``
      - Number of damped-sinusoid modes.
+   * - ``N-DS-tails``
+     - ``0``
+     - Number of tail factors added to ``Damped-sinusoids``.
    * - ``QNM-modes``
      - ``220,221,320``
      - Linear Kerr QNM list.
@@ -166,7 +170,7 @@ fixed values or minimization start values.
      - ``London2018``, ``Cheung2023`` or ``Carullo2024``.
    * - ``KerrBinary-amplitudes-nc-version``
      - empty string
-     - Noncircular amplitude-correction variables.
+     - Carullo2024 amplitude-correction variables.
    * - ``TEOB-template``
      - ``HypTan``
      - TEOB post-merger template branch, either ``HypTan`` or ``RatExp``.

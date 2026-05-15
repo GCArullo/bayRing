@@ -51,8 +51,8 @@ Supported catalogue names in the current parser are:
        ``res-nx``/``res-nl``.
    * - ``RWZ-env``
      - Regge-Wheeler-Zerilli environmental simulations
-     - Not public NR data. Developer-level path format. The tracked example
-       uses ``m = 0``.
+     - Not public NR data. Supports simple ``HplusHcrossLMlm.dat`` files and
+       resolution/extrapolation files named ``HplusHcrossLMlmRL*EP*.dat``.
    * - ``C2EFT``
      - Local C2EFT data
      - Not public NR data. Some resolution/extrapolation choices are currently
@@ -97,7 +97,7 @@ Optional metadata tables use:
    fits-file = /path/to/fits.csv
 
 ``properties-file`` supplies extra NR quantities such as peak amplitudes or
-noncircular variables. ``fits-file`` supplies fit coefficients for calibrated
+Carullo2024 metadata variables. ``fits-file`` supplies fit coefficients for calibrated
 templates such as some ``TEOBPM`` workflows. Empty strings are treated as no
 file supplied.
 
@@ -188,8 +188,8 @@ The main resolution options are:
    * - Option
      - Meaning
    * - ``res-level``
-     - Catalogue resolution level. For SXS, ``-1`` selects the highest
-       available resolution found by the reader.
+     - Catalogue resolution level. For SXS and RWZ ``RL`` files, ``-1``
+       selects the highest available resolution found by the reader.
    * - ``extrap-order``
      - SXS extrapolation order. The default is ``2``.
    * - ``res-nx`` and ``res-nl``
@@ -244,7 +244,8 @@ Catalogue-dependent options include:
        mismatch minimization.
    * - ``resolution``
      - For Teukolsky data, compare against another resolution level when
-       available.
+       available. For ``RWZ-env``, compare against the next lower available
+       ``RL`` file.
    * - ``gaussian-X``
      - For ``fake_NR``, set a Gaussian-noise scale ``X``.
    * - ``from-SXS-NR``
