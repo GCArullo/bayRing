@@ -188,28 +188,33 @@ def read_default_bounds(wf_model, TEOB_template=''):
                                 'phi' : [0.0, twopi]            ,
                                 'f'   : [-2.0/twopi,2.0/twopi]  ,
                                 'tau' : [1,50]                  }
-    
+
+    default_bounds_DS_tail   = {'ln_A_tail': [-20.0, 5.0]       ,
+                                'phi_tail' : [0.0, twopi]       ,
+                                'p_tail'   : [-10.0,  3.0]      }
+
     default_bounds_Kerr      = {'ln_A': [-20.0, 5.0]            ,
                                 'phi' : [0.0, twopi]            }
-    
+
     default_bounds_Kerr_tail = {'ln_A_tail': [-20.0, 5.0]       ,
                                 'phi_tail' : [0.0, twopi]       ,
                                 'p_tail'   : [-20.0,  20.0]     }
-    
+
     default_bounds_TEOBPM    = {'phi_mrg': [0.0  , twopi]       ,
                                 'c3A'    : [-10.0, 10.0 ]       ,
                                 'c3p'    : [-10.0, 10.0 ]       ,
                                 'c4p'    : [-10.0, 10.0 ]       ,
                                 }
-    if not(TEOB_template=='qc'):
+    if not(TEOB_template=='HypTan'):
         default_bounds_TEOBPM['c2A']          = [-10.0, 10.0]
         default_bounds_TEOBPM['c2p']          = [-10.0, 10.0]
 
-    if(  wf_model=='Damped-sinusoids'): default_bounds = default_bounds_DS
-    elif(wf_model=='Kerr'            ): default_bounds = default_bounds_Kerr
-    elif(wf_model=='Kerr-tail'       ): default_bounds = default_bounds_Kerr_tail
-    elif(wf_model=='KerrBinary'      ): default_bounds = {'phi': [0.0, twopi]}
-    elif(wf_model=='TEOBPM'          ): default_bounds = default_bounds_TEOBPM
+    if(  wf_model=='Damped-sinusoids'     ): default_bounds = default_bounds_DS
+    elif(wf_model=='Damped-sinusoids-tail'): default_bounds = default_bounds_DS_tail
+    elif(wf_model=='Kerr'                 ): default_bounds = default_bounds_Kerr
+    elif(wf_model=='Kerr-tail'            ): default_bounds = default_bounds_Kerr_tail
+    elif(wf_model=='KerrBinary'           ): default_bounds = {'phi': [0.0, twopi]}
+    elif(wf_model=='TEOBPM'               ): default_bounds = default_bounds_TEOBPM
 
     return default_bounds
 
@@ -390,8 +395,10 @@ def Dynamic_InferenceModel(base):
             self.kind          = likelihood_kind
             self.Kerr_modes    = self.wf_model.Kerr_modes
             self.N_ds_modes    = self.wf_model.N_ds_modes
-            self.TEOB_NR_fit   = self.wf_model.TEOB_NR_fit
+            self.N_ds_tails    = getattr(self.wf_model, 'N_ds_tails', 0)
             self.TEOB_template = self.wf_model.TEOB_template
+            self.TEOB_global_fit = self.wf_model.TEOB_global_fit
+            self.TEOB_merger_data = self.wf_model.TEOB_merger_data 
             self.min_method    = min_method
             self.Config        = Config
 
@@ -447,7 +454,7 @@ def Dynamic_InferenceModel(base):
                                 self.bounds.append(single_bounds)
         
             elif(self.wf_model.wf_model=='Damped-sinusoids'):
-            
+                           
                 default_bounds = read_default_bounds(self.wf_model.wf_model)
                 for i,name in it.product(list(range(self.N_ds_modes)),default_bounds.keys()):
 
@@ -458,7 +465,18 @@ def Dynamic_InferenceModel(base):
                         single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds)
                         self.names.append(fullname)
                         self.bounds.append(single_bounds)
-                    
+
+                default_bounds_DS_tail = read_default_bounds(self.wf_model.wf_model+'-tail')
+                for i,name in it.product(list(range(self.N_ds_tails)),default_bounds_DS_tail.keys()):
+
+                    fullname      = '{}_{}'.format(name,i)
+                    try:
+                        self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                    except(configparser.NoOptionError):
+                        single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_DS_tail)
+                        self.names.append(fullname)
+                        self.bounds.append(single_bounds)
+
             elif(self.wf_model.wf_model=='Kerr-Damped-sinusoids'):
 
                 self.tail            = self.wf_model.tail
@@ -525,12 +543,13 @@ def Dynamic_InferenceModel(base):
                         single_bounds = read_parameter_bounds(Config, configparser, name, name, default_bounds)
                         self.names.append(name)
                         self.bounds.append(single_bounds)
-
+ 
             elif(self.wf_model.wf_model=='TEOBPM'):
 
                 default_bounds_TEOBPM = read_default_bounds(self.wf_model.wf_model, TEOB_template=self.TEOB_template)   
                 for name in default_bounds_TEOBPM.keys():
-                    if(not(self.TEOB_NR_fit) and not(name=='phi_mrg')): continue
+                    if self.TEOB_global_fit and name != 'phi_mrg':
+                        continue
                     fullname = '{}_{}{}'.format(name, self.wf_model.l_NR, self.wf_model.m_NR)
                     try:
                         self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)

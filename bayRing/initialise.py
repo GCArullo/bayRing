@@ -122,15 +122,16 @@ def read_config(Config):
         {
         'template'                         : 'Kerr'       ,
         'N-DS-modes'                       : 1            ,
+        'N-DS-tails'                       : 0            ,
         'QNM-modes'                        : '220,221,320',
         'QQNM-modes'                       : ''           ,
         'Kerr-tail'                        : 0            ,
         'Kerr-tail-modes'                  : '22'         ,
         'KerrBinary-version'               : 'London2018' ,
         'KerrBinary-amplitudes-nc-version' : ''           ,
-        'TEOB-NR-fit'                      : 0            ,
-        'TEOB-template'                    : 'qc'         ,
-        'TEOB-qc-fit-type'                 : 'equal-mass' , 
+        'TEOB-template'                    : 'HypTan'     ,
+        'TEOB-global-fit'                  : 1            ,
+        'TEOB-merger-data'                 : 0            ,
         },
 
         'Inference':
@@ -198,7 +199,6 @@ def read_config(Config):
         }
 
     }
-
     #General input read.
     for parameters_section in parameters.keys():
 
@@ -259,18 +259,15 @@ def read_config(Config):
             parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,440,430,550,2-20,2-10'
             if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4 or parameters['NR-data']['l-NR']==5): raise ValueError("The KerrBinary-Cheung template is only available for l=2,3,4,5")
         
-        elif  (parameters['Model']['KerrBinary-version']=='noncircular'): 
+        elif  (parameters['Model']['KerrBinary-version']=='Carullo2024'):
             parameters['Model']['QNM-modes'] = '220,210,330'
-            if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4): raise ValueError("The KerrBinary-noncircular template is only available for l=2,3")  
+            if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4): raise ValueError("The KerrBinary-Carullo2024 template is only available for l=2,3")
     
     elif(parameters['Model']['template']=='TEOBPM'      ):
         parameters['Model']['QNM-modes']     = '220,221,210,211,330,331,320,321,310,311,440,441,430,431,420,421,410,411,550,551'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4  or parameters['NR-data']['l-NR']==5): raise ValueError("The TEOBPM template is only available for l=2,3,4,5")
         
-        if parameters['Model']['TEOB-NR-fit'] == 0:
-            keytype = type(parameters['Model']['TEOB-qc-fit-type'])
-            try                                                     : parameters['Model']['TEOB-qc-fit-type'] = keytype(Config.get('Model', 'TEOB-qc-fit-type'))
-            except (KeyError, configparser.NoOptionError, TypeError): pass
+    print('\n\n\nFIXME: print updated vars\n\n\n')
 
     return parameters
 
@@ -342,10 +339,10 @@ A dot is present at the end of each description line and is not to be intended a
         add-const               Parameter of the complex constant to be added to the fit template. Required to account for spurious \
                                 effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.
         
-        properties-file  Path to the file containing additional properties of the NR simulation in `.csv` format. \
-                         Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
+        properties-file         Path to the file containing additional properties of the NR simulation in `.csv` format. \
+                                Follows the conventions of: `github.com/GCArullo/noncircular_BBH_fits/tree/main/Parameters_to_fit.  Default: ''.
 
-        fits-file       Path to the file containing the fits of the NR simulation.                                           Default: ''.
+        fits-file               Path to the file containing the fits of the NR simulation. Used for 'RatExp' template global fits.  Default: ''.
         
         t-peak-22               Time of the peak of the 22 mode. Used as reference time in KerrBinary model. Must be passed when \
                                 fitting HMs with KerrBinary.                                                                        Default: 0.0.                         
@@ -389,18 +386,29 @@ A dot is present at the end of each description line and is not to be intended a
         
         Kerr-tail-modes                  Modes to which a tail will be added in the fitting template. Example format: '22,32'.                                            Default: '22'.
         
-        KerrBinary-version               Option to select the version of the KerrBinary model to be used. Available options: ['London2018', 'Cheung2023', 'noncircular'].     Default: 'London2018'.
+        KerrBinary-version               Option to select the version of the KerrBinary model to be used. Available options: ['London2018', 'Cheung2023', 'Carullo2024'].     Default: 'London2018'.
         
         KerrBinary-amplitudes-nc-version Option to select the version of the KerrBinary model amplitudes noncircular correction fit to be used. Format: `X-Y`, \ 
                                          where each entry selects a noncircular variable to be used for the noncircular fit, among ['bmrg','Emrg', 'Jmrg', 'Mf', 'af']. \
                                          Can also pass a single variable instead of two, but not less than one or more than two.                                          Default: ''.
-
-        TEOB-NR-fit                      Boolean to fit also for NR calibration coefficients within TEOB model, otherwise, use default fits.                              Default: 0.
         
-        TEOB-template                    TEOB template to be used. Available options: ['qc', 'nc']. The 'qc' version is defined in  \
-                                         arXiv:1904.09550, arXiv:2001.09082, while the 'nc' in II.C of arXiv:2305.19336.                                                  Default: 'qc'.
+        TEOB-template                    TEOB template to be used. Available options: ['HypTan', 'RatExp']. The 'HypTan' version is defined in  \
+                                         arXiv:1904.09550, arXiv:2001.09082, while the 'RatExp' in II.C of arXiv:2305.19336. 
+                                         
+                                         Additionally, if 'RatExp' template is selected, the TEOB-merger-data flag has to be set to 1, and NR merger data has \
+                                         to be provided in [NR-data][properties-file].                                                                                    Default: 'HypTan'.
 
-        TEOB-qc-fit-type                 Type of fit to be used. Available options: ['non_spinning', 'equal_mass'].                                                       Default: None.
+        N-DS-tails                       Number of free tails in the ringdown model if 'Damped-sinusoids' in template. Otherwise, ignored.                                Default: 0.
+
+        TEOB-global-fit                  Boolean to use the NR-calibrated global fits of the TEOB model. 
+                                         If 1: 
+                                            - For 'HypTan' template, this selects the internally coded quasi-circular fits in pyRing.
+                                            - For 'RatExp' template, fits-file containing global fit coefficients have to be provided in [NR-data][fits-file].
+                                         If 0: Runs local fits for the amplitude and phase coefficients.                                                                  Default: 1.
+
+        TEOB-merger-data                 Boolean flag to switch between using the values of the amplitude and frequency at the peak of the modes as given \ 
+                                         by the NR merger data (TEOB-merger-data = 1, to be provided in [NR-data][properties-file]) or by the quasi-circular fits \
+                                         (TEOB-merger-data = 0).                                                                                                          Default: 0.
 
     *******************************************************
     * Parameters to be passed to the [Inference] section. *

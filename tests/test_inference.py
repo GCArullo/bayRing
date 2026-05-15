@@ -27,14 +27,14 @@ class FakeWaveform:
         self.wf_model = wf_model
         self.Kerr_modes = []
         self.N_ds_modes = 0
-        self.TEOB_NR_fit = 0
-        self.TEOB_template = "qc"
+        self.TEOB_template = "HypTan"
+        self.TEOB_global_fit = 1
+        self.TEOB_merger_data = 0
         self.tail = 0
         self.tail_modes = []
         self.quadratic_modes = None
         self.l_NR = 2
         self.m_NR = 2
-        self.TEOB_qc_fit_type = "equal-mass"
         for key, value in overrides.items():
             setattr(self, key, value)
 
@@ -314,12 +314,24 @@ def test_dynamic_inference_model_instances_are_pickleable_after_global_lookup_re
         ("KerrBinary", "", {"phi": [0.0, inference.twopi]}),
         (
             "TEOBPM",
-            "qc",
+            "HypTan",
             {
                 "phi_mrg": [0.0, inference.twopi],
                 "c3A": [-10.0, 10.0],
                 "c3p": [-10.0, 10.0],
                 "c4p": [-10.0, 10.0],
+            },
+        ),
+        (
+            "TEOBPM",
+            "RatExp",
+            {
+                "phi_mrg": [0.0, inference.twopi],
+                "c3A": [-10.0, 10.0],
+                "c3p": [-10.0, 10.0],
+                "c4p": [-10.0, 10.0],
+                "c2A": [-10.0, 10.0],
+                "c2p": [-10.0, 10.0],
             },
         ),
     ],

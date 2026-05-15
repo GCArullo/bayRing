@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="720" height="360" viewBox="0 0 720 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="720" height="360" rx="20" fill="#f8fbff"/>
+  <rect x="24" y="24" width="672" height="312" rx="16" fill="#ffffff" stroke="#dde4ef" stroke-width="2"/>
+  <text x="74" y="91" font-family="Lato, Helvetica, Arial, sans-serif" font-size="62" font-weight="800" fill="#111820">bayRing</text>
+  <text x="78" y="126" font-family="Lato, Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#00626a">Bayesian ringdown inference on numerical waveforms</text>
+  <path d="M78 148 H352" stroke="#dde4ef" stroke-width="2"/>
+  <text x="78" y="182" font-family="Lato, Helvetica, Arial, sans-serif" font-size="18" fill="#5f6572">QNM amplitudes, calibrated templates, mismatch diagnostics</text>
+  <circle cx="548" cy="236" r="84" stroke="#111820" stroke-width="2" opacity="0.07"/>
+  <circle cx="548" cy="236" r="70" stroke="#111820" stroke-width="2" opacity="0.09"/>
+  <circle cx="548" cy="236" r="58" stroke="#111820" stroke-width="2" opacity="0.12"/>
+  <circle cx="548" cy="236" r="36" stroke="#111820" stroke-width="2" opacity="0.16"/>
+  <circle cx="548" cy="236" r="16" fill="#111820" opacity="0.12"/>
+  <g>
+    <rect x="328" y="202" width="270" height="102" rx="6" fill="#f9c56a" opacity="0.22"/>
+    <line x1="328" y1="202" x2="328" y2="304" stroke="#d98518" stroke-width="2" stroke-dasharray="7 5"/>
+    <line x1="598" y1="202" x2="598" y2="304" stroke="#d98518" stroke-width="2" stroke-dasharray="7 5"/>
+    <g stroke="#c13a8a" stroke-width="2.2" stroke-linecap="round" opacity="0.28">
+      <line x1="348" y1="205" x2="348" y2="237"/>
+      <line x1="340" y1="205" x2="356" y2="205"/>
+      <line x1="340" y1="237" x2="356" y2="237"/>
+      <line x1="408" y1="250" x2="408" y2="288"/>
+      <line x1="400" y1="250" x2="416" y2="250"/>
+      <line x1="400" y1="288" x2="416" y2="288"/>
+      <line x1="463" y1="229" x2="463" y2="269"/>
+      <line x1="455" y1="229" x2="471" y2="229"/>
+      <line x1="455" y1="269" x2="471" y2="269"/>
+      <line x1="519" y1="212" x2="519" y2="246"/>
+      <line x1="511" y1="212" x2="527" y2="212"/>
+      <line x1="511" y1="246" x2="527" y2="246"/>
+      <line x1="570" y1="250" x2="570" y2="286"/>
+      <line x1="562" y1="250" x2="578" y2="250"/>
+      <line x1="562" y1="286" x2="578" y2="286"/>
+      <line x1="623" y1="216" x2="623" y2="246"/>
+      <line x1="615" y1="216" x2="631" y2="216"/>
+      <line x1="615" y1="246" x2="631" y2="246"/>
+    </g>
+    <path d="M76 278 C96 256 113 221 134 238 C151 252 160 304 181 289 C201 275 210 215 234 224 C257 233 265 297 291 293 C315 289 323 232 348 223 C372 214 389 248 408 267 C429 289 448 274 463 245 C479 216 501 209 519 229 C537 249 548 275 570 268 C592 261 602 236 623 229 C644 222 662 236 681 251" stroke="#008c95" stroke-width="5.2" stroke-linecap="round"/>
+    <path d="M328 224 C352 212 371 220 389 244 C409 272 433 283 456 254 C478 225 498 212 520 228 C541 243 552 267 574 268 C596 269 610 242 632 232 C652 223 666 235 681 249" stroke="#c13a8a" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="628" cy="283" r="5" fill="#008c95"/>
+    <text x="640" y="288" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#29313d">NR</text>
+    <circle cx="628" cy="299" r="5" fill="#c13a8a"/>
+    <text x="640" y="304" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#29313d">fit</text>
+  </g>
+</svg>
