@@ -134,3 +134,41 @@ def test_kerrbinary_waveform_passes_filtered_modes(monkeypatch):
     assert captured["modes"] == {"linear": {(2, 2): ["filtered"]}, "quadratic": {}}
     assert captured["args"][10] == params["phi"]
     assert result == "binary"
+
+
+def test_teobpm_waveform_passes_string_template(monkeypatch):
+    model = _build_model(
+        wf_model="TEOBPM",
+        TEOB_template="RatExp",
+        TEOB_merger_data=1,
+        TEOB_global_fit=0,
+        metadata_overrides={
+            "omg_peak_22": 0.3,
+            "A_peak_22": 0.4,
+            "A_peak22dotdot": -0.01,
+        },
+    )
+
+    params = {
+        "phi_mrg_22": 0.0,
+        "c2A_22": 1.0,
+        "c2p_22": 1.0,
+        "c3A_22": 1.0,
+        "c3p_22": 1.0,
+        "c4p_22": 1.0,
+    }
+    captured = {}
+
+    def fake_teobpm(*args, **kwargs):
+        captured["args"] = args
+        captured.update(kwargs)
+        return "teob"
+
+    monkeypatch.setattr(template_waveforms.wf, "TEOBPM", fake_teobpm, raising=False)
+
+    result = model.TEOBPM_waveform(params, {})
+
+    assert captured["template"] == "RatExp"
+    assert not isinstance(captured["template"], int)
+    assert captured["merger_data"] == 1
+    assert captured["global_fit"] == 0

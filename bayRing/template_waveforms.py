@@ -245,11 +245,7 @@ class WaveformModel(cpnest.model.Model):
 
     def TEOBPM_waveform(self, params, fixed_params):
 
-        if self.TEOB_template=='HypTan':
-            template_index = 0
-        elif self.TEOB_template=='RatExp':
-            template_index = 1
-        else:
+        if self.TEOB_template not in ['HypTan', 'RatExp']:
             raise ValueError("Unknown TEOB template: {}".format(self.TEOB_template))
         
         TGR_parameters = {}
@@ -319,7 +315,7 @@ class WaveformModel(cpnest.model.Model):
                                    modes                        ,
                                    TGR_parameters               ,
                                    geom          = 1            ,
-                                   template      = template_index ,
+                                   template      = self.TEOB_template ,
                                    merger_data   = self.TEOB_merger_data ,
                                    global_fit    = self.TEOB_global_fit ,
                                    NR_fit_coeffs = NR_fit_coeffs)
