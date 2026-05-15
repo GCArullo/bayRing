@@ -354,7 +354,7 @@ if "pyRing" not in sys.modules:
     fake_pyRing_utils.print_subsection = _fake_print_section
     fake_pyRing_utils.railing_check = _fake_railing_check
     fake_pyRing_utils.compute_KerrBinary_binary_quantities = _fake_compute_binary_quantities
-    fake_pyRing_utils.available_modes_dict_KerrBinary = {"London2018": fake_modes, "noncircular": fake_modes}
+    fake_pyRing_utils.available_modes_dict_KerrBinary = {"London2018": fake_modes, "Carullo2024": fake_modes}
 
     fake_pyRing_waveform.KerrBH = lambda *args, **kwargs: {"args": args, "kwargs": kwargs}
     fake_pyRing_waveform.damped_sinusoid = lambda *args, **kwargs: 0j

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="960" height="520" viewBox="0 0 960 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="520" rx="18" fill="#f8fbff"/>
+  <rect x="28" y="28" width="904" height="464" rx="14" fill="#ffffff" stroke="#dce5ef" stroke-width="2"/>
+
+  <text x="56" y="72" font-family="Lato, Helvetica, Arial, sans-serif" font-size="28" font-weight="800" fill="#111820">Time-domain waveform reconstruction workflow</text>
+  <text x="58" y="101" font-family="Lato, Helvetica, Arial, sans-serif" font-size="16" fill="#5f6572">The full NR multipole is loaded, but only the highlighted post-peak interval enters the likelihood.</text>
+
+  <rect x="74" y="352" width="170" height="66" rx="8" fill="#edf7f8" stroke="#83c9cf" stroke-width="2"/>
+  <text x="101" y="380" font-family="Lato, Helvetica, Arial, sans-serif" font-size="17" font-weight="800" fill="#0b5057">config.ini</text>
+  <text x="96" y="402" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#315961">catalog, modes, priors</text>
+
+  <rect x="294" y="352" width="170" height="66" rx="8" fill="#fff4e4" stroke="#e2ad5c" stroke-width="2"/>
+  <text x="324" y="380" font-family="Lato, Helvetica, Arial, sans-serif" font-size="17" font-weight="800" fill="#7d3d00">fit interval</text>
+  <text x="315" y="402" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#7d3d00">t-start to t-end</text>
+
+  <rect x="514" y="352" width="170" height="66" rx="8" fill="#f5f1ff" stroke="#b7a6e8" stroke-width="2"/>
+  <text x="548" y="380" font-family="Lato, Helvetica, Arial, sans-serif" font-size="17" font-weight="800" fill="#514083">inference</text>
+  <text x="538" y="402" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#514083">posterior or point fit</text>
+
+  <rect x="734" y="352" width="170" height="66" rx="8" fill="#f3fbf6" stroke="#9fc8b4" stroke-width="2"/>
+  <text x="819" y="380" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="17" font-weight="800" fill="#1e5940">diagnostics</text>
+  <text x="819" y="398" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#1e5940">residuals, mismatch</text>
+  <text x="819" y="414" text-anchor="middle" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#1e5940">SNR</text>
+
+  <path d="M244 385 H292" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M282 376 L294 385 L282 394" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M464 385 H512" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M502 376 L514 385 L502 394" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M684 385 H732" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M722 376 L734 385 L722 394" stroke="#8a98a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="86" y="132" width="748" height="170" rx="10" fill="#fbfdff" stroke="#dce5ef" stroke-width="2"/>
+  <line x1="116" y1="254" x2="806" y2="254" stroke="#c9d4e1" stroke-width="1.5"/>
+  <line x1="116" y1="156" x2="116" y2="278" stroke="#c9d4e1" stroke-width="1.5"/>
+
+  <rect x="344" y="147" width="276" height="132" rx="4" fill="#f9c56a" opacity="0.28"/>
+  <line x1="344" y1="147" x2="344" y2="279" stroke="#d98518" stroke-width="2" stroke-dasharray="7 5"/>
+  <line x1="620" y1="147" x2="620" y2="279" stroke="#d98518" stroke-width="2" stroke-dasharray="7 5"/>
+
+  <g stroke="#c13a8a" stroke-width="2.4" stroke-linecap="round" opacity="0.24">
+    <line x1="365" y1="178" x2="365" y2="220"/>
+    <line x1="355" y1="178" x2="375" y2="178"/>
+    <line x1="355" y1="220" x2="375" y2="220"/>
+    <line x1="405" y1="204" x2="405" y2="246"/>
+    <line x1="395" y1="204" x2="415" y2="204"/>
+    <line x1="395" y1="246" x2="415" y2="246"/>
+    <line x1="470" y1="238" x2="470" y2="272"/>
+    <line x1="460" y1="238" x2="480" y2="238"/>
+    <line x1="460" y1="272" x2="480" y2="272"/>
+    <line x1="528" y1="178" x2="528" y2="214"/>
+    <line x1="518" y1="178" x2="538" y2="178"/>
+    <line x1="518" y1="214" x2="538" y2="214"/>
+    <line x1="592" y1="214" x2="592" y2="256"/>
+    <line x1="582" y1="214" x2="602" y2="214"/>
+    <line x1="582" y1="256" x2="602" y2="256"/>
+  </g>
+
+  <path d="M122 233 C148 188 171 168 191 184 C211 200 226 255 252 268 C278 281 296 228 318 202 C340 176 365 181 385 211 C405 241 424 273 449 263 C474 253 489 209 510 194 C531 179 556 192 574 220 C592 248 608 263 629 250 C650 237 664 204 686 191 C708 178 733 194 754 222 C775 250 788 263 806 250" stroke="#008c95" stroke-width="5" stroke-linecap="round"/>
+  <path d="M344 212 C365 180 386 188 405 218 C424 248 445 273 470 255 C495 237 504 204 528 194 C552 184 575 205 592 232 C609 259 633 255 655 229" stroke="#c13a8a" stroke-width="4" stroke-linecap="round"/>
+  <path d="M344 229 C365 226 384 226 405 229 C426 232 446 231 470 225 C494 219 512 218 531 221 C550 224 573 225 592 222 C611 219 634 220 655 223" stroke="#3b6fb6" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 5"/>
+
+  <circle cx="344" cy="212" r="5" fill="#d98518"/>
+  <circle cx="620" cy="232" r="5" fill="#d98518"/>
+
+  <text x="314" y="137" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" font-weight="800" fill="#7d3d00">t-start</text>
+  <text x="596" y="137" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" font-weight="800" fill="#7d3d00">t-end</text>
+  <text x="430" y="171" font-family="Lato, Helvetica, Arial, sans-serif" font-size="15" font-weight="800" fill="#7d3d00">samples used in the fit</text>
+
+  <circle cx="670" cy="151" r="6" fill="#008c95"/>
+  <text x="684" y="156" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#29313d">NR data</text>
+  <circle cx="670" cy="176" r="6" fill="#c13a8a"/>
+  <text x="684" y="181" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#29313d">model reconstruction</text>
+  <line x1="128" y1="160" x2="144" y2="160" stroke="#3b6fb6" stroke-width="3" stroke-dasharray="5 4"/>
+  <text x="152" y="165" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14" fill="#29313d">residual trend</text>
+
+  <text x="117" y="293" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#5f6572">pre-peak and merger data are loaded for context</text>
+  <text x="504" y="293" font-family="Lato, Helvetica, Arial, sans-serif" font-size="13" fill="#5f6572">post-fit samples are plotted but not used by the likelihood</text>
+  <text x="440" y="326" font-family="Lato, Helvetica, Arial, sans-serif" font-size="15" font-weight="800" fill="#29313d">time-domain NR multipole</text>
+</svg>

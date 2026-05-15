@@ -1,6 +1,55 @@
-[build-system]
-requires = [
-    "setuptools>=42",
-    "wheel",
+[project]
+requires-python = ">=3.10"
+name = "bayRing"
+description = "bayRing: Bayesian modelling of Ringdown waveforms with Nested Sampling."
+dynamic = ["version", "readme"]
+dependencies = [
+    "corner",
+    "cpnest",
+    "matplotlib",
+    "numpy",
+    "pycbc",
+    "pyRingGW",
+    "qnm",
+    "seaborn",
+    "scipy",
+    "sxs",
 ]
+authors = [
+    {name = "Gregorio Carullo", email = "gregorio.carullo@ligo.org"},
+    {name = "Marina De Amicis"},
+    {name = "Jaime Redondo Yuste"},
+]
+license = "MIT"
+
+[project.urls]
+"Bug Tracker" = "https://github.com/GCArullo/bayRing/issues"
+"Source Code" = "https://github.com/GCArullo/bayRing"
+
+[project.scripts]
+bayRing = "bayRing.bayRing:main"
+
+[project.optional-dependencies]
+docs = [
+    "sphinx==3.4.3",
+    "sphinxcontrib-applehelp==1.0.4",
+    "sphinxcontrib-devhelp==1.0.2",
+    "sphinxcontrib-htmlhelp==2.0.1",
+    "sphinxcontrib-jsmath==1.0.1",
+    "sphinxcontrib-qthelp==1.0.3",
+    "sphinxcontrib-serializinghtml==1.1.5",
+    "sphinx_rtd_theme==0.5.1",
+    "myst_parser==0.17.2",
+    "jinja2==3.0.0",
+    "standard-imghdr",
+    "setuptools<81",
+]
+
+[build-system]
+requires = ["setuptools>=60", "setuptools_scm>=8.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+
+[bdist_wheel]
+universal = 1
