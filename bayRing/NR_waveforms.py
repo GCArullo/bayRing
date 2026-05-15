@@ -842,10 +842,23 @@ class NR_simulation():
             self.ecc, self.Mf, self.af = 0.0, 1.0, 0.0
 
             # Build NR waveform and time axis
+            if(self.res_level==-1):
+                try:
+                    self.res_level = self.highest_available_RWZ_resolution_level(self.extrap_order)
+                    print("\n* Resolution found at level: {}".format(self.res_level))
+                except FileNotFoundError:
+                    if NR_error in ['resolution', 'align-at-peak']:
+                        raise
+                    self.res_level = None
+
             self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_RWZ(self.res_level, self.extrap_order)
             if NR_error in ['resolution', 'align-at-peak']:
-                t_res,  NR_r_res,  NR_i_res  = self.read_waveform_lm_from_RWZ(self.res_level-1, self.extrap_order, allow_simple_fallback=False)
-                t_extr, NR_r_extr, NR_i_extr = self.read_waveform_lm_from_RWZ(self.res_level, self.extrap_order+1, allow_simple_fallback=False)
+                res_level_error              = self.lower_available_RWZ_resolution_level(self.res_level, self.extrap_order)
+                t_res,  NR_r_res,  NR_i_res  = self.read_waveform_lm_from_RWZ(res_level_error, self.extrap_order, allow_simple_fallback=False)
+                if(NR_error=='align-at-peak'):
+                    t_extr, NR_r_extr, NR_i_extr = self.read_waveform_lm_from_RWZ(self.res_level, self.extrap_order+1, allow_simple_fallback=False)
+                else:
+                    t_extr, NR_r_extr, NR_i_extr = None, None, None
             else:
                 t_res,  NR_r_res,  NR_i_res  = None, None, None
                 t_extr, NR_r_extr, NR_i_extr = None, None, None
@@ -946,10 +959,10 @@ class NR_simulation():
 
             # Waveforms at different resolution levels are already aligned.
             if(NR_error=='resolution'):
-                if np.shape(self.NR_r) != np.shape(NR_r_res):
-                    if np.shape(NR_r_res) < np.shape(self.NR_r):
-                        NR_r_res = np.append(NR_r_res, np.zeros(len(self.NR_r) - len(NR_r_res))) 
-                        NR_i_res = np.append(NR_r_res, np.zeros(len(self.NR_r) - len(NR_r_res)))
+                if len(self.NR_r) != len(NR_r_res):
+                    if len(NR_r_res) < len(self.NR_r):
+                        NR_r_res = np.append(NR_r_res, np.zeros(len(self.NR_r) - len(NR_r_res)))
+                        NR_i_res = np.append(NR_i_res, np.zeros(len(self.NR_i) - len(NR_i_res)))
                     else:
                         NR_r_res = NR_r_res[:len(self.NR_r)]
                         NR_i_res = NR_i_res[:len(self.NR_r)]
@@ -960,8 +973,8 @@ class NR_simulation():
                 # Resolution error.
                 NR_r_res    , NR_i_res       = waveform_utils.align_waveforms_at_peak(self.t_NR, self.NR_amp, self.NR_phi, t_res, NR_r_res, NR_i_res)
                 NR_r_err_res, NR_i_err_res   = np.abs(self.NR_r-NR_r_res), np.abs(self.NR_i-NR_i_res)
-                    
-                # Extrapolation error.    
+
+                # Extrapolation error.
                 NR_r_extr    , NR_i_extr     = waveform_utils.align_waveforms_at_peak(self.t_NR, self.NR_amp, self.NR_phi, t_extr, NR_r_extr, NR_i_extr)
                 NR_r_err_extr, NR_i_err_extr = np.abs(self.NR_r-NR_r_extr), np.abs(self.NR_i-NR_i_extr)
                 # Global error
@@ -1673,6 +1686,41 @@ class NR_simulation():
 
         return a_halo, M_halo, C
 
+    def available_RWZ_resolution_levels(self, extrap_order):
+
+        sim_dir = os.path.join(self.NR_dir, '{}'.format(self.NR_ID))
+        prefix  = f'HplusHcrossLM{self.l}{self.m}RL'
+        suffix  = f'EP{extrap_order}.dat'
+        levels  = []
+
+        if not os.path.isdir(sim_dir):
+            raise FileNotFoundError("RWZ simulation directory not found: {}".format(sim_dir))
+
+        for filename in os.listdir(sim_dir):
+            if filename.startswith(prefix) and filename.endswith(suffix):
+                res_level = filename[len(prefix):-len(suffix)]
+                try:
+                    levels.append(int(res_level))
+                except ValueError:
+                    pass
+
+        if not levels:
+            raise FileNotFoundError("No RWZ waveform files found for mode ({}, {}) and extrapolation order {} in {}".format(self.l, self.m, extrap_order, sim_dir))
+
+        return sorted(set(levels))
+
+    def highest_available_RWZ_resolution_level(self, extrap_order):
+
+        return self.available_RWZ_resolution_levels(extrap_order)[-1]
+
+    def lower_available_RWZ_resolution_level(self, res_level, extrap_order):
+
+        lower_levels = [level for level in self.available_RWZ_resolution_levels(extrap_order) if level < res_level]
+        if not lower_levels:
+            raise ValueError("Only a single RWZ resolution available below level {} for extrapolation order {}.".format(res_level, extrap_order))
+
+        return lower_levels[-1]
+
     def read_waveform_lm_from_RWZ(self, res_level=None, extrap_order=None, allow_simple_fallback=True):
 
         """
@@ -1695,6 +1743,13 @@ class NR_simulation():
 
         sim_dir = os.path.join(self.NR_dir, '{}'.format(self.NR_ID))
         sim_paths = []
+        if res_level == -1 and extrap_order is not None:
+            try:
+                res_level = self.highest_available_RWZ_resolution_level(extrap_order)
+            except FileNotFoundError:
+                if not allow_simple_fallback:
+                    raise
+                res_level = None
         if res_level is not None and extrap_order is not None:
             sim_paths.append(os.path.join(sim_dir, f'HplusHcrossLM{self.l}{self.m}RL{res_level}EP{extrap_order}.dat'))
         if allow_simple_fallback:

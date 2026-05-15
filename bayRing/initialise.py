@@ -123,7 +123,6 @@ def read_config(Config):
         'template'                         : 'Kerr'       ,
         'N-DS-modes'                       : 1            ,
         'N-DS-tails'                       : 0            ,
-        'DS-tail'                          : 0            ,
         'QNM-modes'                        : '220,221,320',
         'QQNM-modes'                       : ''           ,
         'Kerr-tail'                        : 0            ,
