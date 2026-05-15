@@ -8,6 +8,7 @@ Runs
 __pycache__/
 build/
 dist/
+docs/_build/
 NR_data/Teukolsky_data
 bayRing/*.c
 bayRing/*.h
