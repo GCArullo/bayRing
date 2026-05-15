@@ -2185,7 +2185,7 @@ def global_corner(x, names, output, truths=None):
     Nothing, but saves a corner plot to the output directory.
 
     """
-
+    
     samples = []
     for xy in names: samples.append(np.array(x[xy]))
     samples = np.transpose(samples)
