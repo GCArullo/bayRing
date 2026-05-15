@@ -12,7 +12,7 @@ Inference package targeting ringdown modeling of numerical relativity waveforms,
 
 Requires Python 3.10 or newer.
 
-Relies on [pyRing](https://git.ligo.org/lscsoft/pyring) for waveform interfacing, on [qnm](https://github.com/duetosymmetry/qnm/) for QNM frequencies computations and on [cpnest](https://github.com/johnveitch/cpnest/tree/master)/[raynest](https://github.com/wdpozzo/raynest) for sampling.
+Relies on [pyRing](https://git.ligo.org/lscsoft/pyring) for waveform interfacing. For source-based development, install the [`generalise_NR_informed_models`](https://git.ligo.org/lscsoft/pyring/-/tree/generalise_NR_informed_models) branch of pyRing. It also relies on [qnm](https://github.com/duetosymmetry/qnm/) for QNM frequencies computations and on [cpnest](https://github.com/johnveitch/cpnest/tree/master)/[raynest](https://github.com/wdpozzo/raynest) for sampling.
 
 # Documentation
 

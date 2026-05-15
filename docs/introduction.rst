@@ -9,8 +9,8 @@ the same QNM conventions and waveform infrastructure used by ``pyRing``.
 The package depends on:
 
 * **Waveform infrastructure:** ``pyRing`` provides waveform interfaces and
-  shared ringdown utilities, and the ``hm_nc_fit`` branch of ``pyRing`` should
-  be installed to use ``bayRing``.
+  shared ringdown utilities, and the ``generalise_NR_informed_models`` branch
+  of ``pyRing`` should be installed to use ``bayRing``.
 * **QNM spectra:** ``qnm`` provides Kerr QNM frequencies and damping times.
 * **Nested sampling:** ``cpnest`` and ``raynest`` provide sampling backends.
 * **Point estimates:** ``scipy.optimize.least_squares`` provides the
