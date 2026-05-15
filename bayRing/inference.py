@@ -182,39 +182,46 @@ def store_evidence_to_file(parameters, Evidence):
 
     return
 
-def read_default_bounds(wf_model, TEOB_template=''):
+def read_default_bounds(wf_model, TEOB_template='', TEOB_development_fit=False, TEOB_sigmoid=False):
 
     default_bounds_DS        = {'ln_A': [-20.0, 5.0]            ,
                                 'phi' : [0.0, twopi]            ,
                                 'f'   : [-2.0/twopi,2.0/twopi]  ,
                                 'tau' : [1,50]                  }
-    
+
+    default_bounds_DS_tail   = {'ln_A_tail': [-20.0, 5.0]       ,
+                                'phi_tail' : [0.0, twopi]       ,
+                                'p_tail'   : [-10.0,  3.0]      }
+
     default_bounds_Kerr      = {'ln_A': [-20.0, 5.0]            ,
                                 'phi' : [0.0, twopi]            }
-    
+
     default_bounds_Kerr_tail = {'ln_A_tail': [-20.0, 5.0]       ,
                                 'phi_tail' : [0.0, twopi]       ,
                                 'p_tail'   : [-20.0,  20.0]     }
-    
-    default_bounds_TEOBPM    = {'phi_mrg'           : [0.0  , twopi]       ,
-                                't_sigmoid'         : [-5,40]              ,
-                                'width_sigmoid'     : [0.5, 40]            ,
-                                'ln_A'              : [-8, 5]              ,
-                                'phi'               : [0.0, twopi ]        ,
-                                'dphi'              : [0.0, twopi ]        ,
-                                'c3A'               : [-10.0, 10.0 ]       ,
-                                'c3p'               : [0, 10.0 ]           ,
-                                'c4p'               : [0, 10.0 ]           ,
+
+    default_bounds_TEOBPM    = {'phi_mrg': [0.0  , twopi]       ,
+                                'c3A'    : [-10.0, 10.0 ]       ,
+                                'c3p'    : [-10.0, 10.0 ]       ,
+                                'c4p'    : [-10.0, 10.0 ]       ,
                                 }
-    if not(TEOB_template=='qc'):
+    if not(TEOB_template=='HypTan'):
         default_bounds_TEOBPM['c2A']          = [-10.0, 10.0]
         default_bounds_TEOBPM['c2p']          = [-10.0, 10.0]
+    if(TEOB_development_fit):
+        default_bounds_TEOBPM['ln_A']  = [-8.0, 5.0]
+        default_bounds_TEOBPM['phi']   = [0.0, twopi]
+        default_bounds_TEOBPM['dphi']  = [0.0, twopi]
+    if(TEOB_sigmoid):
+        default_bounds_TEOBPM['t_sigmoid']     = [-5.0, 40.0]
+        default_bounds_TEOBPM['width_sigmoid'] = [0.5, 40.0]
 
-    if(  wf_model=='Damped-sinusoids'): default_bounds = default_bounds_DS
-    elif(wf_model=='Kerr'            ): default_bounds = default_bounds_Kerr
-    elif(wf_model=='Kerr-tail'       ): default_bounds = default_bounds_Kerr_tail
-    elif(wf_model=='KerrBinary'      ): default_bounds = {'phi': [0.0, twopi]}
-    elif(wf_model=='TEOBPM'          ): default_bounds = default_bounds_TEOBPM
+    if(  wf_model=='Damped-sinusoids'     ): default_bounds = default_bounds_DS
+    elif(wf_model=='Damped-sinusoids-tail'): default_bounds = default_bounds_DS_tail
+    elif(wf_model=='Kerr'                 ): default_bounds = default_bounds_Kerr
+    elif(wf_model=='Kerr-tail'            ): default_bounds = default_bounds_Kerr_tail
+    elif(wf_model=='KerrBinary'           ): default_bounds = {'phi': [0.0, twopi]}
+    elif(wf_model=='TEOBPM'               ): default_bounds = default_bounds_TEOBPM
 
     return default_bounds
 
@@ -395,8 +402,14 @@ def Dynamic_InferenceModel(base):
             self.kind          = likelihood_kind
             self.Kerr_modes    = self.wf_model.Kerr_modes
             self.N_ds_modes    = self.wf_model.N_ds_modes
-            self.TEOB_NR_fit   = self.wf_model.TEOB_NR_fit
+            self.N_ds_tails    = getattr(self.wf_model, 'N_ds_tails', 0)
             self.TEOB_template = self.wf_model.TEOB_template
+            self.TEOB_global_fit = self.wf_model.TEOB_global_fit
+            self.TEOB_merger_data = self.wf_model.TEOB_merger_data
+            self.TEOB_NR_fit = getattr(self.wf_model, 'TEOB_NR_fit', 0)
+            self.TEOB_qc_fit_type = getattr(self.wf_model, 'TEOB_qc_fit_type', None)
+            self.sigmoid_flag = getattr(self.wf_model, 'sigmoid_flag', 0)
+            self.quadratic_fits = getattr(self.wf_model, 'quadratic_fits', 0)
             self.min_method    = min_method
             self.Config        = Config
 
@@ -450,9 +463,9 @@ def Dynamic_InferenceModel(base):
                                 single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_tail)
                                 self.names.append(fullname)
                                 self.bounds.append(single_bounds)
-        
+
             elif(self.wf_model.wf_model=='Damped-sinusoids'):
-            
+
                 default_bounds = read_default_bounds(self.wf_model.wf_model)
                 for i,name in it.product(list(range(self.N_ds_modes)),default_bounds.keys()):
 
@@ -463,7 +476,18 @@ def Dynamic_InferenceModel(base):
                         single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds)
                         self.names.append(fullname)
                         self.bounds.append(single_bounds)
-                    
+
+                default_bounds_DS_tail = read_default_bounds(self.wf_model.wf_model+'-tail')
+                for i,name in it.product(list(range(self.N_ds_tails)),default_bounds_DS_tail.keys()):
+
+                    fullname      = '{}_{}'.format(name,i)
+                    try:
+                        self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                    except(configparser.NoOptionError):
+                        single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_DS_tail)
+                        self.names.append(fullname)
+                        self.bounds.append(single_bounds)
+
             elif(self.wf_model.wf_model=='Kerr-Damped-sinusoids'):
 
                 self.tail            = self.wf_model.tail
@@ -533,40 +557,50 @@ def Dynamic_InferenceModel(base):
 
             elif(self.wf_model.wf_model=='TEOBPM'):
 
-                params_Kerr = ['t_sigmoid', 'width_sigmoid', 'ln_A', 'phi', 'dphi']
+                TEOB_development_fit = bool(self.TEOB_NR_fit or self.sigmoid_flag or self.quadratic_fits)
+                TEOB_mode_parameters = ['ln_A', 'phi', 'dphi']
+                if(self.sigmoid_flag):
+                    TEOB_mode_parameters += ['t_sigmoid', 'width_sigmoid']
                 self.quadratic_modes = self.wf_model.quadratic_modes
 
-                default_bounds_TEOBPM = read_default_bounds(self.wf_model.wf_model, TEOB_template=self.TEOB_template)   
+                default_bounds_TEOBPM = read_default_bounds(
+                    self.wf_model.wf_model,
+                    TEOB_template=self.TEOB_template,
+                    TEOB_development_fit=TEOB_development_fit,
+                    TEOB_sigmoid=bool(self.sigmoid_flag),
+                )
                 for name in default_bounds_TEOBPM.keys():
-
-                    if name not in params_Kerr:
-                        if(not(self.TEOB_NR_fit) and not(name=='phi_mrg')): continue
-                        fullname = '{}_{}{}'.format(name, self.wf_model.l_NR, self.wf_model.m_NR)
-                        try:
-                            self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
-                        except(configparser.NoOptionError):
-                            single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_TEOBPM)
-                            self.names.append(fullname)
-                            self.bounds.append(single_bounds)
-                    else:
+                    if(name in TEOB_mode_parameters and TEOB_development_fit):
                         for (l_ring, m_ring, n) in self.Kerr_modes:
-                            
-                            fullname      = '{}_{}{}{}'.format(name, l_ring, m_ring, n)
+                            fullname = '{}_{}{}{}'.format(name, l_ring, m_ring, n)
                             try:
                                 self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
                             except(configparser.NoOptionError):
                                 single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_TEOBPM)
                                 self.names.append(fullname)
                                 self.bounds.append(single_bounds)
-                        for quad_term in self.quadratic_modes:
-                            for ((l,m,n),(l1,m1,n1),(l2,m2,n2)) in self.quadratic_modes[quad_term]:
-                                fullname      = '{}_{}_{}{}{}_{}{}{}_{}{}{}'.format(name, quad_term, l,m,n, l1,m1,n1, l2,m2,n2)
-                                try:
-                                    self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
-                                except(configparser.NoOptionError):
-                                    single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_TEOBPM)
-                                    self.names.append(fullname)
-                                    self.bounds.append(single_bounds)
+
+                        if(self.quadratic_fits and self.quadratic_modes is not None):
+                            for quad_term in self.quadratic_modes:
+                                for ((l,m,n),(l1,m1,n1),(l2,m2,n2)) in self.quadratic_modes[quad_term]:
+                                    fullname = '{}_{}_{}{}{}_{}{}{}_{}{}{}'.format(name, quad_term, l,m,n, l1,m1,n1, l2,m2,n2)
+                                    try:
+                                        self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                                    except(configparser.NoOptionError):
+                                        single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_TEOBPM)
+                                        self.names.append(fullname)
+                                        self.bounds.append(single_bounds)
+                        continue
+
+                    if self.TEOB_global_fit and not self.TEOB_NR_fit and name != 'phi_mrg':
+                        continue
+                    fullname = '{}_{}{}'.format(name, self.wf_model.l_NR, self.wf_model.m_NR)
+                    try:
+                        self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                    except(configparser.NoOptionError):
+                        single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_TEOBPM)
+                        self.names.append(fullname)
+                        self.bounds.append(single_bounds)
 
             else:
                 raise ValueError("Unknown template selected: {}".format(self.wf_model.wf_model))

@@ -134,3 +134,93 @@ def test_kerrbinary_waveform_passes_filtered_modes(monkeypatch):
     assert captured["modes"] == {"linear": {(2, 2): ["filtered"]}, "quadratic": {}}
     assert captured["args"][10] == params["phi"]
     assert result == "binary"
+
+
+def test_teobpm_waveform_passes_string_template(monkeypatch):
+    model = _build_model(
+        wf_model="TEOBPM",
+        TEOB_template="RatExp",
+        TEOB_merger_data=1,
+        TEOB_global_fit=0,
+        metadata_overrides={
+            "omg_peak_22": 0.3,
+            "A_peak_22": 0.4,
+            "A_peak22dotdot": -0.01,
+        },
+    )
+
+    params = {
+        "phi_mrg_22": 0.0,
+        "c2A_22": 1.0,
+        "c2p_22": 1.0,
+        "c3A_22": 1.0,
+        "c3p_22": 1.0,
+        "c4p_22": 1.0,
+    }
+    captured = {}
+
+    def fake_teobpm(*args, **kwargs):
+        captured["args"] = args
+        captured.update(kwargs)
+        return "teob"
+
+    monkeypatch.setattr(template_waveforms.wf, "TEOBPM", fake_teobpm, raising=False)
+
+    result = model.TEOBPM_waveform(params, {})
+
+    assert captured["template"] == "RatExp"
+    assert not isinstance(captured["template"], int)
+    assert captured["merger_data"] == 1
+    assert captured["global_fit"] == 0
+    assert result == "teob"
+
+
+def test_teobpm_development_path_keeps_nr_fit_sigmoid_and_quadratic(monkeypatch):
+    model = _build_model(
+        wf_model="TEOBPM",
+        TEOB_template="HypTan",
+        TEOB_NR_fit=1,
+        TEOB_global_fit=1,
+        TEOB_merger_data=0,
+        TEOB_qc_fit_type="equal-mass",
+        sigmoid_flag=1,
+        quadratic_fits=1,
+        quadratic_modes={"sum": [((4, 4, 0), (2, 2, 0), (2, 2, 0))]},
+    )
+
+    params = {
+        "phi_mrg_22": 0.0,
+        "c3A_22": 1.0,
+        "c3p_22": 2.0,
+        "c4p_22": 3.0,
+        "ln_A_220": math.log(2.0),
+        "phi_220": 0.1,
+        "dphi_220": 0.2,
+        "t_sigmoid_220": 4.0,
+        "width_sigmoid_220": 5.0,
+        "ln_A_sum_440_220_220": math.log(3.0),
+        "phi_sum_440_220_220": 0.3,
+        "dphi_sum_440_220_220": 0.4,
+        "t_sigmoid_sum_440_220_220": 6.0,
+        "width_sigmoid_sum_440_220_220": 7.0,
+    }
+    captured = {}
+
+    def fake_teobpm(*args, **kwargs):
+        captured["args"] = args
+        captured.update(kwargs)
+        return "teob-dev"
+
+    monkeypatch.setattr(template_waveforms.wf, "TEOBPM", fake_teobpm, raising=False)
+
+    result = model.TEOBPM_waveform(params, {})
+
+    assert captured["template"] == 0
+    assert captured["ecc_par"] == 0
+    assert captured["sigmoid_flag"] == 1
+    assert captured["quadratic_fits"] == 1
+    assert captured["order_S_hat"] == 342
+    assert captured["NR_fit_coeffs"][(2, 2)]["c3A"] == 1.0
+    assert abs(captured["args"][6][(2, 2, 2, 0)] - 2.0 * cmath.exp(1j * 0.1)) < 1e-12
+    assert abs(captured["args"][10]["sum"][((2, 4, 4, 0), (2, 2, 2, 0), (2, 2, 2, 0))] - 3.0 * cmath.exp(1j * 0.3)) < 1e-12
+    assert result == "teob-dev"

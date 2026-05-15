@@ -127,7 +127,20 @@ def main():
     # Load Kerr modes. #
     # =================#
     
-    Kerr_modes, Kerr_quad_modes, qnm_cached = QNM_utils.read_Kerr_modes(parameters['Model']['QNM-modes'], parameters['Model']['QQNM-modes'], parameters['Model']['charge'], parameters['NR-data']['l-NR'], parameters['NR-data']['m'], NR_metadata)
+    cache_negative_m_qnms = (
+        parameters['Model']['template'] == 'KerrBinary'
+        and parameters['Model']['KerrBinary-version'] == 'Cheung2023'
+        and NR_metadata['af'] < 0.0
+    )
+    Kerr_modes, Kerr_quad_modes, qnm_cached = QNM_utils.read_Kerr_modes(
+        parameters['Model']['QNM-modes'],
+        parameters['Model']['QQNM-modes'],
+        parameters['Model']['charge'],
+        parameters['NR-data']['l-NR'],
+        parameters['NR-data']['m'],
+        NR_metadata,
+        cache_negative_m_qnms=cache_negative_m_qnms,
+    )
     Kerr_tail_modes                         = QNM_utils.read_tail_modes(parameters['Model']['Kerr-tail-modes'])
 
     # ============#
@@ -138,24 +151,27 @@ def main():
                                                 NR_sim.t_min                                                               , 
                                                 NR_sim.t_peak                                                              ,
                                                 parameters['Model']['template']                                            , 
-                                                parameters['Model']['N-DS-modes']                                          , 
+                                                parameters['Model']['N-DS-modes']                                          ,
                                                 Kerr_modes                                                                 , 
                                                 NR_metadata                                                                ,
                                                 fit_metadata                                                               ,  
                                                 qnm_cached                                                                 , 
                                                 parameters['NR-data']['l-NR']                                              , 
                                                 parameters['NR-data']['m']                                                 , 
+                                                N_ds_tails                = parameters['Model']['N-DS-tails']                      ,
                                                 tail                      = parameters['Model']['Kerr-tail']                       ,
                                                 tail_modes                = Kerr_tail_modes                                        ,     
                                                 quadratic_modes           = Kerr_quad_modes                                        , 
                                                 const_params              = parameters['NR-data']['add-const']                     , 
                                                 KerrBinary_version        = parameters['Model']['KerrBinary-version']              ,
                                                 KerrBinary_amp_nc_version = parameters['Model']['KerrBinary-amplitudes-nc-version'],
-                                                TEOB_NR_fit               = parameters['Model']['TEOB-NR-fit']                     ,
                                                 TEOB_template             = parameters['Model']['TEOB-template']                   ,
+                                                TEOB_global_fit           = parameters['Model']['TEOB-global-fit']                 ,
+                                                TEOB_merger_data          = parameters['Model']['TEOB-merger-data']                ,
+                                                TEOB_NR_fit               = parameters['Model']['TEOB-NR-fit']                     ,
                                                 TEOB_qc_fit_type          = parameters['Model']['TEOB-qc-fit-type']                ,
-                                                sigmoid_flag              = parameters['Model']['sigmoid-flag']                ,
-                                                quadratic_fits            = parameters['Model']['quadratic-fits']            
+                                                sigmoid_flag              = parameters['Model']['sigmoid-flag']                    ,
+                                                quadratic_fits            = parameters['Model']['quadratic-fits']                  ,
                                                 )
 
     # ===============#
