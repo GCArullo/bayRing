@@ -4,7 +4,31 @@ import qnm
 import pyRing.utils as pyRing_utils
 
 twopi = 2.*np.pi
-qnm.download_data()
+
+def qnm_data_available():
+
+    try:
+        qnm_cached = qnm.cached
+        qnm_cache_dir = qnm_cached.get_cachedir()
+    except AttributeError:
+        return False
+
+    if qnm_cache_dir is None:
+        return True
+
+    qnm_data_dir = qnm_cache_dir / 'data'
+    if qnm_data_dir.exists() and any(qnm_data_dir.glob('*.pickle')):
+        return True
+
+    try:
+        qnm_data_filename = qnm_cached._data_url.split('/')[-1]
+    except AttributeError:
+        return False
+
+    return (qnm_cache_dir / qnm_data_filename).exists()
+
+if not qnm_data_available():
+    qnm.download_data()
 
 def read_quad_modes(QQNM_modes, l_NR, m):  
 
@@ -30,7 +54,7 @@ def read_quad_modes(QQNM_modes, l_NR, m):
 
     """
 
-    quad_modes_list   = QQNM_modes[0].split(',')
+    quad_modes_list = QQNM_modes.split(',')
 
     quad_modes        = {'sum': [], 'diff': []}
     for i in range(len(quad_modes_list)):
@@ -141,7 +165,15 @@ def read_linear_modes(modes_input, l_NR, m):
 
     return modes
 
-def read_Kerr_modes(modes_input, QQNM_modes, charge, l_NR, m, NR_metadata):
+def read_Kerr_modes(
+        modes_input,
+        QQNM_modes,
+        charge,
+        l_NR,
+        m,
+        NR_metadata,
+        cache_negative_m_qnms=False,
+    ):
 
     """
 
@@ -164,6 +196,12 @@ def read_Kerr_modes(modes_input, QQNM_modes, charge, l_NR, m, NR_metadata):
 
     m : int
         m-mode of the NR waveform.
+
+    cache_negative_m_qnms : bool
+        If True, cache the m -> -m Kerr-sector partner for each requested
+        QNM mode. This is required by Cheung/Jaxqualin negative-spin runs,
+        where the waveform keeps the orbital-frame spherical mode fixed and
+        evaluates QNMs at |af| with flipped black-hole-frame m.
 
     Returns
     -------
@@ -193,18 +231,32 @@ def read_Kerr_modes(modes_input, QQNM_modes, charge, l_NR, m, NR_metadata):
     qnm_cached = {}
     for (l_ring,m_ring,n) in modes_full:
 
-        if(charge): 
-            interpolate_freq, interpolate_tau = pyRing_utils.qnm_interpolate_KN(2, l_ring, m_ring, n)
-            freq = (interpolate_freq(NR_metadata['af'], NR_metadata['qf']) / NR_metadata['Mf']) * (1./twopi)
-            tau  = -1./(interpolate_tau(NR_metadata['af'], NR_metadata['qf'])) * NR_metadata['Mf']
-            qnm_cached[(2, l_ring, m_ring, n)] = {'f': freq, 'tau': tau}
+        cache_modes = [(l_ring, m_ring, n)]
+        if(cache_negative_m_qnms):
+            # Cheung/Jaxqualin negative-spin convention keeps the orbital-frame
+            # spherical mode fixed, but flips the Kerr-sector m label and
+            # evaluates the QNM spectrum at |af|.  Cache both labels so pyRing's
+            # waveform code can choose the proper branch without a KeyError.
+            cache_modes = list(dict.fromkeys(
+                cache_modes + [(l_ring, -m_ring, n)]
+            ))
 
-        else      : 
+        for (l_cache, m_cache, n_cache) in cache_modes:
 
-            omega, _, _ = qnm.modes_cache(s=-2,l=l_ring,m=m_ring,n=n)(a=NR_metadata['af'])
-            freq        = (np.real(omega) / NR_metadata['Mf']) * (1./twopi)
-            tau         = -1./(np.imag(omega)) * NR_metadata['Mf']
-            qnm_cached[(2, l_ring, m_ring, n)] = {'f': freq, 'tau': tau}
+            if((2, l_cache, m_cache, n_cache) in qnm_cached): continue
+
+            if(charge):
+                interpolate_freq, interpolate_tau = pyRing_utils.qnm_interpolate_KN(2, l_cache, m_cache, n_cache)
+                freq = (interpolate_freq(np.abs(NR_metadata['af']), NR_metadata['qf']) / NR_metadata['Mf']) * (1./twopi)
+                tau  = -1./(interpolate_tau(np.abs(NR_metadata['af']), NR_metadata['qf'])) * NR_metadata['Mf']
+                qnm_cached[(2, l_cache, m_cache, n_cache)] = {'f': freq, 'tau': tau}
+
+            else      :
+
+                omega, _, _ = qnm.modes_cache(s=-2,l=l_cache,m=m_cache,n=n_cache)(a=np.abs(NR_metadata['af']))
+                freq        = (np.real(omega) / NR_metadata['Mf']) * (1./twopi)
+                tau         = -1./(np.imag(omega)) * NR_metadata['Mf']
+                qnm_cached[(2, l_cache, m_cache, n_cache)] = {'f': freq, 'tau': tau}
 
     return linear_modes, quad_modes, qnm_cached
 

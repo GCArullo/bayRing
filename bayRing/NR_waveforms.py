@@ -1,15 +1,16 @@
 # General python imports
-import h5py, numpy as np, os, pandas as pd
+import h5py, numpy as np, os, pandas as pd, subprocess
 from scipy import interpolate
 
 import sxs
 try   : from cbhdb import simulation
 except: pass
 
+import bayRing.QNM_utils      as QNM_utils
+import bayRing.utils          as utils
 import bayRing.waveform_utils as waveform_utils
-import bayRing.QNM_utils as QNM_utils
-import pyRing.utils as pyRing_utils
-import pyRing.waveform as wf
+import pyRing.utils           as pyRing_utils
+import pyRing.waveform        as wf
 
 twopi = 2.*np.pi
 
@@ -141,51 +142,117 @@ def convert_resolution_level_Teukolsky(res_level):
 
 class Waveform_rit(object):
 
-    def __init__(self, sims='', path='', csv_path='', ID='', ell=2, m=2):
+    def __init__(self, NR_data_path='', csv_path='', fit_path='', ID='', ell=2, m=2, resolution_level=100):
 
-        self.path     = path
-        self.ID       = ID 
-        self.smpath   = sims
-        self.ell      = ell
-        self.m        = m
-        self.metadata = {}
-        self.csv_path = csv_path 
+        self.base             = NR_data_path
+        self.metadata_path    = os.path.join(NR_data_path, 'Metadata')
+        self.waveform_path    = os.path.join(NR_data_path, 'Data')
+        self.psi4_path        = os.path.join(NR_data_path, 'Data/Psi4')
+        self.csv_path         = csv_path 
+        self.fit_path         = fit_path
+        self.ID               = ID 
+        self.ell              = ell
+        self.m                = m
+        self.resolution_level = resolution_level
+
+        self.metadata       = {}
+
+    def set_metadata_RIT(self, filename_to_set):
+
+        full_name = os.path.join(self.metadata_path, filename_to_set)
+        if not os.path.isfile(full_name):
+            print(f"File not present locally. Attempting to download it from the online RIT catalog.")
+            os.system(f'wget https://ccrgpages.rit.edu/~RITCatalog/Metadata/{filename_to_set} -P {self.metadata_path} --no-check-certificate')
+
+        f = open(full_name, "r")
+
+        return f
 
     def load_metadata(self):
 
         ID_str = str(self.ID)
-        nm     = self.smpath + '/RIT_eBBH_'+ID_str+'-n100-ecc_Metadata.txt'
 
-        with open(nm, 'r') as f:
+        possible_name_formats_list = [
+                                        os.path.join(self.base, f'RIT_eBBH_{ID_str}-n{self.resolution_level}-ecc_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT:eBBH:{ID_str}-n{self.resolution_level}-ecc_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT_BBH_{ID_str}-n{self.resolution_level}-id0_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT:BBH:{ID_str}-n{self.resolution_level}-id0_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT_BBH_{ID_str}-n{self.resolution_level}-id1_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT:BBH:{ID_str}-n{self.resolution_level}-id1_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT_BBH_{ID_str}-n{self.resolution_level}-id2_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT:BBH:{ID_str}-n{self.resolution_level}-id2_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT_BBH_{ID_str}-n{self.resolution_level}-id3_Metadata.txt'),
+                                        os.path.join(self.base, f'RIT:BBH:{ID_str}-n{self.resolution_level}-id3_Metadata.txt')
+                                     ]
 
-            lines = [l for l in f.readlines() if l.strip()] # rm empty
+        possible_name_formats_list = possible_name_formats_list
+        for name_format in possible_name_formats_list:
+            try:
+                f  = self.set_metadata_RIT(name_format)
+                break
+            except:
+                continue
 
-            for line in lines[1:]:
+        lines = [l for l in f.readlines() if l.strip()] # rm empty
 
-                #line = line.split("#", 1)[0]
-                if line[0]=="#": continue
+        for line in lines[1:]:
 
-                line               = line.rstrip("\n")
-                key, val           = line.split("= ")
-                key                = key.strip()
-                self.metadata[key] = val
+            #line = line.split("#", 1)[0]
+            if line[0]=="#": continue
+
+            line               = line.rstrip("\n")
+            key, val           = line.split("= ")
+            key                = key.strip()
+            self.metadata[key] = val
 
         try:
-            additional_data = pd.read_csv(self.csv_path)
-            
-            self.metadata[  f'A_peak_{self.ell}{self.m}'] = float(additional_data.loc[additional_data.ID==self.ID,     f'A_peak{self.ell}{self.m}'])
-            self.metadata[f'omg_peak_{self.ell}{self.m}'] = float(additional_data.loc[additional_data.ID==self.ID, f'omega_peak{self.ell}{self.m}'])
+            additional_data = pd.read_csv(self.csv_path)     
+            self.metadata[f'A_peak_{self.ell}{self.m}']      = additional_data.loc[additional_data['ID'] == int(self.ID), f'A_peak{self.ell}{self.m}'].values[0]
+            self.metadata[f'omg_peak_{self.ell}{self.m}']    = additional_data.loc[additional_data['ID'] == int(self.ID), f'omega_peak{self.ell}{self.m}'].values[0]
+            try:
+                self.metadata['A_nr_error']                  = additional_data.loc[additional_data['ID'] == int(self.ID), f'A_nr_error'].values[0]
+            except:
+                print("No NR error found in the csv file. Setting it to 1e-3.")
+                self.metadata['A_nr_error'] = 1e-3
+            self.metadata[f'A_peak{self.ell}{self.m}dotdot'] = additional_data.loc[additional_data['ID'] == int(self.ID), f'A_peak{self.ell}{self.m}dotdot'].values[0]
+            self.metadata['Emrg']                            = additional_data.loc[additional_data['ID'] == int(self.ID), f'Heff_til'].values[0]
+            self.metadata['Jmrg']                            = additional_data.loc[additional_data['ID'] == int(self.ID), f'Jmrg_til'].values[0]
+            self.metadata['bmrg']                            = additional_data.loc[additional_data['ID'] == int(self.ID), f'b_massless_EOB'].values[0]
         except:
-            self.metadata[  f'A_peak_{self.ell}{self.m}'] = 0.0
-            self.metadata[f'omg_peak_{self.ell}{self.m}'] = 0.0
+            self.metadata[  f'A_peak_{self.ell}{self.m}']   = self.metadata[f'peak-ampl-l{self.ell}-m{self.m}']
+            self.metadata[f'omg_peak_{self.ell}{self.m}']   = self.metadata[f'peak-omega-l{self.ell}-m{self.m}']
+            self.metadata['A_nr_error']                     = 1e-3
+            self.metadata['A_peak{self.ell}{self.m}dotdot'] = 0.0
+            self.metadata[                       f'Emrg']   = 0.0
+            self.metadata[                       f'Jmrg']   = 0.0
+            self.metadata[                       f'bmrg']   = 0.0
 
         return self.metadata
 
-    def load_hlm(self):
+    def set_h_data_RIT(self, filename_strain):
+
+        full_name = os.path.join(self.waveform_path, filename_strain)
+        if not os.path.isfile(full_name):
+            print(f"File not present locally. Attempting to download it from the online RIT catalog.")
+            os.system(f'wget https://ccrgpages.rit.edu/~RITCatalog/Data/{filename_strain} -P {self.waveform_path} --no-check-certificate')
+
+        f = h5py.File(full_name, "r")
+
+        return f
+
+    def load_waveform_lm(self):
 
         ID_str = str(self.ID)
-        nm = self.path + '/ExtrapStrain_RIT-eBBH-'+ID_str+'-n100.h5'
-        f = h5py.File(nm, "r")
+
+        possible_name_formats_list = [f'ExtrapStrain_RIT-eBBH-{ID_str}-n{self.resolution_level}.h5',
+                                      f'ExtrapStrain_RIT-BBH-{ID_str}-n{self.resolution_level}.h5' ,]            
+        for filename_strain in possible_name_formats_list:
+            try:
+                f = self.set_h_data_RIT(filename_strain)
+                break
+            except:
+                continue
+
         u   =  f['NRTimes'][:]
         A   =  f[f'amp_l{self.ell}_m{self.m}']['Y'][:]
         A_u =  f[f'amp_l{self.ell}_m{self.m}']['X'][:]
@@ -199,18 +266,41 @@ class Waveform_rit(object):
         self.im = self.A*np.sin(-self.p)
 
         return self.u, self.re, self.im, self.A, self.p
+ 
+    def set_psi4_data_RIT(self, dir_name):
+
+        asc_name    = os.path.join(dir_name, f'rPsi4_l{self.ell}_m{self.m}_rInf.asc')
+        tar_gz_name = f'{dir_name}.tar.gz'
+        tar_gz_path = os.path.join(self.psi4_path, tar_gz_name)
+
+        if not os.path.isfile(tar_gz_path):
+            print(f"File not present locally. Attempting to download it from the online RIT catalog.")
+            os.system(f'wget https://ccrgpages.rit.edu/~RITCatalog/Data/{tar_gz_name} -P {self.psi4_path} --no-check-certificate')
+
+        f = utils.read_psi4_RIT_format(tar_gz_path, asc_name)
+
+        return f
+
+    def load_psi4_lm(self):
+
+        ID_str    = str(self.ID)
+
+        possible_name_formats_list = [f'ExtrapPsi4_RIT-eBBH-{ID_str}-n{self.resolution_level}-ecc'                          ]    
+        idx_names                  = [f'ExtrapPsi4_RIT-BBH-{ID_str}-n{self.resolution_level}-id{idx}' for idx in range(0, 4)]
         
-    def load_psilm(self):
+        possible_name_formats_list = possible_name_formats_list + idx_names
+        for dir_name in possible_name_formats_list:
+            try:
+                f = self.set_psi4_data_RIT(dir_name)
+                break
+            except:
+                continue
 
-        ID_str  = str(self.ID)
-        nm      = self.path + f'/Psi_data/ExtrapPsi4_RIT-eBBH-{ID_str}-n100-ecc/rPsi4_l{self.ell}_m{self.m}_rInf.asc'
-        f       = np.loadtxt(nm)
-
-        self.u  = f['1:time']
-        self.p  = f['4:ampl']
-        self.A  = f['5:phse']
-        self.re = f['2:real']
-        self.im = f['3:imag']
+        self.u  = f['time']
+        self.A  = f['ampl']
+        self.p  = f['phse']
+        self.re = f['real']
+        self.im = f['imag']
 
         return self.u, self.re, self.im, self.A, self.p
 
@@ -221,7 +311,7 @@ class Waveform_rit(object):
 
         return yn
 
-    def interpolate_hlm(self, u_new):
+    def interpolate_waveform_lm(self, u_new):
 
         re_i = self.interp_qnt(self.u, self.re, u_new)
         im_i = self.interp_qnt(self.u, self.im, u_new)
@@ -259,7 +349,7 @@ class Waveform_C2EFT(object):
 
         return self.metadata 
 
-    def load_hlm(self):
+    def load_waveform_lm(self):
 
         self.t,  self.re = np.loadtxt(os.path.join(self.path, 'strain_rh+22.dat'), unpack=True)
         self.t2, self.im = np.loadtxt(os.path.join(self.path, 'strain_Ih+22.dat'), unpack=True)
@@ -288,23 +378,40 @@ def read_NR_metadata(NR_sim, NR_catalog):
         Dictionary containing the metadata of the NR simulation.
 
     """
-
     if(NR_catalog=='SXS'):
-
-        M = 1.0
-        metadata = {
-                    'q'    : NR_sim.q,
-                    'chi1' : NR_sim.chi1,
-                    'chi2' : NR_sim.chi2,
-                    'tilt1': NR_sim.tilt1,
-                    'tilt2': NR_sim.tilt2,
-                    'm1'   : pyRing_utils.m1_from_m_q(M, NR_sim.q),
-                    'm2'   : pyRing_utils.m2_from_m_q(M, NR_sim.q),
-                    'ecc'  : NR_sim.ecc,
-                    'Mf'   : NR_sim.Mf,
-                    'af'   : NR_sim.af,
-                }
-                
+        try:
+            M = 1.0
+            metadata = {
+                        'q'    : NR_sim.q,
+                        'chi1' : NR_sim.chi1,
+                        'chi2' : NR_sim.chi2,
+                        'tilt1': NR_sim.tilt1,
+                        'tilt2': NR_sim.tilt2,
+                        'm1'   : pyRing_utils.m1_from_m_q(M, NR_sim.q),
+                        'm2'   : pyRing_utils.m2_from_m_q(M, NR_sim.q),
+                        'ecc'  : NR_sim.ecc,
+                        'Mf'   : NR_sim.Mf,
+                        'af'   : NR_sim.af,
+                        'A_peak_22'     : NR_sim.A_peak_22,
+                        'omg_peak_22'   : NR_sim.omg_peak_22,
+                        'A_nr_error'    : NR_sim.A_nr_error,
+                        'A_peak22dotdot': NR_sim.A_peak22dotdot
+                    }
+        except:
+            M = 1.0
+            metadata = {
+                        'q'    : NR_sim.q,
+                        'chi1' : NR_sim.chi1,
+                        'chi2' : NR_sim.chi2,
+                        'tilt1': NR_sim.tilt1,
+                        'tilt2': NR_sim.tilt2,
+                        'm1'   : pyRing_utils.m1_from_m_q(M, NR_sim.q),
+                        'm2'   : pyRing_utils.m2_from_m_q(M, NR_sim.q),
+                        'ecc'  : NR_sim.ecc,
+                        'Mf'   : NR_sim.Mf,
+                        'af'   : NR_sim.af,
+                    }
+            
     elif(NR_catalog=='cbhdb'):
 
         M = 1.0
@@ -328,16 +435,21 @@ def read_NR_metadata(NR_sim, NR_catalog):
 
         M = 1.0
         metadata = {
-                    'q'          : NR_sim.q,
-                    'chi1'       : NR_sim.chi1,
-                    'chi2'       : NR_sim.chi2,
-                    'm1'         : pyRing_utils.m1_from_m_q(M, NR_sim.q),
-                    'm2'         : pyRing_utils.m2_from_m_q(M, NR_sim.q),
-                    'ecc'        : NR_sim.ecc,
-                    'Mf'         : NR_sim.Mf,
-                    'af'         : NR_sim.af,
-                    'A_peak_22'  : NR_sim.A_peak_22,
-                    'omg_peak_22': NR_sim.omg_peak_22,
+                    'q'             : NR_sim.q,
+                    'chi1'          : NR_sim.chi1,
+                    'chi2'          : NR_sim.chi2,
+                    'm1'            : pyRing_utils.m1_from_m_q(M, NR_sim.q),
+                    'm2'            : pyRing_utils.m2_from_m_q(M, NR_sim.q),
+                    'ecc'           : NR_sim.ecc,
+                    'Mf'            : NR_sim.Mf,
+                    'af'            : NR_sim.af,
+                    'A_peak_22'     : NR_sim.A_peak_22,
+                    'omg_peak_22'   : NR_sim.omg_peak_22,
+                    'A_nr_error'    : NR_sim.A_nr_error,
+                    'A_peak22dotdot': NR_sim.A_peak22dotdot,
+                    'bmrg'          : NR_sim.bmrg,
+                    'Emrg'          : NR_sim.Emrg,
+                    'Jmrg'          : NR_sim.Jmrg,
                 }
 
     elif(NR_catalog=='C2EFT'):
@@ -387,7 +499,7 @@ def read_NR_metadata(NR_sim, NR_catalog):
     else: raise ValueError("Invalid option for NR catalog: {}".format(NR_catalog))
 
     return metadata
-
+    
 class NR_simulation():
 
     """
@@ -428,7 +540,7 @@ class NR_simulation():
         If True, the NR simulation is downloaded from the NR catalog. Default: False.
 
     NR_error : str, optional
-        Error of the NR simulation. Available options: 'align-with-mismatch-res-only', 'align-with-mismatch-res-and-extrap', 'align-with-mismatch-res-and-extrap-and-pert', 'constant-X' (with X=error value). Default: 'align-with-mismatch-res-only'.
+        Error of the NR simulation. Available options: 'align-with-mismatch-res-only', 'align-with-mismatch-res-and-extrap', 'align-with-mismatch-res-and-extrap-and-pert', 'constant-X' (with X=error value), 'late-time-const-error'. Default: 'align-with-mismatch-res-only'.
 
     tM_start : float, optional
         Initial time of the fit. Default: 30.0.
@@ -454,7 +566,8 @@ class NR_simulation():
                  extrap_order                                   , 
                  perturbation_order                             , 
                  NR_dir                                         , 
-                 additional_NR_properties                       , 
+                 additional_NR_properties                       ,
+                 fits                                           , 
                  injection_modes_list                           , 
                  injection_times                                , 
                  injection_noise                                , 
@@ -462,14 +575,15 @@ class NR_simulation():
                  l                                              , 
                  m                                              , 
                  outdir                                         , 
+                 waveform_type  = 'strain'                      ,
                  download       = False                         , 
                  NR_error       = 'align-with-mismatch-res-only', 
                  tM_start       = 30.0                          , 
                  tM_end         = 150.0                         , 
                  t_delay_scd    = 0.0                           , 
                  t_peak_22      = 0.0                           ,
-                 t_min_mismatch = 2692.7480095302817            , 
-                 t_max_mismatch = 3792.7480095302817            ):
+                 t_min_mismatch = 3e-1                          ,
+                 t_max_mismatch = 4e-3                          ):
 
         ####################
         # Input parameters #
@@ -479,13 +593,15 @@ class NR_simulation():
         self.NR_ID                    = NR_ID
         self.res_level                = res_level
         self.extrap_order             = extrap_order
+        self.waveform_type            = waveform_type
 
         self.l                        = l
         self.m                        = m
         self.pert_order               = perturbation_order
 
         self.NR_dir                   = NR_dir
-        self.additional_NR_properties = additional_NR_properties
+        self.additional_NR_properties = utils.normalize_optional_path(additional_NR_properties)
+        self.fits                     = utils.normalize_optional_path(fits)
         self.outdir                   = outdir
 
         self.fake_NR_modes            = injection_modes_list
@@ -557,7 +673,7 @@ class NR_simulation():
                                      reference_amplitude = 0.0            ,
                                      geom                = 1              ,
                                      qnm_fit             = 0              ,
-                                     interpolants        = None           ,
+                                     qnm_interpolants    = None           ,
                                     
                                      Spheroidal          = 0              , # Spheroidal harmonics, overrun by geom
                                      amp_non_prec_sym    = 1              ,
@@ -607,51 +723,85 @@ class NR_simulation():
                 try:
                     path_waveform2            = self.NR_dir + f'/{NR_ID}_lev-{self.res_level-1}.h5'
                     self.waveform_obj2        = simulation.Simulation.from_file(path_waveform2)
-                    NR_h2                     = self.waveform_obj2.processed.rhlm_finite_radius[(self.l, self.m)]
-                    t_res, NR_r_res, NR_i_res = self.waveform_obj2.processed.rhlm_finite_radius_times, NR_h2.real, NR_h2.imag
+                    NR_h2                     = self.waveform_obj2.processed.rwaveform_lm_finite_radius[(self.l, self.m)]
+                    t_res, NR_r_res, NR_i_res = self.waveform_obj2.processed.rwaveform_lm_finite_radius_times, NR_h2.real, NR_h2.imag
                 except(ValueError):
                     print("Lower resolution not found!")
                     raise
 
             # Built NR waveform and time axis
-            NR_h      = self.waveform_obj.processed.rhlm_finite_radius[(self.l, self.m)]
+            NR_h      = self.waveform_obj.processed.rwaveform_lm_finite_radius[(self.l, self.m)]
             self.NR_r = NR_h.real
             self.NR_i = NR_h.imag
-            self.t_NR = self.waveform_obj.processed.rhlm_finite_radius_times
+            self.t_NR = self.waveform_obj.processed.rwaveform_lm_finite_radius_times
 
             # Define metadata in the class
             self.q, self.q1, self.q2, self.chi1, self.chi2, self.tilt1, self.tilt2, self.ecc, self.Mf, self.qf, self.af = self.read_cbhdb_metadata()
 
         elif(self.NR_catalog=='SXS'):
         
-            self.download = download
+            self.download  = download
             self.q, self.chi1, self.chi2, self.tilt1, self.tilt2, self.ecc, self.Mf, self.af = self.read_SXS_metadata()
+            
+            if self.additional_NR_properties:
+                self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = self.load_SXS_addn_metadata(csv_path=self.additional_NR_properties, ID_str=self.NR_ID)
+            else:
+                self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = None, None, None, None
 
             # Build NR waveform and time axis.
+            if self.res_level == -1:
+                # We add a maximum number of attempts to avoid the infinite loop
 
-            if(self.res_level==-1):
-                for res_level_x in [6,5,4,3,2,1]:
-                    try: 
-                        self.t_NR, self.NR_r, self.NR_i = self.read_hlm_from_SXS(self.extrap_order, res_level_x)
+                # Max attempts corresponding to the 6 resolution levels
+                max_attempts = 6
+
+                # Counter for the number of attempts
+                attempts = 0
+
+                # Loop through each resolution level from 6 down to 1
+                for res_level_x in [6, 5, 4, 3, 2, 1]:
+                    try:
+
+                        # Attempt to read the waveform for the current resolution level
+                        self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_SXS(self.extrap_order, res_level_x)
+                        
+                        # Set the resolution level if successful
                         self.res_level = res_level_x
-                        break
-                    except(ValueError):
-                        pass
-                print("\n* Setting the resolution level to the maximum available: {}\n".format(self.res_level))
-            else:
-                self.t_NR, self.NR_r, self.NR_i = self.read_hlm_from_SXS(self.extrap_order, self.res_level)
+                        print("\n* Resolution found at level: {}".format(self.res_level))
 
-            t_res,     NR_r_res,  NR_i_res  = self.read_hlm_from_SXS(self.extrap_order,   self.res_level-1)
-            t_extr,    NR_r_extr, NR_i_extr = self.read_hlm_from_SXS(self.extrap_order+1, self.res_level)
+                        # Exit the loop if the level is valid and waveform is loaded
+                        break
+                    except Exception as e:
+
+                        # If an error occurs (e.g., file not found or data issues), increment the attempt count
+                        attempts += 1
+                        print(f"\n*Error in attempt {attempts} with resolution level {res_level_x}: {e}")
+                        
+                        # If we reach the maximum number of attempts, break the loop and stop trying
+                        if attempts >= max_attempts:
+                            print("\n* Unable to find a valid resolution level. Stopping attempts.")
+                            break
+            else:
+                # If a valid resolution level is already set, load the waveform with that resolution level
+                self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level)
+
+            counter = 1
+            while(not(counter==0)):
+                try              : 
+                    if(self.res_level-counter==0): raise ValueError("Only a single resolution available.")
+                    t_res, NR_r_res, NR_i_res = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level-counter)
+                    print('* Resolution error constructed with resolution level {}'.format(self.res_level-counter))
+                    counter = 0
+                except ValueError: 
+                    counter += 1
+            t_extr, NR_r_extr, NR_i_extr = self.read_waveform_lm_from_SXS(self.extrap_order+1, self.res_level)
 
         elif(self.NR_catalog=='RIT'):
         
-            print('\n\n\nFIXME: figure out extrapolation order and resolution level for RIT\n\n\n')
-
-            self.q, self.chi1, self.chi2, self.ecc, self.Mf, self.af, self.A_peak_22, self.omg_peak_22 = self.read_RIT_metadata()
+            self.q, self.chi1, self.chi2, self.ecc, self.Mf, self.af, self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot, self.bmrg, self.Emrg, self.Jmrg = self.read_RIT_metadata()
 
             # Build NR waveform and time axis.
-            self.t_NR, self.NR_r, self.NR_i = self.read_hlm_from_RIT()
+            self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_RIT()
             t_res,     NR_r_res,  NR_i_res  = None, None, None
             t_extr,    NR_r_extr, NR_i_extr = None, None, None
 
@@ -669,16 +819,16 @@ class NR_simulation():
             self.ecc = 0.0
 
             # Build NR waveform and time axis. 
-            self.t_NR, self.NR_r, self.NR_i = self.read_hlm_from_C2EFT(resolution = res_1, sigma = sigma_1, tau = tau_1)
-            t_res,     NR_r_res,  NR_i_res  = self.read_hlm_from_C2EFT(resolution = res_2, sigma = sigma_2, tau = tau_1)
-            t_extr,    NR_r_extr, NR_i_extr = self.read_hlm_from_C2EFT(resolution = res_1, sigma = sigma_2, tau = tau_1)
+            self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_C2EFT(resolution = res_1, sigma = sigma_1, tau = tau_1)
+            t_res,     NR_r_res,  NR_i_res  = self.read_waveform_lm_from_C2EFT(resolution = res_2, sigma = sigma_2, tau = tau_1)
+            t_extr,    NR_r_extr, NR_i_extr = self.read_waveform_lm_from_C2EFT(resolution = res_1, sigma = sigma_2, tau = tau_1)
 
         elif(self.NR_catalog=='Teukolsky'):
         
             self.Mf, self.af                = self.read_Teukolsky_metadata()
-            self.t_NR, self.NR_r, self.NR_i = self.read_hlm_from_Teukolsky(self.res_level)
+            self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_Teukolsky(self.res_level)
             if not isinstance(self.res_level, str):
-                try: t_res, NR_r_res,  NR_i_res = self.read_hlm_from_Teukolsky(self.res_level-1)
+                try: t_res, NR_r_res,  NR_i_res = self.read_waveform_lm_from_Teukolsky(self.res_level-1)
                 except: print('\n* Teukolsky resolution level {} not available.\n'.format(self.res_level-1))
             else:
                 if(NR_error=='resolution'): raise ValueError("Resolution error not yet available when using nx,nl as resolution indicators.")
@@ -692,9 +842,13 @@ class NR_simulation():
             self.ecc, self.Mf, self.af = 0.0, 1.0, 0.0
 
             # Build NR waveform and time axis
-            self.t_NR, self.NR_r, self.NR_i = self.read_hlm_from_RWZ(self.res_level,self.extrap_order)
-            t_res,     NR_r_res,  NR_i_res  = self.read_hlm_from_RWZ(self.res_level-1,self.extrap_order)
-            t_extr,    NR_r_extr, NR_i_extr = self.read_hlm_from_RWZ(self.res_level,self.extrap_order+1)
+            self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_RWZ(self.res_level, self.extrap_order)
+            if NR_error in ['resolution', 'align-at-peak']:
+                t_res,  NR_r_res,  NR_i_res  = self.read_waveform_lm_from_RWZ(self.res_level-1, self.extrap_order, allow_simple_fallback=False)
+                t_extr, NR_r_extr, NR_i_extr = self.read_waveform_lm_from_RWZ(self.res_level, self.extrap_order+1, allow_simple_fallback=False)
+            else:
+                t_res,  NR_r_res,  NR_i_res  = None, None, None
+                t_extr, NR_r_extr, NR_i_extr = None, None, None
 
         # Auxiliary quantities for the reference NR simulation.
         self.NR_cpx                         = self.NR_r + 1j * self.NR_i
@@ -710,16 +864,20 @@ class NR_simulation():
                 error_value                = float(NR_error.split('-')[-1])
                 self.NR_err_cmplx          = self.generate_constant_error(error_value)
 
+            elif(NR_error == 'late-time-const-error'):
+                error_value                = self.A_nr_error
+                self.NR_err_cmplx          = self.generate_constant_error(error_value)
+
             else:
 
-                # Align the waveforms minimising the mismatch over a [t_min, t_max] interval.
+                # Align the waveforms minimizing the mismatch over a [t_min, t_max] interval.
                 if('align-with-mismatch' in NR_error):
                     
-                    # Resolution error.
+                    # Resolution error. 
                     NR_r_res    , NR_i_res       = waveform_utils.align_waveforms_with_mismatch(self.t_NR, self.NR_amp, self.NR_phi,  t_res,  NR_r_res,  NR_i_res, t_min_mismatch, t_max_mismatch)
                     NR_r_err_res, NR_i_err_res   = np.abs(self.NR_r-NR_r_res), np.abs(self.NR_i-NR_i_res)
 
-                    # Extrapolation error.  Align different extrapolation orders only if requested.
+                    # Extrapolation error.  Align different extrapolation orders only if requested. 
                     if(NR_error=='align-with-mismatch-all'): 
                         NR_r_extr, NR_i_extr     = waveform_utils.align_waveforms_with_mismatch(self.t_NR, self.NR_amp, self.NR_phi, t_extr, NR_r_extr, NR_i_extr, t_min_mismatch, t_max_mismatch)
                     NR_r_err_extr, NR_i_err_extr = np.abs(self.NR_r-NR_r_extr), np.abs(self.NR_i-NR_i_extr)
@@ -741,8 +899,14 @@ class NR_simulation():
                 self.NR_err_cmplx = np.sqrt(NR_r_err_extr**2 + NR_r_err_res**2) + 1j * np.sqrt(NR_i_err_extr**2 + NR_i_err_res**2)
             
         elif(self.NR_catalog=='RIT'):
-            error_value       = float(NR_error.split('-')[-1])
-            self.NR_err_cmplx = self.generate_constant_error(error_value)   
+            
+            if('constant' in NR_error):
+                error_value                = float(NR_error.split('-')[-1])
+                self.NR_err_cmplx          = self.generate_constant_error(error_value)
+
+            elif(NR_error == 'late-time-const-error'):
+                error_value                = self.A_nr_error
+                self.NR_err_cmplx          = self.generate_constant_error(error_value)
 
         elif(self.NR_catalog=='C2EFT'):
 
@@ -752,7 +916,7 @@ class NR_simulation():
 
             else:
 
-                # Align the waveforms minimising the mismatch over a [t_min, t_max] interval.
+                # Align the waveforms minimizing the mismatch over a [t_min, t_max] interval.
                 if('align-with-mismatch' in NR_error):
                     
                     # Resolution error.
@@ -834,7 +998,7 @@ class NR_simulation():
                 error_value                = float(NR_error.split('-')[-1])
                 self.NR_err_cmplx          = self.generate_constant_error(error_value)
         
-            # Align the waveforms minimising the mismatch over a [t_min, t_max] interval.
+            # Align the waveforms minimizing the mismatch over a [t_min, t_max] interval.
             if('align-with-mismatch' in NR_error):
                 
                 # Resolution error.
@@ -842,7 +1006,6 @@ class NR_simulation():
                 NR_r_err_res, NR_i_err_res = np.abs(self.NR_r-NR_r_res), np.abs(self.NR_i-NR_i_res)
             
                 self.NR_err_cmplx          = NR_r_err_res + 1j * NR_i_err_res
-
 
         elif(self.NR_catalog=='charged_raw'):
             if('constant' in NR_error):
@@ -885,8 +1048,7 @@ class NR_simulation():
                         self.NR_i[i] += np.imag(self.NR_err_cmplx.data[i])
 
         # Start from zero.
-        if(self.t_NR[0] < 0):
-            self.t_NR = self.t_NR - self.t_NR[0]
+        if(self.t_NR[0] < 0 and self.waveform_type=='strain'): self.t_NR = self.t_NR - self.t_NR[0]
         
         # Locate the merger time (which does not coincide with the peak in the eccentric case).
         self.t_peak = waveform_utils.find_peak_time(self.t_NR, self.NR_amp, self.ecc)
@@ -896,7 +1058,7 @@ class NR_simulation():
             print("\n* The peak time has been set to the secondary peak time with a delay of: {}.".format(self.t_delay_scd))
             self.t_peak = self.t_peak + self.t_delay_scd
 
-        if(not(self.t_peak_22==0.0) and not(self.l==2 and self.m==2)):
+        if not(self.t_peak_22==0.0):
             print("\n* The peak time has been set to the peak of the 22 mode: {}.".format(self.t_peak_22))
             self.t_peak = self.t_peak_22
 
@@ -922,25 +1084,23 @@ class NR_simulation():
     def extract_data_NR(self, t_min_mismatch, t_max_mismatch):
 
         # Build NR time axis.
-
         if(self.res_level==-1):
             for res_level_x in [6,5,4,3,2,1]:
                 try: 
-                    t_NR, NR_r, NR_i = self.read_hlm_from_SXS(self.extrap_order, res_level_x)
+                    t_NR, NR_r, NR_i = self.read_waveform_lm_from_SXS(self.extrap_order, res_level_x)
                     self.res_level = res_level_x
                     break
                 except(ValueError):
                     pass
         else:
-            t_NR, NR_r, NR_i = self.read_hlm_from_SXS(self.extrap_order, self.res_level)
+            t_NR, NR_r, NR_i = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level)
 
         NR_amp, NR_phi               = waveform_utils.amp_phase_from_re_im(NR_r, NR_i)
 
         # Build NR error array.
-
         if(self.fake_error_NR=='from-SXS-NR'):
-            t_res,  NR_r_res,  NR_i_res  = self.read_hlm_from_SXS(self.extrap_order,   self.res_level-1)
-            t_extr, NR_r_extr, NR_i_extr = self.read_hlm_from_SXS(self.extrap_order+1, self.res_level)
+            t_res,  NR_r_res,  NR_i_res  = self.read_waveform_lm_from_SXS(self.extrap_order,   self.res_level-1)
+            t_extr, NR_r_extr, NR_i_extr = self.read_waveform_lm_from_SXS(self.extrap_order+1, self.res_level)
 
             NR_r_res    , NR_i_res       = waveform_utils.align_waveforms_with_mismatch(t_NR, NR_amp, NR_phi,  t_res,  NR_r_res,  NR_i_res, t_min_mismatch, t_max_mismatch)
             NR_r_err_res, NR_i_err_res   = np.abs(NR_r-NR_r_res), np.abs(NR_i-NR_i_res)
@@ -950,13 +1110,15 @@ class NR_simulation():
             NR_err_cmplx = np.sqrt(NR_r_err_extr**2 + NR_r_err_res**2) + 1j * np.sqrt(NR_i_err_extr**2 + NR_i_err_res**2)
         else:
             NR_err_cmplx = None
-        
+
+        # Construct positive t_NR and compute t_peak
         if(t_NR[0] < 0):
             t_NR = t_NR - t_NR[0]
         t_peak   = t_NR[np.argmax(NR_amp)]
 
         return t_NR, NR_err_cmplx, t_peak
         
+    # FIXME: this function should be cleaned up
     def read_fake_NR_metadata(self):
         
         """
@@ -1156,7 +1318,7 @@ class NR_simulation():
 
         """
 
-        Read the metadata of the SXS waveform.
+        Read the metadata of the SXS waveform (with latest version released on 25th April 2025).
 
         Parameters
         ----------
@@ -1185,7 +1347,8 @@ class NR_simulation():
 
         """
         
-        metadata      = sxs.load("SXS:BBH:{}/Lev/metadata.json".format(self.NR_ID), download=self.download)
+        sim      = sxs.load("SXS:BBH:{}".format(self.NR_ID), download=self.download, auto_supersede=True)
+        metadata = sim.metadata
         
         tilt1, tilt2  = 0.0, 0.0
 
@@ -1196,6 +1359,17 @@ class NR_simulation():
         if isinstance(ecc, str): ecc = float(ecc[1:])
 
         return q, chi1, chi2, tilt1, tilt2, ecc, Mf, chif
+
+
+    def load_SXS_addn_metadata(self, csv_path, ID_str):
+
+        additional_data = pd.read_csv(csv_path) 
+        A_peak_22 = additional_data.loc[additional_data['ID'] == int(ID_str), 'A_peak22'].values[0]
+        omg_peak_22 = additional_data.loc[additional_data['ID'] == int(ID_str), 'omega_peak22'].values[0]
+        A_nr_error = additional_data.loc[additional_data['ID'] == int(ID_str), 'A_nr_error'].values[0]
+        A_peak22dotdot = additional_data.loc[additional_data['ID'] == int(ID_str), 'A_peak22dotdot'].values[0]
+
+        return A_peak_22, omg_peak_22, A_nr_error, A_peak22dotdot
 
     # FIXME: The two functions below have been written in a rush and should be adapted to the overall code style.
     def read_RIT_metadata(self):
@@ -1239,10 +1413,10 @@ class NR_simulation():
         """
 
                 
-        h_NR = Waveform_rit(sims=os.path.join(self.NR_dir, 'Metadata'), path=os.path.join(self.NR_dir, 'Data'), csv_path=self.additional_NR_properties, ID=self.NR_ID)
+        waveform_NR = Waveform_rit(NR_data_path=self.NR_dir, csv_path=self.additional_NR_properties, fit_path=self.fits, ID=self.NR_ID)
         
         # Read intrinsic parameters
-        data        = h_NR.load_metadata()
+        data        = waveform_NR.load_metadata()
         m1          = float(data['initial-mass1'])
         m2          = float(data['initial-mass2'])
         chi1z       = float(data['initial-bh-chi1z'])
@@ -1261,12 +1435,17 @@ class NR_simulation():
         chif        = float(data['final-chi'])
 
         # FIXME: Generalise to multiple modes with dictionaries.
-        A_peak_22   = float(data['A_peak_22'])
-        omg_peak_22 = float(data['omg_peak_22'])
+        A_peak_22       = float(data['A_peak_22'])
+        omg_peak_22     = float(data['omg_peak_22'])
+        A_nr_error      = float(data['A_nr_error'])
+        A_peak22dotdot  = float(data['A_peak22dotdot'])
+        bmrg            = float(data['bmrg'])
+        Emrg            = float(data['Emrg'])
+        Jmrg            = float(data['Jmrg'])
 
-        return q, chi1z, chi2z, ecc, Mf, chif, A_peak_22, omg_peak_22
+        return q, chi1z, chi2z, ecc, Mf, chif, A_peak_22, omg_peak_22, A_nr_error, A_peak22dotdot, bmrg, Emrg, Jmrg
 
-    def read_hlm_from_RIT(self):
+    def read_waveform_lm_from_RIT(self):
 
         """
 
@@ -1291,10 +1470,23 @@ class NR_simulation():
 
         """
                 
-        h_NR = Waveform_rit(sims=os.path.join(self.NR_dir, 'Metadata'), path=os.path.join(self.NR_dir, 'Data'), ID=self.NR_ID, ell = self.l, m = self.m)                
-        t_NR, wv_re, wv_im, _, _  = h_NR.load_hlm()
+        waveform_NR = Waveform_rit(NR_data_path=self.NR_dir, ID=self.NR_ID, ell = self.l, m = self.m)                
+        
+        if  (self.waveform_type=='strain'): 
+            t_NR, wv_re, wv_im, _, _  = waveform_NR.load_waveform_lm()
+            t_NR = t_NR.astype(np.float64)
+        elif(self.waveform_type=='psi4'  ): 
 
-        t_NR = t_NR.astype(np.float64)
+            # RIT Psi4 data are longer than the strain (likely because of the data conditioning involved in getting h), and have not been shifted to have the zero corresponding to the maximum of the amplitude.
+            # Here, we compensate for the length difference, and in the code below we avoid shifting the time axis to have the zero set to the first element, to re-aligned it with the strain.
+            t_NR_h,     _,     _, _, _  = waveform_NR.load_waveform_lm()
+            t_NR  , wv_re, wv_im, _, _  = waveform_NR.load_psi4_lm()
+
+            dt_missing  = t_NR_h[1] - t_NR_h[0]
+            len_missing = dt_missing * (len(t_NR)-len(t_NR_h))
+
+            t_NR = t_NR.astype(np.float64)
+            t_NR = t_NR - len_missing
         
         return t_NR, wv_re, wv_im
 
@@ -1334,10 +1526,10 @@ class NR_simulation():
         """
 
                 
-        h_NR = Waveform_C2EFT(path=os.path.join(self.NR_dir, self.NR_ID, 'Res_{resolution}_sigma{sigma}_tau_{tau}'.format(resolution=resolution, sigma=str(sigma).replace('.', 'p'), tau=str(tau).replace('.', 'p'))))
+        waveform_NR = Waveform_C2EFT(path=os.path.join(self.NR_dir, self.NR_ID, 'Res_{resolution}_sigma{sigma}_tau_{tau}'.format(resolution=resolution, sigma=str(sigma).replace('.', 'p'), tau=str(tau).replace('.', 'p'))))
         
         # Read intrinsic parameters
-        data  = h_NR.load_metadata()
+        data  = waveform_NR.load_metadata()
 
         q     = float(data['q'])
         chi1z = float(data['chi1'])
@@ -1350,7 +1542,7 @@ class NR_simulation():
 
         return q, chi1z, chi2z, Mf, chif, eps
 
-    def read_hlm_from_C2EFT(self, resolution, sigma, tau):
+    def read_waveform_lm_from_C2EFT(self, resolution, sigma, tau):
 
         """
 
@@ -1375,14 +1567,14 @@ class NR_simulation():
 
         """
                 
-        h_NR = Waveform_C2EFT(path=os.path.join(self.NR_dir, self.NR_ID, 'Res_{resolution}_sigma{sigma}_tau_{tau}'.format(resolution=resolution, sigma=str(sigma).replace('.', 'p'), tau=str(tau).replace('.', 'p'))), ell = self.l, m = self.m)                
-        t_NR, wv_re, wv_im = h_NR.load_hlm()
+        waveform_NR = Waveform_C2EFT(path=os.path.join(self.NR_dir, self.NR_ID, 'Res_{resolution}_sigma{sigma}_tau_{tau}'.format(resolution=resolution, sigma=str(sigma).replace('.', 'p'), tau=str(tau).replace('.', 'p'))), ell = self.l, m = self.m)                
+        t_NR, wv_re, wv_im = waveform_NR.load_waveform_lm()
 
         t_NR = t_NR.astype(np.float64)
         
         return t_NR, wv_re, wv_im
 
-    def read_hlm_from_SXS(self, ExtOrd, LevRes):
+    def read_waveform_lm_from_SXS(self, ExtOrd, LevRes):
 
         """
 
@@ -1411,7 +1603,8 @@ class NR_simulation():
 
         """
         
-        waveform = sxs.load("SXS:BBH:{}/Lev{}/rhOverM_Asymptotic_GeometricUnits_CoM.h5".format(self.NR_ID, LevRes), extrapolation_order=ExtOrd, download=self.download)
+        sim = sxs.load("SXS:BBH:{}/Lev{}".format(self.NR_ID, LevRes), download=self.download, extrapolation_order=ExtOrd, auto_supersede=True)
+        waveform = sim.h
         
         time        = waveform.t
         mode_index  = waveform.index(self.l, self.m)
@@ -1480,7 +1673,7 @@ class NR_simulation():
 
         return a_halo, M_halo, C
 
-    def read_hlm_from_RWZ(self,res_level,extrap_order):
+    def read_waveform_lm_from_RWZ(self, res_level=None, extrap_order=None, allow_simple_fallback=True):
 
         """
 
@@ -1500,7 +1693,19 @@ class NR_simulation():
 
         """
 
-        sim_path  = os.path.join(self.NR_dir, '{}'.format(self.NR_ID), f'HplusHcrossLM{self.l}{self.m}RL{res_level}EP{extrap_order}.dat')
+        sim_dir = os.path.join(self.NR_dir, '{}'.format(self.NR_ID))
+        sim_paths = []
+        if res_level is not None and extrap_order is not None:
+            sim_paths.append(os.path.join(sim_dir, f'HplusHcrossLM{self.l}{self.m}RL{res_level}EP{extrap_order}.dat'))
+        if allow_simple_fallback:
+            sim_paths.append(os.path.join(sim_dir, f'HplusHcrossLM{self.l}{self.m}.dat'))
+
+        for sim_path in sim_paths:
+            if os.path.exists(sim_path):
+                break
+        else:
+            raise FileNotFoundError("RWZ waveform file not found. Tried: {}".format(', '.join(sim_paths)))
+
         sim_file  = np.genfromtxt(sim_path, names=True)
         
         time             = sim_file['t']
@@ -1509,7 +1714,11 @@ class NR_simulation():
         
         return time, waveform_real, waveform_imag
 
-    def read_hlm_from_Teukolsky(self, res_level):
+    def read_hlm_from_RWZ(self, res_level, extrap_order):
+
+        return self.read_waveform_lm_from_RWZ(res_level, extrap_order, allow_simple_fallback=False)
+
+    def read_waveform_lm_from_Teukolsky(self, res_level):
 
         """
 
