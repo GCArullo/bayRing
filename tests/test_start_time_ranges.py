@@ -34,6 +34,18 @@ def test_read_config_records_nr_mode_scan_and_inclinations():
     assert parameters["Inference"]["n-mode-workers"] == 2
     assert len(parameters["Mismatch-GW-parameters"]["inclination-list"]) == 3
     assert all(math.isclose(value, expected, rel_tol=0.0, abs_tol=1e-11) for value, expected in zip(parameters["Mismatch-GW-parameters"]["inclination-list"], [0.0, math.pi/4.0, math.pi/2.0]))
+    assert all(math.isclose(value, expected, rel_tol=0.0, abs_tol=1e-11) for value, expected in zip(parameters["Mismatch-GW-parameters"]["polarisation-list"], [0.0, math.pi/4.0, math.pi/2.0, 3.0*math.pi/4.0]))
+
+
+def test_read_config_accepts_single_hm_polarisation():
+    config = configparser.ConfigParser()
+    config.add_section("Mismatch-GW-parameters")
+    config.set("Mismatch-GW-parameters", "polarisation", "pi/3")
+
+    parameters = initialise.read_config(config)
+
+    assert len(parameters["Mismatch-GW-parameters"]["polarisation-list"]) == 1
+    assert math.isclose(parameters["Mismatch-GW-parameters"]["polarisation-list"][0], math.pi/3.0, rel_tol=0.0, abs_tol=1e-11)
 
 
 def test_parse_start_time_scalar_list_and_range():

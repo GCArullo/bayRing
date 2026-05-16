@@ -380,7 +380,8 @@ used in mismatch/SNR diagnostics.
      - Declination in radians.
    * - ``psi``
      - ``2.659``
-     - Polarization angle in radians.
+     - Polarization angle in radians for fixed-polarisation mismatch/SNR
+       diagnostics.
    * - ``azimuth``
      - ``0.0``
      - Source-frame azimuthal phase used in the spin-weighted spherical
@@ -390,6 +391,12 @@ used in mismatch/SNR diagnostics.
      - Inclination values for summed-higher-mode mismatch diagnostics. Accepts
        a scalar, comma/list values, or an inclusive ``start:stop:step`` range;
        expressions using ``pi`` are accepted.
+   * - ``polarisation``
+     - ``0:3*pi/4:pi/4``
+     - Polarisation-angle samples for summed-higher-mode mismatch diagnostics.
+       By default the reported HM-sum mismatch is marginalised over these
+       samples by retaining the minimum mismatch. Pass a scalar to evaluate one
+       fixed polarisation. The spelling ``polarization`` is also accepted.
    * - ``hm-include-negative-m``
      - ``1``
      - Include missing negative-``m`` partners through the non-precessing

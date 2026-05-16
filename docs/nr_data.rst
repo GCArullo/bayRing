@@ -137,6 +137,11 @@ Compact mode tokens such as ``NR-modes = 22,33,4-4`` are also accepted. When
 several modes are supplied, bayRing repeats the analysis for each mode and
 writes mode-dependent products below ``outdir/mode_l<l>_m<m>/``. Set
 ``n-mode-workers`` in ``[Inference]`` to run multiple mode fits concurrently.
+Multi-mode scans also write a summed higher-mode mismatch under
+``outdir/HM_sum/Algorithm/Mismatch/``. Its inclination grid is controlled by
+``[Mismatch-GW-parameters] inclination``; its polarisation treatment defaults to
+the marginalised ``polarisation = 0:3*pi/4:pi/4`` grid, or to one fixed angle if
+``polarisation`` is set to a scalar.
 
 For informed-amplitude fits using the ``(2,2)`` peak time as reference, provide
 the time of the ``(2,2)`` peak:

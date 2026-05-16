@@ -103,16 +103,16 @@ def _safe_numeric_value(raw_value):
 
     return evaluate(node)
 
-def parse_angle_values(raw_value):
+def parse_angle_values(raw_value, option_name='inclination'):
 
     raw_value = str(raw_value).strip()
     if(raw_value == ''):
-        raise ValueError("The inclination option cannot be empty.")
+        raise ValueError("The {} option cannot be empty.".format(option_name))
 
     if(':' in raw_value):
         range_values = [value.strip() for value in raw_value.split(':')]
         if(len(range_values) != 3):
-            raise ValueError("Invalid inclination range `{}`. Use `start:stop:step`.".format(raw_value))
+            raise ValueError("Invalid {} range `{}`. Use `start:stop:step`.".format(option_name, raw_value))
 
         start, stop, step = [_safe_numeric_value(value) for value in range_values]
         values = parse_start_time_values("{}:{}:{}".format(start, stop, step))
@@ -128,9 +128,9 @@ def parse_angle_values(raw_value):
             values = [_clean_float(_safe_numeric_value(value)) for value in str(raw_value).split(',')]
 
     if(len(values) == 0):
-        raise ValueError("The inclination option must provide at least one value.")
+        raise ValueError("The {} option must provide at least one value.".format(option_name))
     if(len(set(values)) != len(values)):
-        raise ValueError("The inclination option contains duplicate values: {}.".format(values))
+        raise ValueError("The {} option contains duplicate values: {}.".format(option_name, values))
 
     return values
 
@@ -493,6 +493,7 @@ def read_config(Config):
         'psi'                  : 2.659  ,
         'azimuth'              : 0.0    ,
         'inclination'          : '0:pi:pi/4',
+        'polarisation'         : '0:3*pi/4:pi/4',
         'hm-include-negative-m': 1
         },
 
@@ -517,7 +518,10 @@ def read_config(Config):
             for key in list(parameters[parameters_section].keys()):
                 keytype = type(parameters[parameters_section][key])
                 try:
-                    raw_value = Config.get(parameters_section, key)
+                    if(parameters_section == 'Mismatch-GW-parameters' and key == 'polarisation' and Config.has_option(parameters_section, 'polarization') and not(Config.has_option(parameters_section, key))):
+                        raw_value = Config.get(parameters_section, 'polarization')
+                    else:
+                        raw_value = Config.get(parameters_section, key)
                     if(parameters_section == 'Inference' and key == 't-start'):
                         t_start_values = parse_start_time_values(raw_value)
                         parameters[parameters_section][key] = t_start_values[0]
@@ -531,10 +535,10 @@ def read_config(Config):
                             nr_mode_values = parse_nr_mode_values(raw_value)
                             parameters[parameters_section][key] = raw_value
                             parameters[parameters_section]['NR-mode-list'] = nr_mode_values
-                    elif(parameters_section == 'Mismatch-GW-parameters' and key == 'inclination'):
-                        inclination_values = parse_angle_values(raw_value)
+                    elif(parameters_section == 'Mismatch-GW-parameters' and key in ['inclination', 'polarisation']):
+                        angle_values = parse_angle_values(raw_value, key)
                         parameters[parameters_section][key] = raw_value
-                        parameters[parameters_section]['inclination-list'] = inclination_values
+                        parameters[parameters_section]['{}-list'.format(key)] = angle_values
                     else:
                         parameters[parameters_section][key] = keytype(raw_value)
                 except (KeyError, configparser.NoOptionError, TypeError):
@@ -555,8 +559,8 @@ def read_config(Config):
                     if(len(print_value) == 1): print_value = print_value[0]
                 if(parameters_section == 'NR-data' and key == 'NR-modes'):
                     print_value = parameters[parameters_section].get('NR-mode-list', parameters[parameters_section][key])
-                if(parameters_section == 'Mismatch-GW-parameters' and key == 'inclination'):
-                    print_value = parameters[parameters_section].get('inclination-list', parameters[parameters_section][key])
+                if(parameters_section == 'Mismatch-GW-parameters' and key in ['inclination', 'polarisation']):
+                    print_value = parameters[parameters_section].get('{}-list'.format(key), parameters[parameters_section][key])
                     if(isinstance(print_value, list) and len(print_value) == 1): print_value = print_value[0]
                 print("{name} : {value}".format(name=key.ljust(max_len_keyword), value=print_value))
         except (KeyError, configparser.NoSectionError, configparser.NoOptionError, TypeError): pass
@@ -575,7 +579,12 @@ def read_config(Config):
     parameters['NR-data']['l-NR'], parameters['NR-data']['m'] = parameters['NR-data']['NR-mode-list'][0]
 
     if('inclination-list' not in parameters['Mismatch-GW-parameters']):
-        parameters['Mismatch-GW-parameters']['inclination-list'] = parse_angle_values(parameters['Mismatch-GW-parameters']['inclination'])
+        parameters['Mismatch-GW-parameters']['inclination-list'] = parse_angle_values(parameters['Mismatch-GW-parameters']['inclination'], 'inclination')
+    if(Config.has_option('Mismatch-GW-parameters', 'polarization') and not(Config.has_option('Mismatch-GW-parameters', 'polarisation'))):
+        parameters['Mismatch-GW-parameters']['polarisation'] = Config.get('Mismatch-GW-parameters', 'polarization')
+        parameters['Mismatch-GW-parameters']['polarisation-list'] = parse_angle_values(parameters['Mismatch-GW-parameters']['polarisation'], 'polarisation')
+    if('polarisation-list' not in parameters['Mismatch-GW-parameters']):
+        parameters['Mismatch-GW-parameters']['polarisation-list'] = parse_angle_values(parameters['Mismatch-GW-parameters']['polarisation'], 'polarisation')
 
     # Cleanup specific parameters formatting
     if(parameters['Inference']['sampler'] == 'raynest'):
@@ -943,7 +952,7 @@ A dot is present at the end of each description line and is not to be intended a
         
         dec              Declination (in radiants).                                                 Default: -0.2108.
         
-        psi              Polarization angle (in radiants).                                          Default: 2.659.
+        psi              Polarization angle (in radiants) used by fixed-polarisation diagnostics.    Default: 2.659.
 
         azimuth          Source-frame azimuthal phase entering the spin-weighted spherical harmonic \
                          recomposition of multiple NR modes.                                        Default: 0.0.
@@ -951,6 +960,11 @@ A dot is present at the end of each description line and is not to be intended a
         inclination      Inclination values used for summed-higher-mode mismatch diagnostics. Accepts a scalar, \
                          comma/list values, or an inclusive range `start:stop:step`; expressions using `pi` are \
                          accepted.                                                                  Default: `0:pi:pi/4`.
+
+        polarisation     Polarisation-angle values used for summed-higher-mode mismatch diagnostics. The reported \
+                         summed-HM mismatch is marginalised over these samples by retaining the minimum mismatch. \
+                         Pass a scalar to compute at one fixed polarisation. Expressions using `pi` are accepted. \
+                                                                                                      Default: `0:3*pi/4:pi/4`.
 
         hm-include-negative-m
                          Boolean to include non-precessing negative-m counterparts via \

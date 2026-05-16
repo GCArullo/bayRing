@@ -1268,6 +1268,7 @@ def compute_higher_mode_sum_mismatch(mode_products, base_parameters, t_start, n_
     M, dL, ra, dec, psi = waveform_utils.extract_GW_parameters(base_parameters)
     azimuth = base_parameters['Mismatch-GW-parameters']['azimuth']
     inclinations = base_parameters['Mismatch-GW-parameters']['inclination-list']
+    polarisations = base_parameters['Mismatch-GW-parameters'].get('polarisation-list', [psi])
     include_negative_m = bool(base_parameters['Mismatch-GW-parameters']['hm-include-negative-m'])
 
     outdir = _hm_sum_output_dir(base_outdir, t_start, n_start_times)
@@ -1291,31 +1292,48 @@ def compute_higher_mode_sum_mismatch(mode_products, base_parameters, t_start, n_
         for percentile in summary_percentiles
     }
 
-    resp = AntennaResponse('H1', ra=ra, dec=dec, psi=psi, tensor=True, times=1126259462.43)
-    F_plus, F_cross = resp.plus, resp.cross
+    detector_responses = []
+    for polarisation in polarisations:
+        resp = AntennaResponse('H1', ra=ra, dec=dec, psi=polarisation, tensor=True, times=1126259462.43)
+        detector_responses.append((polarisation, resp.plus, resp.cross))
 
     for inclination in inclinations:
-        NR_data = _project_modes_to_detector(
-            nr_modes, inclination, azimuth, F_plus, F_cross, include_negative_m
-        )
-        whiten_whiten_h_NR, h_NR_h_NR_sqrt = _toeplitz_whitened_norm(acf, NR_data)
-        if(h_NR_h_NR_sqrt == 0.0):
-            print("* Skipping HM-summed mismatch at inclination {} because the NR norm is zero.".format(inclination))
+        nr_by_polarisation = []
+        for polarisation, F_plus, F_cross in detector_responses:
+            NR_data = _project_modes_to_detector(
+                nr_modes, inclination, azimuth, F_plus, F_cross, include_negative_m
+            )
+            whiten_whiten_h_NR, h_NR_h_NR_sqrt = _toeplitz_whitened_norm(acf, NR_data)
+            if(h_NR_h_NR_sqrt == 0.0):
+                continue
+            nr_by_polarisation.append((polarisation, F_plus, F_cross, whiten_whiten_h_NR, h_NR_h_NR_sqrt))
+
+        if(len(nr_by_polarisation) == 0):
+            print("* Skipping HM-summed mismatch at inclination {} because the NR norm is zero for every polarisation.".format(inclination))
             continue
 
         for percentile in summary_percentiles:
-            wf = _project_modes_to_detector(
-                model_modes_by_percentile[percentile], inclination, azimuth, F_plus, F_cross, include_negative_m
-            )
-            _, h_wf_h_wf_sqrt = _toeplitz_whitened_norm(acf, wf)
-            if(h_wf_h_wf_sqrt == 0.0):
-                print("* Skipping HM-summed mismatch for percentile {} at inclination {} because the model norm is zero.".format(percentile, inclination))
+            best_result = None
+            for polarisation, F_plus, F_cross, whiten_whiten_h_NR, h_NR_h_NR_sqrt in nr_by_polarisation:
+                wf = _project_modes_to_detector(
+                    model_modes_by_percentile[percentile], inclination, azimuth, F_plus, F_cross, include_negative_m
+                )
+                _, h_wf_h_wf_sqrt = _toeplitz_whitened_norm(acf, wf)
+                if(h_wf_h_wf_sqrt == 0.0):
+                    continue
+                h_wf_h_NR = np.dot(wf, whiten_whiten_h_NR)
+                TD_match = abs(h_wf_h_NR) / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
+                TD_match = np.minimum(1 - abs(1 - TD_match), TD_match)
+                TD_mismatch = 1 - TD_match
+                if(best_result is None or TD_mismatch < best_result[1]):
+                    best_result = (polarisation, TD_mismatch)
+
+            if(best_result is None):
+                print("* Skipping HM-summed mismatch for percentile {} at inclination {} because the model norm is zero for every polarisation.".format(percentile, inclination))
                 continue
-            h_wf_h_NR = np.dot(wf, whiten_whiten_h_NR)
-            TD_match = abs(h_wf_h_NR) / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
-            TD_match = np.minimum(1 - abs(1 - TD_match), TD_match)
-            TD_mismatch = 1 - TD_match
-            _append_result(outFile_path, percentile, inclination, azimuth, psi, TD_mismatch)
+
+            polarisation, TD_mismatch = best_result
+            _append_result(outFile_path, percentile, inclination, azimuth, polarisation, TD_mismatch)
 
     print("* HM-summed mismatch written to `{}`.".format(outFile_path))
 
