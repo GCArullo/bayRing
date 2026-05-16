@@ -435,8 +435,10 @@ def read_config(Config):
         'KerrBinary-final-state-nc-version': ''           ,
         'KerrBinary-amplitudes-nc-version' : ''           ,
         'TEOB-template'                    : 'HypTan'     ,
+        'TEOB-calibration'                 : 'qc'         ,
         'TEOB-global-fit'                  : 1            ,
         'TEOB-merger-data'                 : 0            ,
+        'TEOB-mode-mixing'                 : 0            ,
         },
 
         'Inference':
@@ -786,18 +788,23 @@ A dot is present at the end of each description line and is not to be intended a
                                          where each entry selects a noncircular variable to be used for the noncircular fit, among ['bmrg','Emrg', 'Jmrg', 'Mf', 'af']. \
                                          Can also pass a single variable instead of two, but not less than one or more than two.                                          Default: ''.
         
-        TEOB-template                    TEOB template to be used. Available options: ['HypTan', 'RatExp']. The 'HypTan' version is defined in  \
+        TEOB-template                    TEOB amplitude ansatz to be used. Available options: ['HypTan', 'RatExp']. The 'HypTan' version is defined in  \
                                          arXiv:1904.09550, arXiv:2001.09082, while the 'RatExp' in II.C of arXiv:2305.19336. 
                                          
                                          Additionally, if 'RatExp' template is selected, the TEOB-merger-data flag has to be set to 1, and NR merger data has \
                                          to be provided in [NR-data][properties-file].                                                                                    Default: 'HypTan'.
 
+        TEOB-calibration                 TEOB calibration family. Available options: ['qc', 'noncirc']. The 'qc' family allows noneccentric/quasi-circular \
+                                         fit variables. The 'noncirc' family allows noncircular/eccentric fit variables such as 'ecc', 'bmrg', 'Emrg' and \
+                                         'Jmrg', which must be provided by the NR metadata.                                                                                Default: 'qc'.
+
         N-DS-tails                       Number of free tails in the ringdown model if 'Damped-sinusoids' in template. Otherwise, ignored.                                Default: 0.
 
         TEOB-global-fit                  Boolean to use the NR-calibrated global fits of the TEOB model. 
+        TEOB-mode-mixing                 Boolean to enable TEOBPM spherical/spheroidal mode-mixing for modes where it is implemented.
                                          If 1: 
-                                            - For 'HypTan' template, this selects the internally coded quasi-circular fits in pyRing.
-                                            - For 'RatExp' template, fits-file containing global fit coefficients have to be provided in [NR-data][fits-file].
+                                            - If [NR-data][fits-file] is provided, coefficients are evaluated from that file using TEOB-calibration.
+                                            - Otherwise, the internal quasi-circular pyRing fits are used when available.
                                          If 0: Runs local fits for the amplitude and phase coefficients.                                                                  Default: 1.
 
         TEOB-merger-data                 Boolean flag to switch between using the values of the amplitude and frequency at the peak of the modes as given \ 

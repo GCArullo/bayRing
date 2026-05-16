@@ -6,9 +6,21 @@ import pyRing.waveform as wf
 import pyRing.utils    as pyr_utils
 import bayRing.utils   as utils
 
+TEOB_MODE_MIXING_PARENTS = {(3, 2): (2, 2), (4, 3): (3, 3)}
+TEOB_FIT_NONCIRCULAR_VARIABLES = {'ecc', 'e0', 'eccentricity', 'emrg', 'bmrg', 'jmrg'}
+TEOB_FIT_METADATA_KEYS = {
+    'ecc': 'ecc',
+    'e0': 'ecc',
+    'eccentricity': 'ecc',
+    'emrg': 'Emrg',
+    'bmrg': 'bmrg',
+    'jmrg': 'Jmrg',
+}
+
+
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, N_ds_tails=0, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_template = 'RatExp', TEOB_merger_data = 1, TEOB_global_fit = 0):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, N_ds_tails=0, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_template = 'RatExp', TEOB_calibration = 'qc', TEOB_merger_data = 1, TEOB_global_fit = 0, TEOB_mode_mixing = 0):
 
         self.t_NR                      = t_NR
         self.t_start                   = tM_start
@@ -29,8 +41,10 @@ class WaveformModel(cpnest.model.Model):
         self.KerrBinary_version        = KerrBinary_version
         self.KerrBinary_amp_nc_version = KerrBinary_amp_nc_version
         self.TEOB_template             = TEOB_template
+        self.TEOB_calibration          = TEOB_calibration
         self.TEOB_merger_data          = TEOB_merger_data
         self.TEOB_global_fit           = TEOB_global_fit
+        self.TEOB_mode_mixing          = TEOB_mode_mixing
 
         if not(const_params==None):
             self.const_r = [const_params[0]*np.cos(const_params[1])]
@@ -263,48 +277,85 @@ class WaveformModel(cpnest.model.Model):
 
         if self.TEOB_template not in ['HypTan', 'RatExp']:
             raise ValueError("Unknown TEOB template: {}".format(self.TEOB_template))
+        if self.TEOB_calibration not in ['qc', 'noncirc']:
+            raise ValueError("Unknown TEOB calibration family: {}".format(self.TEOB_calibration))
         
         TGR_parameters = {}
         
-        modes          = [(self.l_NR,self.m_NR)]
-        merger_phases  = {(self.l_NR,self.m_NR): params['phi_mrg_{}{}'.format(self.l_NR,self.m_NR)]}
+        requested_mode = (self.l_NR, self.m_NR)
+        modes          = [requested_mode]
+        internal_modes = list(modes)
+        if self.TEOB_mode_mixing and requested_mode in TEOB_MODE_MIXING_PARENTS:
+            parent_mode = TEOB_MODE_MIXING_PARENTS[requested_mode]
+            if parent_mode not in internal_modes:
+                internal_modes.append(parent_mode)
+
+        merger_phases = {}
+        for mode in internal_modes:
+            mode_label = '{}{}'.format(mode[0], mode[1])
+            try:
+                merger_phases[mode] = utils.get_param_override(fixed_params, params, 'phi_mrg_{}'.format(mode_label))
+            except KeyError as exc:
+                if mode != requested_mode:
+                    raise ValueError("TEOBPM mode-mixing for {}{} requires fixed parent phase phi_mrg_{}.".format(self.l_NR, self.m_NR, mode_label)) from exc
+                raise
 
         nu = (self.metadata['m1']*self.metadata['m2'])/(self.metadata['m1']+self.metadata['m2'])**2
 
         if(self.TEOB_merger_data):
-            NR_fit_coeffs = {
-                            (self.l_NR,self.m_NR): {
-                                                    'omg_peak'            : self.metadata['omg_peak_{}{}'.format(self.l_NR,self.m_NR)]       ,
-                                                    'A_peak_over_nu'      : self.metadata['A_peak_{}{}'.format(self.l_NR,self.m_NR)]/nu      ,
-                                                    }
-                            }
-            if(self.TEOB_template=='RatExp'):
-                NR_fit_coeffs[(self.l_NR,self.m_NR)]['A_peakdotdot_over_nu'] = self.metadata['A_peak{}{}dotdot'.format(self.l_NR,self.m_NR)]/nu
+            NR_fit_coeffs = {}
+            for mode in internal_modes:
+                mode_key = '{}{}'.format(mode[0], mode[1])
+                NR_fit_coeffs[mode] = {
+                    'omg_peak'      : self.metadata['omg_peak_{}'.format(mode_key)],
+                    'A_peak_over_nu': self.metadata['A_peak_{}'.format(mode_key)]/nu,
+                }
+                if(self.TEOB_template=='RatExp'):
+                    NR_fit_coeffs[mode]['A_peakdotdot_over_nu'] = self.metadata['A_peak{}dotdot'.format(mode_key)]/nu
         else:
-            NR_fit_coeffs = {(self.l_NR,self.m_NR): {}}
+            NR_fit_coeffs = {mode: {} for mode in internal_modes}
 
         if not(self.TEOB_global_fit):
-            NR_fit_coeffs[(self.l_NR,self.m_NR)]['c3A'] = params['c3A_{}{}'.format(self.l_NR,self.m_NR)]
-            NR_fit_coeffs[(self.l_NR,self.m_NR)]['c3p'] = params['c3p_{}{}'.format(self.l_NR,self.m_NR)]
-            NR_fit_coeffs[(self.l_NR,self.m_NR)]['c4p'] = params['c4p_{}{}'.format(self.l_NR,self.m_NR)]
+            for mode in internal_modes:
+                mode_label = '{}{}'.format(mode[0], mode[1])
+                try:
+                    NR_fit_coeffs[mode]['c3A'] = utils.get_param_override(fixed_params, params, 'c3A_{}'.format(mode_label))
+                    NR_fit_coeffs[mode]['c3p'] = utils.get_param_override(fixed_params, params, 'c3p_{}'.format(mode_label))
+                    NR_fit_coeffs[mode]['c4p'] = utils.get_param_override(fixed_params, params, 'c4p_{}'.format(mode_label))
 
-            if(self.TEOB_template=='RatExp'):
-                NR_fit_coeffs[(self.l_NR,self.m_NR)]['c2A'] = params['c2A_{}{}'.format(self.l_NR,self.m_NR)]
-                NR_fit_coeffs[(self.l_NR,self.m_NR)]['c2p'] = params['c2p_{}{}'.format(self.l_NR,self.m_NR)]
+                    if(self.TEOB_template=='RatExp'):
+                        NR_fit_coeffs[mode]['c2A'] = utils.get_param_override(fixed_params, params, 'c2A_{}'.format(mode_label))
+                        NR_fit_coeffs[mode]['c2p'] = utils.get_param_override(fixed_params, params, 'c2p_{}'.format(mode_label))
+                except KeyError as exc:
+                    if mode != requested_mode:
+                        raise ValueError("TEOBPM mode-mixing for {}{} requires fixed parent coefficient {}.".format(self.l_NR, self.m_NR, exc.args[0])) from exc
+                    raise
         else:
-            NR_fit_coeffs['ecc'] = self.metadata['ecc']
-            NR_fit_coeffs['bmrg'] = self.metadata['bmrg']
-            NR_fit_coeffs['Jmrg'] = self.metadata['Jmrg']
-            NR_fit_coeffs['Emrg'] = self.metadata['Emrg']
-
             if self.fit_metadata is not None:
+                fit_type_variables = str(self.fit_metadata.get('fit_type', '')).lower().split('_')
+                noncircular_variables = [variable for variable in fit_type_variables if variable in TEOB_FIT_NONCIRCULAR_VARIABLES]
+                if noncircular_variables and self.TEOB_calibration != 'noncirc':
+                    raise ValueError(
+                        "TEOBPM global-fit metadata contains noncircular/eccentric variable(s) {}. "
+                        "Set TEOB-calibration = noncirc for these fits; keep TEOB-calibration = qc for noneccentric/quasi-circular fits."
+                        .format(', '.join(noncircular_variables))
+                    )
+                if self.TEOB_calibration == 'noncirc':
+                    for variable in sorted(set(noncircular_variables)):
+                        metadata_key = TEOB_FIT_METADATA_KEYS[variable]
+                        if metadata_key not in self.metadata or self.metadata[metadata_key] is None:
+                            raise ValueError(
+                                "TEOBPM noncirc calibration requires metadata `{}` for fit variable `{}`."
+                                .format(metadata_key, variable)
+                            )
+                        NR_fit_coeffs[metadata_key] = self.metadata[metadata_key]
                 fit_coeffs = {key: val for key, val in self.fit_metadata.items() if key.startswith(('c_2_', 'c_3_', 'c_4_'))}
                 NR_fit_coeffs[(self.l_NR, self.m_NR)].update(fit_coeffs)
 
                 NR_fit_coeffs[(self.l_NR, self.m_NR)]['fit_type'] = self.fit_metadata['fit_type']
                 NR_fit_coeffs[(self.l_NR, self.m_NR)]['fit_order'] = self.fit_metadata['fit_order']
 
-                for key in ['nu', 'ecc', 'bmrg', 'jmrg', 'emrg']:
+                for key in fit_type_variables:
                     norm_scale_key, norm_shift_key = 'norm_{}_scale'.format(key), 'norm_{}_shift'.format(key)
                     if norm_scale_key in self.fit_metadata:
                         NR_fit_coeffs[norm_scale_key] = self.fit_metadata[norm_scale_key]
@@ -319,22 +370,36 @@ class WaveformModel(cpnest.model.Model):
         NR_fit_coeffs['af'] = self.af
 
         TGR_parameters = {}
-        ringdown_model = wf.TEOBPM(self.t_peak                  ,
-                                   self.metadata['m1']          ,
-                                   self.metadata['m2']          ,
-                                   self.metadata['chi1']        ,
-                                   self.metadata['chi2']        ,
-                                   merger_phases                ,
-                                   1.0                          , # distance     , dummy with geom=1
-                                   0.0                          , # inclination  , dummy with geom=1
-                                   0.0                          , # orbital phase, dummy with geom=1
-                                   modes                        ,
-                                   TGR_parameters               ,
-                                   geom          = 1            ,
-                                   template      = self.TEOB_template ,
-                                   merger_data   = self.TEOB_merger_data ,
-                                   global_fit    = self.TEOB_global_fit ,
-                                   NR_fit_coeffs = NR_fit_coeffs)
+        teob_kwargs = dict(
+            geom          = 1,
+            template      = self.TEOB_template,
+            calibration   = self.TEOB_calibration,
+            merger_data   = self.TEOB_merger_data,
+            global_fit    = self.TEOB_global_fit,
+            NR_fit_coeffs = NR_fit_coeffs,
+        )
+        if self.TEOB_mode_mixing:
+            teob_kwargs['mode_mixing'] = self.TEOB_mode_mixing
+
+        try:
+            ringdown_model = wf.TEOBPM(self.t_peak                  ,
+                                       self.metadata['m1']          ,
+                                       self.metadata['m2']          ,
+                                       self.metadata['chi1']        ,
+                                       self.metadata['chi2']        ,
+                                       merger_phases                ,
+                                       1.0                          , # distance     , dummy with geom=1
+                                       0.0                          , # inclination  , dummy with geom=1
+                                       0.0                          , # orbital phase, dummy with geom=1
+                                       modes                        ,
+                                       TGR_parameters               ,
+                                       **teob_kwargs)
+        except TypeError as exc:
+            if self.TEOB_mode_mixing and "mode_mixing" in str(exc):
+                raise RuntimeError("The imported pyRing TEOBPM build does not support the mode_mixing argument.") from exc
+            if "calibration" in str(exc):
+                raise RuntimeError("The imported pyRing TEOBPM build does not support the calibration argument.") from exc
+            raise
         return ringdown_model
 
     def waveform(self, params, fixed_params):

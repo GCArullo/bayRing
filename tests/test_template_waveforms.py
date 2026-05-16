@@ -2,6 +2,7 @@ import cmath
 import math
 
 import numpy as np
+import pytest
 
 from bayRing import template_waveforms
 
@@ -169,6 +170,116 @@ def test_teobpm_waveform_passes_string_template(monkeypatch):
     result = model.TEOBPM_waveform(params, {})
 
     assert captured["template"] == "RatExp"
+    assert captured["calibration"] == "qc"
     assert not isinstance(captured["template"], int)
     assert captured["merger_data"] == 1
     assert captured["global_fit"] == 0
+
+
+def test_teobpm_waveform_passes_mode_mixing_parent_inputs(monkeypatch):
+    model = _build_model(
+        wf_model="TEOBPM",
+        l_NR=3,
+        m_NR=2,
+        TEOB_template="HypTan",
+        TEOB_merger_data=0,
+        TEOB_global_fit=0,
+        TEOB_mode_mixing=1,
+    )
+
+    params = {
+        "phi_mrg_32": 0.4,
+        "c3A_32": -0.3,
+        "c3p_32": 4.0,
+        "c4p_32": 3.0,
+    }
+    fixed = {
+        "phi_mrg_22": 0.2,
+        "c3A_22": -0.5,
+        "c3p_22": 5.0,
+        "c4p_22": 2.0,
+    }
+    captured = {}
+
+    def fake_teobpm(*args, **kwargs):
+        captured["args"] = args
+        captured.update(kwargs)
+        return "teob-mixed"
+
+    monkeypatch.setattr(template_waveforms.wf, "TEOBPM", fake_teobpm, raising=False)
+
+    result = model.TEOBPM_waveform(params, fixed)
+
+    assert result == "teob-mixed"
+    assert captured["mode_mixing"] == 1
+    assert captured["args"][9] == [(3, 2)]
+    assert captured["args"][5][(3, 2)] == 0.4
+    assert captured["args"][5][(2, 2)] == 0.2
+    assert captured["NR_fit_coeffs"][(3, 2)]["c3A"] == -0.3
+    assert captured["NR_fit_coeffs"][(2, 2)]["c3A"] == -0.5
+
+
+def test_teobpm_qc_global_fit_rejects_noncircular_fit_metadata():
+    model = _build_model(
+        wf_model="TEOBPM",
+        TEOB_template="RatExp",
+        TEOB_merger_data=0,
+        TEOB_global_fit=1,
+        fit_metadata={"fit_type": "nu_ecc", "fit_order": "1"},
+    )
+
+    with pytest.raises(ValueError, match="TEOB-calibration = noncirc"):
+        model.TEOBPM_waveform({"phi_mrg_22": 0.0}, {})
+
+
+def test_teobpm_noncirc_global_fit_accepts_hyptan_metadata(monkeypatch):
+    model = _build_model(
+        wf_model="TEOBPM",
+        TEOB_template="HypTan",
+        TEOB_calibration="noncirc",
+        TEOB_merger_data=0,
+        TEOB_global_fit=1,
+        fit_metadata={"fit_type": "nu_bmrg", "fit_order": "1", "c_3_A_p0": "0.1"},
+        metadata_overrides={"bmrg": 2.5},
+    )
+    captured = {}
+
+    def fake_teobpm(*args, **kwargs):
+        captured.update(kwargs)
+        return "teob"
+
+    monkeypatch.setattr(template_waveforms.wf, "TEOBPM", fake_teobpm, raising=False)
+
+    assert model.TEOBPM_waveform({"phi_mrg_22": 0.0}, {}) == "teob"
+    assert captured["template"] == "HypTan"
+    assert captured["calibration"] == "noncirc"
+    assert captured["NR_fit_coeffs"]["bmrg"] == 2.5
+
+
+def test_teobpm_qc_global_fit_accepts_ratexp_nu_metadata(monkeypatch):
+    model = _build_model(
+        wf_model="TEOBPM",
+        TEOB_template="RatExp",
+        TEOB_calibration="qc",
+        TEOB_merger_data=1,
+        TEOB_global_fit=1,
+        fit_metadata={"fit_type": "nu", "fit_order": "1", "c_2_A_p0": "0.1"},
+        metadata_overrides={
+            "omg_peak_22": 0.3,
+            "A_peak_22": 0.4,
+            "A_peak22dotdot": -0.01,
+        },
+    )
+    captured = {}
+
+    def fake_teobpm(*args, **kwargs):
+        captured.update(kwargs)
+        return "teob"
+
+    monkeypatch.setattr(template_waveforms.wf, "TEOBPM", fake_teobpm, raising=False)
+
+    assert model.TEOBPM_waveform({"phi_mrg_22": 0.0}, {}) == "teob"
+    assert captured["template"] == "RatExp"
+    assert captured["calibration"] == "qc"
+    assert captured["NR_fit_coeffs"][(2, 2)]["fit_type"] == "nu"
+    assert "bmrg" not in captured["NR_fit_coeffs"]

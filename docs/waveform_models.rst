@@ -315,10 +315,11 @@ TEOBPM
    [Model]
    template = TEOBPM
    TEOB-template = HypTan
+   TEOB-calibration = qc
    TEOB-global-fit = 1
    TEOB-merger-data = 0
 
-``TEOB-template`` can be:
+``TEOB-template`` selects the amplitude ansatz:
 
 .. list-table::
    :header-rows: 1
@@ -327,10 +328,24 @@ TEOBPM
    * - Value
      - Meaning
    * - ``HypTan``
-     - Hyperbolic-tangent amplitude template for quasi-circular TEOBPM fits.
+     - Hyperbolic-tangent amplitude template.
    * - ``RatExp``
-     - Rational-exponential amplitude template used for noncircular TEOBPM
-       fits.
+     - Rational-exponential amplitude template.
+
+``TEOB-calibration`` selects the calibration family independently of the
+amplitude ansatz:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 60
+
+   * - Value
+     - Meaning
+   * - ``qc``
+     - Noneccentric/quasi-circular global-fit variables.
+   * - ``noncirc``
+     - Noncircular/eccentric global-fit variables. The corresponding NR
+       metadata, for example ``bmrg``, ``Emrg`` or ``Jmrg``, must be supplied.
 
 ``TEOB-global-fit`` controls whether TEOB calibration coefficients come from
 global fits or are sampled locally:
@@ -342,9 +357,9 @@ global fits or are sampled locally:
    * - Value
      - Meaning
    * - ``1``
-     - Use calibrated global fits. For ``HypTan``, this selects the internal
-       quasi-circular pyRing fits. For ``RatExp``, provide global-fit
-       coefficients through ``[NR-data] fits-file``.
+     - Use calibrated global fits. If ``[NR-data] fits-file`` is present,
+       those coefficients are evaluated using ``TEOB-calibration``; otherwise
+       the internal quasi-circular pyRing fits are used where available.
    * - ``0``
      - Sample local amplitude and phase calibration coefficients.
 
@@ -361,7 +376,8 @@ global fits or are sampled locally:
    * - ``1``
      - Use NR merger peak quantities from ``[NR-data] properties-file``.
        ``RatExp`` runs require this option and the corresponding NR merger
-       metadata.
+       peak metadata, because the ansatz uses the second derivative of the
+       peak amplitude. This flag is not the qc/noncirc calibration selector.
 
 For all TEOBPM runs, the merger phase for the fitted multipole is sampled:
 

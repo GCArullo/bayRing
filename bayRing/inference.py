@@ -399,6 +399,7 @@ def Dynamic_InferenceModel(base):
             self.TEOB_template = self.wf_model.TEOB_template
             self.TEOB_global_fit = self.wf_model.TEOB_global_fit
             self.TEOB_merger_data = self.wf_model.TEOB_merger_data 
+            self.TEOB_mode_mixing = getattr(self.wf_model, 'TEOB_mode_mixing', 0)
             self.min_method    = min_method
             self.Config        = Config
 
@@ -557,6 +558,20 @@ def Dynamic_InferenceModel(base):
                         single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_TEOBPM)
                         self.names.append(fullname)
                         self.bounds.append(single_bounds)
+
+                if self.TEOB_mode_mixing:
+                    parent_modes = {(3, 2): (2, 2), (4, 3): (3, 3)}
+                    requested_mode = (self.wf_model.l_NR, self.wf_model.m_NR)
+                    parent_mode = parent_modes.get(requested_mode)
+                    if parent_mode is not None:
+                        for name in default_bounds_TEOBPM.keys():
+                            if self.TEOB_global_fit and name != 'phi_mrg':
+                                continue
+                            fullname = '{}_{}{}'.format(name, parent_mode[0], parent_mode[1])
+                            try:
+                                self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                            except(configparser.NoOptionError):
+                                pass
 
             else:
                 raise ValueError("Unknown template selected: {}".format(self.wf_model.wf_model))

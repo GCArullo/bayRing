@@ -1,7 +1,8 @@
 # General python imports
-import h5py, numpy as np, os, pandas as pd, subprocess
+import h5py, numpy as np, os, pandas as pd, subprocess, tempfile
 from scipy import interpolate
 
+os.environ.setdefault("NUMBA_CACHE_DIR", os.path.join(tempfile.gettempdir(), "bayring_numba_cache"))
 import sxs
 try   : from cbhdb import simulation
 except: pass
@@ -14,6 +15,168 @@ import bayRing.waveform_utils as waveform_utils
 import pyRing.utils           as pyRing_utils
 
 twopi = 2.*np.pi
+
+
+def _prime_sxs_simulations_cache():
+
+    try:
+        from sxscatalog.simulations.simulations import Simulations
+        if not hasattr(Simulations, "_simulations"):
+            Simulations.load(download=False)
+    except Exception:
+        pass
+
+
+def _sxs_bitwise_axis(axis, ndim):
+
+    if axis < 0:
+        axis += ndim
+    if not 0 <= axis < ndim:
+        raise np.exceptions.AxisError(axis, ndim=ndim)
+    return axis
+
+
+def _sxs_numpy_xor(x, reverse=False, preserve_dtype=False, axis=-1, **kwargs):
+
+    x = np.asarray(x)
+    itemsize = x.itemsize
+    if itemsize not in [1, 2, 4, 8]:
+        raise ValueError(f"Input array's byte size must be one of {{1, 2, 4, 8}}, not {itemsize}")
+
+    dtype = np.dtype(f"u{itemsize}")
+    u = x.view(dtype)
+    axis = _sxs_bitwise_axis(axis, u.ndim)
+
+    out = kwargs.pop("out", None)
+    if kwargs:
+        raise TypeError(f"Unexpected keyword argument(s): {', '.join(kwargs)}")
+
+    if reverse:
+        result = np.bitwise_xor.accumulate(u, axis=axis)
+    else:
+        moved = np.moveaxis(u, axis, 0)
+        result_moved = np.empty_like(moved)
+        result_moved[0] = moved[0]
+        result_moved[1:] = np.bitwise_xor(moved[:-1], moved[1:])
+        result = np.moveaxis(result_moved, 0, axis)
+
+    if out is not None:
+        out_view = np.asarray(out).view(dtype)
+        np.copyto(out_view, result)
+        result = out_view
+
+    if preserve_dtype:
+        return result.view(x.dtype)
+    return result
+
+
+def _sxs_numpy_diff(x, reverse=False, axis=-1, **kwargs):
+
+    u = np.asarray(x)
+    if issubclass(u.dtype.type, np.unsignedinteger):
+        u = u.view(np.complex128)
+
+    kwargs.pop("preserve_dtype", None)
+    out = kwargs.pop("out", None)
+    if kwargs:
+        raise TypeError(f"Unexpected keyword argument(s): {', '.join(kwargs)}")
+
+    axis = _sxs_bitwise_axis(axis, u.ndim)
+    moved = np.moveaxis(u, axis, 0)
+    result_moved = np.empty_like(moved)
+    result_moved[0] = moved[0]
+    if reverse:
+        for i in range(1, moved.shape[0]):
+            result_moved[i] = result_moved[i - 1] - moved[i]
+    else:
+        result_moved[1:] = moved[:-1] - moved[1:]
+
+    result = np.moveaxis(result_moved, 0, axis)
+    if out is not None:
+        out_array = np.asarray(out)
+        np.copyto(out_array, result)
+        result = out_array
+
+    return result
+
+
+def _sxs_is_numba_bitwise_function(func, name):
+
+    return (
+        getattr(func, "__name__", None) == name
+        and getattr(func, "__module__", None) == "sxs.utilities.bitwise"
+    )
+
+
+def _quaternionic_numpy_exp(q, qout):
+
+    q = np.asarray(q)
+    qout = np.asarray(qout)
+
+    vnorm = np.linalg.norm(q[..., 1:4], axis=-1)
+    exp_scalar = np.exp(q[..., 0])
+    mask = vnorm > 10 * np.finfo(float).resolution
+
+    qout[..., 0] = exp_scalar
+    qout[..., 1:4] = 0.0
+    qout[..., 0][mask] = exp_scalar[mask] * np.cos(vnorm[mask])
+
+    scale = np.zeros_like(vnorm)
+    scale[mask] = exp_scalar[mask] * np.sin(vnorm[mask]) / vnorm[mask]
+    qout[..., 1:4] = scale[..., np.newaxis] * q[..., 1:4]
+
+
+def _quaternionic_numpy_conj(q, qout):
+
+    q = np.asarray(q)
+    qout = np.asarray(qout)
+    qout[..., 0] = q[..., 0]
+    qout[..., 1:4] = -q[..., 1:4]
+
+
+def _patch_sxs_numba_bitwise_decoder():
+
+    if getattr(sxs, "_bayring_numpy_bitwise_decoder", False):
+        return
+
+    try:
+        import sxs.utilities as sxs_utilities
+        import sxs.utilities.bitwise as sxs_bitwise
+        import sxs.waveforms.format_handlers.rotating_paired_diff_multishuffle_bzip2 as rpdmb
+        import sxs.waveforms.format_handlers.rotating_paired_xor_multishuffle_bzip2 as rpxmb
+        import quaternionic
+    except Exception:
+        return
+
+    sxs_bitwise.diff = _sxs_numpy_diff
+    sxs_bitwise.xor = _sxs_numpy_xor
+    sxs_utilities.diff = _sxs_numpy_diff
+    sxs_utilities.xor = _sxs_numpy_xor
+    rpdmb.xor = _sxs_numpy_xor
+    rpxmb.xor = _sxs_numpy_xor
+    quaternionic.algebra_ufuncs.exp = _quaternionic_numpy_exp
+    quaternionic.algebra_ufuncs.conj = _quaternionic_numpy_conj
+    quaternionic.algebra_ufuncs.conjugate = _quaternionic_numpy_conj
+    quaternionic.algebra_ufuncs.invert = _quaternionic_numpy_conj
+
+    original_load = getattr(rpdmb, "_bayring_original_load", rpdmb.load)
+    rpdmb._bayring_original_load = original_load
+
+    def bayring_rpdmb_load(*args, **kwargs):
+
+        diff = kwargs.get("diff")
+        if diff is None or _sxs_is_numba_bitwise_function(diff, "diff"):
+            kwargs["diff"] = _sxs_numpy_diff
+        elif _sxs_is_numba_bitwise_function(diff, "xor"):
+            kwargs["diff"] = _sxs_numpy_xor
+        return original_load(*args, **kwargs)
+
+    rpdmb.load = bayring_rpdmb_load
+    sxs._bayring_numpy_bitwise_decoder = True
+
+
+_patch_sxs_numba_bitwise_decoder()
+
 
 def read_injection_modes(NR_catalog, injection_modes):
 
@@ -397,7 +560,10 @@ def read_NR_metadata(NR_sim, NR_catalog):
                         'A_peak_22'     : NR_sim.A_peak_22,
                         'omg_peak_22'   : NR_sim.omg_peak_22,
                         'A_nr_error'    : NR_sim.A_nr_error,
-                        'A_peak22dotdot': NR_sim.A_peak22dotdot
+                        'A_peak22dotdot': NR_sim.A_peak22dotdot,
+                        'bmrg'          : NR_sim.bmrg,
+                        'Emrg'          : NR_sim.Emrg,
+                        'Jmrg'          : NR_sim.Jmrg,
                     }
         except:
             M = 1.0
@@ -619,8 +785,10 @@ class NR_simulation():
         self.injection_model_parameters.setdefault('KerrBinary-final-state-nc-version', '')
         self.injection_model_parameters.setdefault('KerrBinary-amplitudes-nc-version', '')
         self.injection_model_parameters.setdefault('TEOB-template', 'HypTan')
+        self.injection_model_parameters.setdefault('TEOB-calibration', 'qc')
         self.injection_model_parameters.setdefault('TEOB-global-fit', 1)
         self.injection_model_parameters.setdefault('TEOB-merger-data', 0)
+        self.injection_model_parameters.setdefault('TEOB-mode-mixing', 0)
         self.injection_model_parameters.setdefault('charge', 0)
         self.injection_truths         = None
         self.injection_metadata       = {}
@@ -694,8 +862,10 @@ class NR_simulation():
                 KerrBinary_version        = self.injection_model_parameters['KerrBinary-version'],
                 KerrBinary_amp_nc_version = self.injection_model_parameters['KerrBinary-amplitudes-nc-version'],
                 TEOB_template             = self.injection_model_parameters['TEOB-template'],
+                TEOB_calibration          = self.injection_model_parameters['TEOB-calibration'],
                 TEOB_global_fit           = self.injection_model_parameters['TEOB-global-fit'],
                 TEOB_merger_data          = self.injection_model_parameters['TEOB-merger-data'],
+                TEOB_mode_mixing          = self.injection_model_parameters['TEOB-mode-mixing'],
             )
 
             try:
@@ -761,9 +931,10 @@ class NR_simulation():
             self.q, self.chi1, self.chi2, self.tilt1, self.tilt2, self.ecc, self.Mf, self.af = self.read_SXS_metadata()
             
             if self.additional_NR_properties:
-                self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = self.load_SXS_addn_metadata(csv_path=self.additional_NR_properties, ID_str=self.NR_ID)
+                self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot, self.bmrg, self.Emrg, self.Jmrg = self.load_SXS_addn_metadata(csv_path=self.additional_NR_properties, ID_str=self.NR_ID)
             else:
                 self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot = None, None, None, None
+                self.bmrg, self.Emrg, self.Jmrg = None, None, None
 
             # Build NR waveform and time axis.
             if self.res_level == -1:
@@ -802,15 +973,16 @@ class NR_simulation():
                 # If a valid resolution level is already set, load the waveform with that resolution level
                 self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level)
 
-            counter = 1
-            while(not(counter==0)):
-                try              : 
-                    if(self.res_level-counter==0): raise ValueError("Only a single resolution available.")
-                    t_res, NR_r_res, NR_i_res = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level-counter)
-                    print('* Resolution error constructed with resolution level {}'.format(self.res_level-counter))
-                    counter = 0
-                except ValueError: 
-                    counter += 1
+            t_res, NR_r_res, NR_i_res = self.t_NR, self.NR_r, self.NR_i
+            for lower_res_level in range(self.res_level - 1, 0, -1):
+                try:
+                    t_res, NR_r_res, NR_i_res = self.read_waveform_lm_from_SXS(self.extrap_order, lower_res_level)
+                    print('* Resolution error constructed with resolution level {}'.format(lower_res_level))
+                    break
+                except ValueError:
+                    pass
+            else:
+                print('* No lower SXS resolution available; setting the resolution error to zero.')
             t_extr, NR_r_extr, NR_i_extr = self.read_waveform_lm_from_SXS(self.extrap_order+1, self.res_level)
 
         elif(self.NR_catalog=='RIT'):
@@ -1364,7 +1536,8 @@ class NR_simulation():
 
         """
         
-        sim      = sxs.load("SXS:BBH:{}".format(self.NR_ID), download=self.download, auto_supersede=True)
+        _prime_sxs_simulations_cache()
+        sim      = sxs.load("SXS:BBH:{}".format(self.NR_ID), download=self.download, auto_supersede=False, ignore_deprecation=True)
         metadata = sim.metadata
         
         tilt1, tilt2  = 0.0, 0.0
@@ -1385,8 +1558,11 @@ class NR_simulation():
         omg_peak_22 = additional_data.loc[additional_data['ID'] == int(ID_str), 'omega_peak22'].values[0]
         A_nr_error = additional_data.loc[additional_data['ID'] == int(ID_str), 'A_nr_error'].values[0]
         A_peak22dotdot = additional_data.loc[additional_data['ID'] == int(ID_str), 'A_peak22dotdot'].values[0]
+        bmrg = additional_data.loc[additional_data['ID'] == int(ID_str), 'b_massless_EOB'].values[0]
+        Emrg = additional_data.loc[additional_data['ID'] == int(ID_str), 'Heff_til'].values[0]
+        Jmrg = additional_data.loc[additional_data['ID'] == int(ID_str), 'Jmrg_til'].values[0]
 
-        return A_peak_22, omg_peak_22, A_nr_error, A_peak22dotdot
+        return A_peak_22, omg_peak_22, A_nr_error, A_peak22dotdot, bmrg, Emrg, Jmrg
 
     # FIXME: The two functions below have been written in a rush and should be adapted to the overall code style.
     def read_RIT_metadata(self):
@@ -1620,7 +1796,8 @@ class NR_simulation():
 
         """
         
-        sim = sxs.load("SXS:BBH:{}/Lev{}".format(self.NR_ID, LevRes), download=self.download, extrapolation_order=ExtOrd, auto_supersede=True)
+        _prime_sxs_simulations_cache()
+        sim = sxs.load("SXS:BBH:{}/Lev{}".format(self.NR_ID, LevRes), download=self.download, extrapolation_order=ExtOrd, auto_supersede=False, ignore_deprecation=True)
         waveform = sim.h
         
         time        = waveform.t

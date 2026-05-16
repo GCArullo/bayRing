@@ -183,15 +183,20 @@ fixed values or minimization start values.
      - Carullo2024 amplitude-correction variables.
    * - ``TEOB-template``
      - ``HypTan``
-     - TEOB post-merger template branch, either ``HypTan`` or ``RatExp``.
+     - TEOB post-merger amplitude ansatz, either ``HypTan`` or ``RatExp``.
+   * - ``TEOB-calibration``
+     - ``qc``
+     - TEOB calibration family, either ``qc`` for noneccentric/quasi-circular
+       fits or ``noncirc`` for fits whose variables include noncircular
+       metadata such as ``bmrg``, ``Emrg`` or ``Jmrg``.
    * - ``TEOB-global-fit``
      - ``1``
      - Use calibrated TEOB global fits. If ``0``, sample local TEOB
        calibration coefficients.
    * - ``TEOB-merger-data``
      - ``0``
-     - Use NR merger peak quantities from ``properties-file`` instead of the
-       quasi-circular peak fits.
+     - If ``1``, use NR merger peak quantities from ``properties-file``
+       instead of the quasi-circular peak fits.
 
 Some templates override ``QNM-modes`` internally. For example ``KerrBinary``
 and ``TEOBPM`` set their calibrated mode lists based on the selected template

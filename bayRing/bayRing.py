@@ -193,8 +193,10 @@ def _run_single_start(Config, parameters, config_file):
                                                 KerrBinary_version        = parameters['Model']['KerrBinary-version']              ,
                                                 KerrBinary_amp_nc_version = parameters['Model']['KerrBinary-amplitudes-nc-version'],
                                                 TEOB_template             = parameters['Model']['TEOB-template']                   ,
+                                                TEOB_calibration          = parameters['Model']['TEOB-calibration']                ,
                                                 TEOB_global_fit           = parameters['Model']['TEOB-global-fit']                 ,
                                                 TEOB_merger_data          = parameters['Model']['TEOB-merger-data']                ,
+                                                TEOB_mode_mixing          = parameters['Model']['TEOB-mode-mixing']                ,
                                                 )
 
     # ===============#
