@@ -105,10 +105,17 @@ fixed values or minimization start values.
      - Teukolsky perturbation order.
    * - ``l-NR``
      - ``2``
-     - Spherical NR multipole ``l`` to fit.
+     - Spherical NR multipole ``l`` to fit. Accepts a scalar or a list paired
+       with ``m``.
    * - ``m``
      - ``2``
-     - Spherical NR multipole ``m`` to fit.
+     - Spherical NR multipole ``m`` to fit. Accepts a scalar or a list paired
+       with ``l-NR``.
+   * - ``NR-modes``
+     - empty string
+     - Optional explicit list of NR ``(l,m)`` modes, for example
+       ``[(2,2),(3,3)]`` or ``22,33,4-4``. Overrides list values passed to
+       ``l-NR`` and ``m``.
    * - ``error``
      - ``align-with-mismatch-res-only``
      - NR error prescription.
@@ -231,6 +238,11 @@ version.
      - Number of start-time fits to run in parallel when ``t-start``
        supplies multiple values. This is in addition to sampler-level
        parallelism.
+   * - ``n-mode-workers``
+     - ``1``
+     - Number of NR-mode fits to run in parallel when multiple ``(l,m)``
+       modes are supplied. Mode and start-time scan jobs use isolated output
+       directories.
    * - ``t-start``
      - ``20.0``
      - Fit start time in ``M`` relative to the selected peak. Accepts a
@@ -371,7 +383,27 @@ used in mismatch/SNR diagnostics.
      - Declination in radians.
    * - ``psi``
      - ``2.659``
-     - Polarization angle in radians.
+     - Polarization angle in radians for fixed-polarisation mismatch/SNR
+       diagnostics.
+   * - ``azimuth``
+     - ``0.0``
+     - Source-frame azimuthal phase used in the spin-weighted spherical
+       harmonic recomposition for summed-higher-mode mismatch diagnostics.
+   * - ``inclination``
+     - ``0:pi:pi/4``
+     - Inclination values for summed-higher-mode mismatch diagnostics. Accepts
+       a scalar, comma/list values, or an inclusive ``start:stop:step`` range;
+       expressions using ``pi`` are accepted.
+   * - ``polarisation``
+     - ``0:3*pi/4:pi/4``
+     - Polarisation-angle samples for summed-higher-mode mismatch diagnostics.
+       By default the reported HM-sum mismatch is marginalised over these
+       samples by retaining the minimum mismatch. Pass a scalar to evaluate one
+       fixed polarisation. The spelling ``polarization`` is also accepted.
+   * - ``hm-include-negative-m``
+     - ``1``
+     - Include missing negative-``m`` partners through the non-precessing
+       symmetry ``h_{l,-m}=(-1)^l h^*_{lm}``.
 
 [Flags]
 ~~~~~~~
@@ -401,3 +433,7 @@ used in mismatch/SNR diagnostics.
    * - ``mismatch_section_plot_flag``
      - ``0``
      - Save PSD/ACF/window sanity plots.
+   * - ``compute_hm_mismatch``
+     - ``1``
+     - Compute detector-projected summed-higher-mode mismatch diagnostics after
+       a multi-mode scan.

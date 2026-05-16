@@ -127,6 +127,58 @@ The optimal SNR diagnostic is:
    \rho_{\mathrm{opt}} =
    \sqrt{(h,h)}.
 
+Summed Higher-Mode Mismatches
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For multi-mode scans, bayRing can also compute a detector-projected mismatch
+after summing the fitted NR multipoles into one waveform. The recomposition
+uses the standard spin-weighted spherical-harmonic convention:
+
+.. math::
+
+   h_+ - i h_\times =
+   \sum_{\ell,m} h_{\ell m}\,{}_{-2}Y_{\ell m}(\iota,\varphi_0).
+
+The detector strain is then built as:
+
+.. math::
+
+   h_{\mathrm{det}} = F_+(\alpha,\delta,\psi) h_+
+   + F_\times(\alpha,\delta,\psi) h_\times,
+
+using the same sky position inputs already present in
+``[Mismatch-GW-parameters]``. The source-frame azimuth ``azimuth`` sets
+``\varphi_0``. The inclination grid is controlled by ``inclination`` and
+defaults to ``0:pi:pi/4``.
+
+The summed-HM mismatch is marginalised over polarisation by default. In this
+diagnostic that means bayRing evaluates the mismatch over the configured
+``polarisation`` samples and reports the minimum mismatch; the ``psi`` column in
+the output file records the selected polarisation angle. The default grid is
+``0:3*pi/4:pi/4``, covering the independent ``[0,\pi)`` polarisation domain at
+``\pi/4`` spacing. Pass a scalar to compute one fixed-polarisation value:
+
+.. code-block:: ini
+
+   [Mismatch-GW-parameters]
+   polarisation = 2.659
+
+The American spelling ``polarization`` is accepted as an alias.
+
+If only positive-``m`` modes are provided, ``hm-include-negative-m = 1`` fills
+the missing partners with the usual non-precessing symmetry
+``h_{l,-m}=(-1)^l h^*_{lm}``. Set it to ``0`` for generic mode sets where this
+symmetry should not be assumed.
+
+The summed-HM diagnostics are written under:
+
+.. code-block:: text
+
+   outdir/HM_sum/Algorithm/Mismatch/
+
+with one subdirectory per start time when the same configuration also scans
+``t-start``.
+
 Percentile Waveforms
 ~~~~~~~~~~~~~~~~~~~~
 

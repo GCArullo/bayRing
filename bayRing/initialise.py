@@ -1,4 +1,4 @@
-import ast, json, os, shutil, subprocess, sys
+import ast, json, math, os, re, shutil, subprocess, sys
 try:                import configparser
 except ImportError: import ConfigParser as configparser
 
@@ -68,6 +68,170 @@ def parse_start_time_values(raw_value):
 
     return values
 
+def _clean_int(value):
+
+    value = float(value)
+    if not(value.is_integer()):
+        raise ValueError("Expected an integer value, got `{}`.".format(value))
+
+    return int(value)
+
+def _safe_numeric_value(raw_value):
+
+    node = ast.parse(str(raw_value).strip(), mode='eval')
+    allowed_names = {'pi': math.pi}
+    allowed_binops = (ast.Add, ast.Sub, ast.Mult, ast.Div)
+    allowed_unaryops = (ast.UAdd, ast.USub)
+
+    def evaluate(subnode):
+        if isinstance(subnode, ast.Expression):
+            return evaluate(subnode.body)
+        if isinstance(subnode, ast.Constant) and isinstance(subnode.value, (int, float)):
+            return float(subnode.value)
+        if isinstance(subnode, ast.Name) and subnode.id in allowed_names:
+            return allowed_names[subnode.id]
+        if isinstance(subnode, ast.UnaryOp) and isinstance(subnode.op, allowed_unaryops):
+            value = evaluate(subnode.operand)
+            return value if isinstance(subnode.op, ast.UAdd) else -value
+        if isinstance(subnode, ast.BinOp) and isinstance(subnode.op, allowed_binops):
+            left, right = evaluate(subnode.left), evaluate(subnode.right)
+            if isinstance(subnode.op, ast.Add): return left + right
+            if isinstance(subnode.op, ast.Sub): return left - right
+            if isinstance(subnode.op, ast.Mult): return left * right
+            if isinstance(subnode.op, ast.Div): return left / right
+        raise ValueError("Invalid numeric expression `{}`.".format(raw_value))
+
+    return evaluate(node)
+
+def parse_angle_values(raw_value, option_name='inclination'):
+
+    raw_value = str(raw_value).strip()
+    if(raw_value == ''):
+        raise ValueError("The {} option cannot be empty.".format(option_name))
+
+    if(':' in raw_value):
+        range_values = [value.strip() for value in raw_value.split(':')]
+        if(len(range_values) != 3):
+            raise ValueError("Invalid {} range `{}`. Use `start:stop:step`.".format(option_name, raw_value))
+
+        start, stop, step = [_safe_numeric_value(value) for value in range_values]
+        values = parse_start_time_values("{}:{}:{}".format(start, stop, step))
+    else:
+        try:
+            literal_value = ast.literal_eval(raw_value)
+        except (ValueError, SyntaxError):
+            literal_value = raw_value
+
+        if(isinstance(literal_value, (list, tuple))):
+            values = [_clean_float(_safe_numeric_value(value)) for value in literal_value]
+        else:
+            values = [_clean_float(_safe_numeric_value(value)) for value in str(raw_value).split(',')]
+
+    if(len(values) == 0):
+        raise ValueError("The {} option must provide at least one value.".format(option_name))
+    if(len(set(values)) != len(values)):
+        raise ValueError("The {} option contains duplicate values: {}.".format(option_name, values))
+
+    return values
+
+def parse_int_values(raw_value, option_name):
+
+    raw_value = str(raw_value).strip()
+    if(raw_value == ''):
+        raise ValueError("The `{}` option cannot be empty.".format(option_name))
+
+    if(':' in raw_value):
+        values = [_clean_int(value) for value in parse_start_time_values(raw_value)]
+    else:
+        try:
+            literal_value = ast.literal_eval(raw_value)
+        except (ValueError, SyntaxError):
+            literal_value = raw_value
+
+        if(isinstance(literal_value, (list, tuple))):
+            values = [_clean_int(value) for value in literal_value]
+        else:
+            values = [_clean_int(value) for value in str(raw_value).split(',')]
+
+    if(len(values) == 0):
+        raise ValueError("The `{}` option must provide at least one value.".format(option_name))
+
+    return values
+
+def _parse_compact_nr_mode(token):
+
+    match = re.fullmatch(r'([1-9]\d*)([+-]?\d+)', token.strip())
+    if(match is None):
+        raise ValueError("Invalid compact NR mode `{}`. Use e.g. `22`, `3-3`, or Python pairs like `(2, 2)`.".format(token))
+
+    return (int(match.group(1)), int(match.group(2)))
+
+def _normalise_nr_mode_pairs(raw_modes):
+
+    modes = []
+    for mode in raw_modes:
+        if(isinstance(mode, str)):
+            modes.append(_parse_compact_nr_mode(mode))
+        elif(isinstance(mode, (list, tuple)) and len(mode) == 2):
+            modes.append((_clean_int(mode[0]), _clean_int(mode[1])))
+        else:
+            raise ValueError("Invalid NR mode `{}`. Use `(l, m)` pairs.".format(mode))
+
+    return modes
+
+def parse_nr_mode_values(raw_value):
+
+    raw_value = str(raw_value).strip()
+    if(raw_value == ''):
+        raise ValueError("The `NR-modes` option cannot be empty.")
+
+    try:
+        literal_value = ast.literal_eval(raw_value)
+    except (ValueError, SyntaxError):
+        literal_value = raw_value
+
+    if(isinstance(literal_value, (list, tuple))):
+        if(len(literal_value) == 2 and all(isinstance(value, (int, float)) for value in literal_value)):
+            modes = _normalise_nr_mode_pairs([literal_value])
+        else:
+            modes = _normalise_nr_mode_pairs(literal_value)
+    else:
+        modes = _normalise_nr_mode_pairs([token for token in str(raw_value).split(',') if token.strip()])
+
+    return validate_nr_mode_values(modes)
+
+def nr_mode_values_from_l_m(l_values, m_values):
+
+    if(len(l_values) == 1 and len(m_values) > 1):
+        modes = [(l_values[0], m_value) for m_value in m_values]
+    elif(len(m_values) == 1 and len(l_values) > 1):
+        modes = [(l_value, m_values[0]) for l_value in l_values]
+    elif(len(l_values) == len(m_values)):
+        modes = list(zip(l_values, m_values))
+    else:
+        raise ValueError("When `NR-modes` is not set, `l-NR` and `m` must be scalars, equal-length lists, or one scalar plus one list.")
+
+    return validate_nr_mode_values(modes)
+
+def validate_nr_mode_values(modes):
+
+    if(len(modes) == 0):
+        raise ValueError("At least one NR mode must be provided.")
+
+    normalised_modes = []
+    for l_value, m_value in modes:
+        l_value, m_value = int(l_value), int(m_value)
+        if(l_value < 2):
+            raise ValueError("Invalid NR mode ({}, {}). The spherical index l must be at least 2.".format(l_value, m_value))
+        if(abs(m_value) > l_value):
+            raise ValueError("Invalid NR mode ({}, {}). The condition |m| <= l is required.".format(l_value, m_value))
+        normalised_modes.append((l_value, m_value))
+
+    if(len(set(normalised_modes)) != len(normalised_modes)):
+        raise ValueError("The NR mode list contains duplicate values: {}.".format(normalised_modes))
+
+    return normalised_modes
+
 def format_start_time_label(t_start):
 
     label = "{:.12g}".format(float(t_start))
@@ -79,9 +243,23 @@ def start_time_output_dir(base_outdir, t_start):
 
     return os.path.join(base_outdir, format_start_time_label(t_start))
 
+def format_nr_mode_label(l_value, m_value):
+
+    m_label = str(int(m_value)).replace('-', 'm')
+
+    return "mode_l{}_m{}".format(int(l_value), m_label)
+
+def nr_mode_output_dir(base_outdir, nr_mode):
+
+    return os.path.join(base_outdir, format_nr_mode_label(*nr_mode))
+
 def get_start_time_values(parameters):
 
     return list(parameters['Inference'].get('t-start-list', [parameters['Inference']['t-start']]))
+
+def get_nr_mode_values(parameters):
+
+    return list(parameters['NR-data'].get('NR-mode-list', [(parameters['NR-data']['l-NR'], parameters['NR-data']['m'])]))
 
 def _copy_config_to_output(config_file, outdir, run_type):
 
@@ -224,6 +402,7 @@ def read_config(Config):
         'pert-order'       : 'lin', 
         'l-NR'             : 2,
         'm'                : 2,
+        'NR-modes'         : '',
         'error'            : 'align-with-mismatch-res-only',
         'error-t-min'      : 3e-1,
         'error-t-max'      : 4e-3,
@@ -271,6 +450,7 @@ def read_config(Config):
         'nnest'            : 1               ,
         'nensemble'        : 1               ,
         'n-start-time-workers': 1            ,
+        'n-mode-workers'   : 1               ,
 
         't-start'          : 20.0 ,
         't-end'            : 140.0,
@@ -312,7 +492,11 @@ def read_config(Config):
         'dL'                   : 410    ,
         'ra'                   : 1.375  ,
         'dec'                  : -0.2108,
-        'psi'                  : 2.659
+        'psi'                  : 2.659  ,
+        'azimuth'              : 0.0    ,
+        'inclination'          : '0:pi:pi/4',
+        'polarisation'         : '0:3*pi/4:pi/4',
+        'hm-include-negative-m': 1
         },
 
         'Flags': 
@@ -323,6 +507,7 @@ def read_config(Config):
         'compare_TD_FD'                : 0,
         'mismatch_print_flag'          : 0,
         'mismatch_section_plot_flag'   : 0,
+        'compute_hm_mismatch'          : 1,
         }
 
     }
@@ -341,11 +526,27 @@ def read_config(Config):
             for key in list(parameters[parameters_section].keys()):
                 keytype = type(parameters[parameters_section][key])
                 try:
-                    raw_value = Config.get(parameters_section, key)
+                    if(parameters_section == 'Mismatch-GW-parameters' and key == 'polarisation' and Config.has_option(parameters_section, 'polarization') and not(Config.has_option(parameters_section, key))):
+                        raw_value = Config.get(parameters_section, 'polarization')
+                    else:
+                        raw_value = Config.get(parameters_section, key)
                     if(parameters_section == 'Inference' and key == 't-start'):
                         t_start_values = parse_start_time_values(raw_value)
                         parameters[parameters_section][key] = t_start_values[0]
                         parameters[parameters_section]['t-start-list'] = t_start_values
+                    elif(parameters_section == 'NR-data' and key in ['l-NR', 'm']):
+                        mode_index_values = parse_int_values(raw_value, key)
+                        parameters[parameters_section][key] = mode_index_values[0]
+                        parameters[parameters_section]['{}-list'.format(key)] = mode_index_values
+                    elif(parameters_section == 'NR-data' and key == 'NR-modes'):
+                        if(str(raw_value).strip() != ''):
+                            nr_mode_values = parse_nr_mode_values(raw_value)
+                            parameters[parameters_section][key] = raw_value
+                            parameters[parameters_section]['NR-mode-list'] = nr_mode_values
+                    elif(parameters_section == 'Mismatch-GW-parameters' and key in ['inclination', 'polarisation']):
+                        angle_values = parse_angle_values(raw_value, key)
+                        parameters[parameters_section][key] = raw_value
+                        parameters[parameters_section]['{}-list'.format(key)] = angle_values
                     else:
                         parameters[parameters_section][key] = keytype(raw_value)
                 except (KeyError, configparser.NoOptionError, TypeError):
@@ -361,6 +562,14 @@ def read_config(Config):
                 if(parameters_section == 'Inference' and key == 't-start'):
                     print_value = parameters[parameters_section].get('t-start-list', [parameters[parameters_section][key]])
                     if(len(print_value) == 1): print_value = print_value[0]
+                if(parameters_section == 'NR-data' and key in ['l-NR', 'm']):
+                    print_value = parameters[parameters_section].get('{}-list'.format(key), [parameters[parameters_section][key]])
+                    if(len(print_value) == 1): print_value = print_value[0]
+                if(parameters_section == 'NR-data' and key == 'NR-modes'):
+                    print_value = parameters[parameters_section].get('NR-mode-list', parameters[parameters_section][key])
+                if(parameters_section == 'Mismatch-GW-parameters' and key in ['inclination', 'polarisation']):
+                    print_value = parameters[parameters_section].get('{}-list'.format(key), parameters[parameters_section][key])
+                    if(isinstance(print_value, list) and len(print_value) == 1): print_value = print_value[0]
                 print("{name} : {value}".format(name=key.ljust(max_len_keyword), value=print_value))
         except (KeyError, configparser.NoSectionError, configparser.NoOptionError, TypeError): pass
 
@@ -368,6 +577,22 @@ def read_config(Config):
         parameters['Inference']['t-start-list'] = [float(parameters['Inference']['t-start'])]
     if(parameters['Inference']['n-start-time-workers'] < 1):
         raise ValueError("Invalid start-time parallelization option: `n-start-time-workers` must be at least 1.")
+    if(parameters['Inference']['n-mode-workers'] < 1):
+        raise ValueError("Invalid mode parallelization option: `n-mode-workers` must be at least 1.")
+
+    if('NR-mode-list' not in parameters['NR-data']):
+        l_values = parameters['NR-data'].get('l-NR-list', [parameters['NR-data']['l-NR']])
+        m_values = parameters['NR-data'].get('m-list', [parameters['NR-data']['m']])
+        parameters['NR-data']['NR-mode-list'] = nr_mode_values_from_l_m(l_values, m_values)
+    parameters['NR-data']['l-NR'], parameters['NR-data']['m'] = parameters['NR-data']['NR-mode-list'][0]
+
+    if('inclination-list' not in parameters['Mismatch-GW-parameters']):
+        parameters['Mismatch-GW-parameters']['inclination-list'] = parse_angle_values(parameters['Mismatch-GW-parameters']['inclination'], 'inclination')
+    if(Config.has_option('Mismatch-GW-parameters', 'polarization') and not(Config.has_option('Mismatch-GW-parameters', 'polarisation'))):
+        parameters['Mismatch-GW-parameters']['polarisation'] = Config.get('Mismatch-GW-parameters', 'polarization')
+        parameters['Mismatch-GW-parameters']['polarisation-list'] = parse_angle_values(parameters['Mismatch-GW-parameters']['polarisation'], 'polarisation')
+    if('polarisation-list' not in parameters['Mismatch-GW-parameters']):
+        parameters['Mismatch-GW-parameters']['polarisation-list'] = parse_angle_values(parameters['Mismatch-GW-parameters']['polarisation'], 'polarisation')
 
     # Cleanup specific parameters formatting
     if(parameters['Inference']['sampler'] == 'raynest'):
@@ -477,9 +702,14 @@ A dot is present at the end of each description line and is not to be intended a
         pert-order              Perturbation order to consider in Teukolsky data. Available options: ['lin', 'scd'].                Default: `lin`.
         
         l-NR                    Polar NR spherical index to be fitted, possibly different than QNM ones, \
-                   since mixing between different l happens.                                                                        Default: 2.
+                   since mixing between different l happens. Can be a scalar or a list paired with `m`.                             Default: 2.
         
-        m                       Angular spherical index to be fitted (same for IMR and QNMs), since only modes with same m do mix.  Default: 2.
+        m                       Angular spherical index to be fitted (same for IMR and QNMs), since only modes with same m do mix. \
+                                Can be a scalar or a list paired with `l-NR`.                                                       Default: 2.
+
+        NR-modes                Optional list of NR `(l,m)` modes to fit in one invocation. Accepts Python pairs such as \
+                                `[(2,2),(3,3)]` or compact tokens such as `22,33,4-4`. Overrides list values passed to \
+                                `l-NR` and `m` when non-empty.                                                                      Default: ''.
         
         error                   Method to compute the NR error. Available options for `SXS`: \
                                 ['constant-X', 'align-with-mismatch-all', 'align-with-mismatch-res-only', 'align-at-peak'], \
@@ -618,6 +848,11 @@ A dot is present at the end of each description line and is not to be intended a
                          `outdir/t_start_<value>M/` directory. This is in addition to sampler-level \
                          parallelism set by options such as `nnest` and `nensemble`.                                           Default: 1.
 
+        n-mode-workers
+                         Number of NR-mode fits to run in parallel when multiple `(l,m)` modes are supplied. \
+                         Each fit is run in a separate process and keeps its products under its \
+                         `outdir/mode_l<l>_m<m>/` directory, with start-time subdirectories below it when needed.               Default: 1.
+
         *****************************************
         * Point-estimate specific parameters.   *
         *****************************************  
@@ -724,6 +959,9 @@ A dot is present at the end of each description line and is not to be intended a
                                     Determines whether to plot sanity check plots regarding the mismatch section (for instance, the windowed PSD vs the original one).
                                     Default: 0.    
 
+        compute_hm_mismatch         Boolean to compute detector-projected summed-higher-mode mismatch diagnostics after a multi-mode scan.
+                                    Default: 1.
+
     ********************************************************************
     * Parameters to be passed to the [Mismatch-GW-parameters] section. *
     ********************************************************************
@@ -736,8 +974,24 @@ A dot is present at the end of each description line and is not to be intended a
         
         dec              Declination (in radiants).                                                 Default: -0.2108.
         
-        psi              Polarization angle (in radiants).                                          Default: 2.659.
-        
+        psi              Polarization angle (in radiants) used by fixed-polarisation diagnostics.    Default: 2.659.
+
+        azimuth          Source-frame azimuthal phase entering the spin-weighted spherical harmonic \
+                         recomposition of multiple NR modes.                                        Default: 0.0.
+
+        inclination      Inclination values used for summed-higher-mode mismatch diagnostics. Accepts a scalar, \
+                         comma/list values, or an inclusive range `start:stop:step`; expressions using `pi` are \
+                         accepted.                                                                  Default: `0:pi:pi/4`.
+
+        polarisation     Polarisation-angle values used for summed-higher-mode mismatch diagnostics. The reported \
+                         summed-HM mismatch is marginalised over these samples by retaining the minimum mismatch. \
+                         Pass a scalar to compute at one fixed polarisation. Expressions using `pi` are accepted. \
+                                                                                                      Default: `0:3*pi/4:pi/4`.
+
+        hm-include-negative-m
+                         Boolean to include non-precessing negative-m counterparts via \
+                         h_{l,-m}=(-1)^l h^*_{lm} when they are not explicitly fitted.              Default: 1.
+
 """
                                                      
 try:
