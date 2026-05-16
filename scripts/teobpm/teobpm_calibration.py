@@ -103,6 +103,7 @@ class CalibrationConfig:
     min_quality_score: float | None = None
     bayring_executable: str = "bayRing"
     nr_data_dir: str = ""
+    properties_file: str = ""
     extrap_order: int = 2
     resolution_level: int = -1
     t_start: float = 0.0
@@ -531,6 +532,59 @@ def read_records(path: str | Path) -> list[SimulationRecord]:
     return [SimulationRecord(**row) for row in data]
 
 
+def _properties_sxs_key(row: dict[str, Any]) -> str:
+    raw_id = str(row.get("sxs_id") or row.get("SXS_ID") or row.get("ID") or "").strip()
+    if raw_id.startswith("SXS:BBH:"):
+        return normalise_sxs_id(raw_id)
+    if raw_id.startswith("SXS"):
+        return normalise_sxs_id(raw_id)
+    return f"SXS:BBH:{raw_id.zfill(4)}"
+
+
+def _mode_metadata_aliases(column: str, value: Any) -> dict[str, Any]:
+    aliases: dict[str, Any] = {column: value}
+    if column.startswith("A_peak") and column.endswith("dotdot"):
+        suffix = column[len("A_peak") : -len("dotdot")]
+        if len(suffix) == 2 and suffix.isdigit():
+            aliases[f"A_peak{suffix}dotdot"] = value
+        return aliases
+
+    for prefix, canonical_prefixes in (
+        ("A_peak", ("A_peak_",)),
+        ("omega_peak", ("omega_peak_", "omg_peak_")),
+    ):
+        if not column.startswith(prefix):
+            continue
+        suffix = column[len(prefix):]
+        if len(suffix) == 2 and suffix.isdigit():
+            for canonical_prefix in canonical_prefixes:
+                aliases[f"{canonical_prefix}{suffix}"] = value
+        return aliases
+    return aliases
+
+
+def attach_properties_metadata(records: Iterable[SimulationRecord], properties_file: str | Path) -> None:
+    properties_path = Path(properties_file)
+    rows_by_id: dict[str, dict[str, Any]] = {}
+    with properties_path.open("r", encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            metadata: dict[str, Any] = {}
+            for key, value in row.items():
+                metadata.update(_mode_metadata_aliases(str(key), value))
+            rows_by_id[_properties_sxs_key(row)] = metadata
+
+    missing = []
+    for record in records:
+        metadata = rows_by_id.get(record.sxs_id)
+        if metadata is None:
+            missing.append(record.sxs_id)
+            continue
+        record.metadata.update(metadata)
+    if missing:
+        examples = ", ".join(missing[:10])
+        raise ValueError(f"`{properties_path}` is missing merger metadata for {len(missing)} SXS IDs, e.g. {examples}.")
+
+
 def _local_prior_text(mode: tuple[int, int], template: str) -> str:
     mode_label = _mode_label(mode)
     if template == "HypTan" and mode == (2, 2):
@@ -620,6 +674,7 @@ catalog = SXS
 ID = {record.sxs_id.split(":")[-1]}
 dir = {config.nr_data_dir}
 download = 1
+properties-file = {config.properties_file}
 extrap-order = {config.extrap_order}
 res-level = {config.resolution_level}
 l-NR = {mode[0]}
@@ -736,6 +791,8 @@ def prepare_campaign(catalog_file: str | None, config: CalibrationConfig) -> dic
     filtered = filter_records(records, config)
     n_before_random_fraction = len(filtered)
     filtered = apply_random_fraction(filtered, config.random_fraction, config.seed)
+    if config.properties_file:
+        attach_properties_metadata(filtered, config.properties_file)
     training, validation = split_train_validation(filtered, config.validation_fraction, config.seed)
     all_split = training + validation
     jobs = local_fit_jobs(all_split, config)
@@ -1165,7 +1222,15 @@ def _wrap_phase(value: float) -> float:
     return (value + math.pi) % (2.0 * math.pi) - math.pi
 
 
-def _record_metadata_targets(record: SimulationRecord | None, job: LocalFitJob) -> list[dict[str, Any]]:
+def _local_fit_targets_for_template(template: str) -> tuple[str, ...]:
+    if template == "HypTan":
+        return LOCAL_FIT_TARGETS_HYPTAN
+    if template == "RatExp":
+        return LOCAL_FIT_TARGETS_RATEXP
+    raise ValueError(f"Unknown TEOBPM template `{template}`.")
+
+
+def _record_metadata_targets(record: SimulationRecord | None, job: LocalFitJob, template: str) -> list[dict[str, Any]]:
     if record is None:
         return []
     rows: list[dict[str, Any]] = []
@@ -1174,9 +1239,12 @@ def _record_metadata_targets(record: SimulationRecord | None, job: LocalFitJob) 
     target_keys = {
         "omg_peak": [f"omg_peak_{mode}", f"omega_peak_{mode}", f"peak-omega-l{mode[0]}-m{mode[1:]}"],
         "A_peak_over_nu": [f"A_peak_{mode}", f"A_peak{mode}", f"peak-ampl-l{mode[0]}-m{mode[1:]}"],
-        "A_peakdotdot_over_nu": [f"A_peak{mode}dotdot", f"A_peak_{mode}_dotdot", f"A_peakdotdot_{mode}"],
+        "A_peakdotdot_over_nu": [f"A_peak{mode}dotdot"],
     }
+    allowed_targets = set(_local_fit_targets_for_template(template))
     for target, keys in target_keys.items():
+        if target not in allowed_targets:
+            continue
         raw_value = _first_present(metadata, keys, None)
         if raw_value is None:
             continue
@@ -1255,11 +1323,33 @@ def read_mismatch_file(path: str | Path, job: LocalFitJob | None = None) -> list
     return rows
 
 
+def read_mismatch_diagnostics_file(path: str | Path, job: LocalFitJob | None = None) -> list[dict[str, Any]]:
+    path = Path(path)
+    rows = []
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        for source_row in reader:
+            if source_row.get("mismatch") in (None, ""):
+                continue
+            row: dict[str, Any] = {"file": str(path), **source_row}
+            if job is not None:
+                row.update({"sxs_id": job.sxs_id, "mode": job.mode, "split": job.split})
+            row["CI"] = _as_float(source_row.get("confidence_interval"), default=math.nan)
+            row["Strain_data"] = source_row.get("strain_data", "")
+            row["Mismatch"] = source_row.get("mismatch", "")
+            row["mismatch"] = _as_float(source_row.get("mismatch"), default=math.nan)
+            rows.append(row)
+    return rows
+
+
 def collect_mismatch_rows(job: LocalFitJob) -> list[dict[str, Any]]:
     mismatch_dir = Path(job.outdir) / "Algorithm" / "Mismatch"
     if not mismatch_dir.exists():
         return []
     rows = []
+    diagnostics_path = mismatch_dir / "mismatch_and_snr_diagnostics.tsv"
+    if diagnostics_path.exists():
+        rows.extend(read_mismatch_diagnostics_file(diagnostics_path, job=job))
     for path in sorted(mismatch_dir.glob("*.txt")):
         rows.extend(read_mismatch_file(path, job=job))
     return [row for row in rows if math.isfinite(_as_float(row.get("mismatch"), default=math.nan))]
@@ -1291,6 +1381,7 @@ def representative_mismatch(rows: list[dict[str, Any]]) -> float | None:
 def collect_local_fit_outputs(campaign_dir: str | Path, output_table: str | Path | None = None, split: str = "all") -> dict[str, Any]:
     campaign_dir = Path(campaign_dir)
     output_table = Path(output_table) if output_table else campaign_dir / "local_fit_summary.csv"
+    template = _campaign_config(campaign_dir).get("template", "RatExp")
     jobs = _select_jobs(read_local_fit_index(campaign_dir / "local_fit_index.csv"), split=split)
     manifest_path = campaign_dir / "manifests" / "dataset_manifest.json"
     records_by_id = {record.sxs_id: record for record in read_records(manifest_path)} if manifest_path.exists() else {}
@@ -1308,7 +1399,7 @@ def collect_local_fit_outputs(campaign_dir: str | Path, output_table: str | Path
 
         if not estimates:
             failures.append({"sxs_id": job.sxs_id, "mode": job.mode, "outdir": job.outdir, "reason": "missing point_estimates.dat or posterior.dat"})
-            rows.extend(_record_metadata_targets(records_by_id.get(job.sxs_id), job))
+            rows.extend(_record_metadata_targets(records_by_id.get(job.sxs_id), job, template))
             continue
 
         for parameter, estimate in estimates.items():
@@ -1328,7 +1419,7 @@ def collect_local_fit_outputs(campaign_dir: str | Path, output_table: str | Path
                         construction_mismatch=mismatch,
                     )
                 )
-        rows.extend(_record_metadata_targets(records_by_id.get(job.sxs_id), job))
+        rows.extend(_record_metadata_targets(records_by_id.get(job.sxs_id), job, template))
 
     for (sxs_id, mode), phase_data in sorted(phases.items()):
         if mode == "22":
@@ -1519,12 +1610,15 @@ def construct_global_fit(
         raise ValueError("Spinning global fits require a nonspinning base fit file.")
     base_fit = _load_global_fit(base_nonspinning_file) if base_nonspinning_file else None
     rows = _read_table(local_fit_table)
+    allowed_targets = set(_local_fit_targets_for_template(template))
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for row in rows:
         if row.get("split", "training") != "training":
             continue
         mode = row.get("mode") or row.get("lm") or row.get("mode_label")
         target = row.get("target") or row.get("parameter")
+        if target not in allowed_targets and not str(target).startswith(PHASE_TARGET_PREFIX):
+            continue
         if not mode or not target or row.get("value") in (None, ""):
             continue
         grouped.setdefault((str(mode), str(target)), []).append(row)
@@ -3920,6 +4014,7 @@ def _config_from_args(args: argparse.Namespace) -> CalibrationConfig:
         min_quality_score=args.min_quality_score,
         bayring_executable=args.bayring_executable,
         nr_data_dir=args.nr_data_dir,
+        properties_file=args.properties_file,
         extrap_order=args.extrap_order,
         resolution_level=args.resolution_level,
         t_start=args.t_start,
@@ -3957,6 +4052,7 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--min-quality-score", type=float, default=None)
     prepare.add_argument("--bayring-executable", default="bayRing")
     prepare.add_argument("--nr-data-dir", default="")
+    prepare.add_argument("--properties-file", default="", help="Optional CSV with SXS merger peak quantities to pass to generated bayRing configs.")
     prepare.add_argument("--extrap-order", type=int, default=2)
     prepare.add_argument("--resolution-level", type=int, default=-1)
     prepare.add_argument("--t-start", type=float, default=0.0)

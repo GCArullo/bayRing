@@ -432,7 +432,8 @@ used in mismatch/SNR diagnostics.
      - Apply C1 fixing after smoothing.
    * - ``clear_directory``
      - ``1``
-     - Clear mismatch smoothing-output subdirectories before running.
+     - Legacy flag. Mismatch diagnostics no longer delete existing outputs;
+       inactive smoothing plot directories are simply not created.
    * - ``compare_TD_FD``
      - ``0``
      - Also compute frequency-domain checks where implemented.

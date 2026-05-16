@@ -197,6 +197,7 @@ def _run_single_start(Config, parameters, config_file):
                                                 TEOB_global_fit           = parameters['Model']['TEOB-global-fit']                 ,
                                                 TEOB_merger_data          = parameters['Model']['TEOB-merger-data']                ,
                                                 TEOB_mode_mixing          = parameters['Model']['TEOB-mode-mixing']                ,
+                                                TEOB_counter_rotating     = parameters['Model']['TEOB-counter-rotating']            ,
                                                 )
 
     # ===============#

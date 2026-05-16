@@ -400,6 +400,7 @@ def Dynamic_InferenceModel(base):
             self.TEOB_global_fit = self.wf_model.TEOB_global_fit
             self.TEOB_merger_data = self.wf_model.TEOB_merger_data 
             self.TEOB_mode_mixing = getattr(self.wf_model, 'TEOB_mode_mixing', 0)
+            self.TEOB_counter_rotating = getattr(self.wf_model, 'TEOB_counter_rotating', 0)
             self.min_method    = min_method
             self.Config        = Config
 
@@ -572,6 +573,27 @@ def Dynamic_InferenceModel(base):
                                 self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
                             except(configparser.NoOptionError):
                                 pass
+
+                if self.TEOB_counter_rotating:
+                    default_bounds_counter = {
+                        'ln_A_counter_scale': [-8.0, 0.0],
+                        'phi_mrg_counter'   : [0.0, twopi],
+                        'c3A_counter'       : default_bounds_TEOBPM['c3A'],
+                        'c3p_counter'       : default_bounds_TEOBPM['c3p'],
+                        'c4p_counter'       : default_bounds_TEOBPM['c4p'],
+                    }
+                    if not(self.TEOB_template=='HypTan'):
+                        default_bounds_counter['c2A_counter'] = default_bounds_TEOBPM['c2A']
+                        default_bounds_counter['c2p_counter'] = default_bounds_TEOBPM['c2p']
+                    counter_mode_label = '{}{}'.format(self.wf_model.l_NR, -self.wf_model.m_NR)
+                    for name in default_bounds_counter.keys():
+                        fullname = '{}_{}'.format(name, counter_mode_label)
+                        try:
+                            self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                        except(configparser.NoOptionError):
+                            single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_counter)
+                            self.names.append(fullname)
+                            self.bounds.append(single_bounds)
 
             else:
                 raise ValueError("Unknown template selected: {}".format(self.wf_model.wf_model))

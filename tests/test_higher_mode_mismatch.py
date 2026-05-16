@@ -1,3 +1,5 @@
+import csv
+
 import numpy as np
 import lal
 
@@ -109,11 +111,11 @@ def test_hm_sum_mismatch_selects_best_polarisation(tmp_path, monkeypatch):
         saturation_SX=1.0,
     )
 
-    [result_path] = list((tmp_path / "HM_sum" / "Algorithm" / "Mismatch").glob("Mismatch_HM_sum*.txt"))
-    rows = result_path.read_text().strip().splitlines()[1:]
+    result_path = tmp_path / "HM_sum" / "Algorithm" / "Mismatch" / "mismatch_and_snr_diagnostics.tsv"
+    rows = list(csv.DictReader(result_path.read_text().splitlines(), delimiter="\t"))
 
     assert len(rows) == 3
     for row in rows:
-        _, _, _, psi, mismatch = row.split("\t")
-        assert float(psi) == 1.0
-        assert float(mismatch) == 0.0
+        assert row["diagnostic_type"] == "higher_mode_sum"
+        assert float(row["psi"]) == 1.0
+        assert float(row["mismatch"]) == 0.0

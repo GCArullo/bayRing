@@ -177,7 +177,9 @@ The summed-HM diagnostics are written under:
    outdir/HM_sum/Algorithm/Mismatch/
 
 with one subdirectory per start time when the same configuration also scans
-``t-start``.
+``t-start``. They use the same ``mismatch_and_snr_diagnostics.tsv`` and
+``mismatch_and_snr_diagnostic_parameters.tsv`` layout described below, with
+``diagnostic_type = higher_mode_sum``.
 
 Percentile Waveforms
 ~~~~~~~~~~~~~~~~~~~~
@@ -200,22 +202,38 @@ to ``Algorithm/posterior.dat`` for diagnostic use.
 Output Files
 ~~~~~~~~~~~~
 
-Mismatch and SNR text files are written under:
+Mismatch and SNR tables are written under:
 
 .. code-block:: text
 
    outdir/Algorithm/Mismatch/
 
-File names encode mass, distance, start time, window settings and FFT length,
-for example:
+The mismatch writer does not delete previous diagnostics. Re-running the same
+settings updates rows with the same ``run_id``; different settings append rows
+with a different ``run_id``.
+
+The main mismatch and SNR value table is:
 
 .. code-block:: text
 
-   Mismatch_M_60_dL_410_t_s_30.0M_wDX_0.8Hz_wSX_0.8Hz_k_7.0_satDX_1.0_satSD_1.0_NFFT_4096.txt
-   Optimal_SNR_M_60_dL_410_t_s_30.0M_wDX_0.8Hz_wSX_0.8Hz_k_7.0_satDX_1.0_satSD_1.0_NFFT_4096.txt
+   outdir/Algorithm/Mismatch/mismatch_and_snr_diagnostics.tsv
 
-Each file stores confidence interval or percentile labels, the strain
-component and the corresponding mismatch or SNR value.
+It stores one row per ``run_id``, confidence interval and strain component,
+with ``mismatch``, ``optimal_snr`` and ``optimal_snr_fd`` columns. The
+frequency-domain SNR column is left empty unless that diagnostic was actually
+computed; no separate header-only FD file is created.
+
+The run settings live in:
+
+.. code-block:: text
+
+   outdir/Algorithm/Mismatch/mismatch_and_snr_diagnostic_parameters.tsv
+
+That table maps each short ``run_id`` to explicit columns such as
+``remnant_mass_solar_masses``, ``luminosity_distance_mpc``, ``start_time_M``,
+``n_fft``, ``low_frequency_window_hz``, ``high_frequency_window_hz``,
+``smoothing_steepness``, ``low_frequency_saturation`` and
+``high_frequency_saturation``.
 
 Sanity Plots
 ~~~~~~~~~~~~
@@ -234,6 +252,10 @@ Depending on the smoothing direction, plots are placed under one of:
    Algorithm/Mismatch/Left_smoothing/
    Algorithm/Mismatch/Right_smoothing/
    Algorithm/Mismatch/Both_edges_smoothing/
+
+Only the directory matching the configured ``direction`` is created for a run.
+The other smoothing-direction directories are not created unless a run actually
+writes plots for those directions.
 
 These plots are useful when tuning window widths, steepness, saturation and
 FFT length. Inspect them whenever changing PSD settings; a numerically smooth

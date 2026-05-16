@@ -134,7 +134,7 @@ Mismatch and optimal-SNR products are written under:
 
    Algorithm/Mismatch/
 
-See :doc:`mismatch_snr` for the file naming and PSD/ACF controls.
+See :doc:`mismatch_snr` for the diagnostics table layout and PSD/ACF controls.
 
 Post-Processing Existing Runs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

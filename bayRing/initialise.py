@@ -439,6 +439,7 @@ def read_config(Config):
         'TEOB-global-fit'                  : 1            ,
         'TEOB-merger-data'                 : 0            ,
         'TEOB-mode-mixing'                 : 0            ,
+        'TEOB-counter-rotating'            : 0            ,
         },
 
         'Inference':
@@ -809,6 +810,10 @@ A dot is present at the end of each description line and is not to be intended a
                                             - If [NR-data][fits-file] is provided, coefficients are evaluated from that file using TEOB-calibration.
                                             - Otherwise, the internal quasi-circular pyRing fits are used when available.
                                          If 0: Runs local fits for the amplitude and phase coefficients.                                                                  Default: 1.
+
+        TEOB-counter-rotating             Boolean to add a time-dependent counter-rotating TEOBPM contribution to the selected
+                                          spherical mode. For a 21 fit, the extra 2-1 parameters are ln_A_counter_scale_2-1,
+                                          phi_mrg_counter_2-1, c3A_counter_2-1, c3p_counter_2-1 and c4p_counter_2-1.                  Default: 0.
 
         TEOB-merger-data                 Boolean flag to switch between using the values of the amplitude and frequency at the peak of the modes as given \ 
                                          by the NR merger data (TEOB-merger-data = 1, to be provided in [NR-data][properties-file]) or by the quasi-circular fits \

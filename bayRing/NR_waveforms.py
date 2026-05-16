@@ -27,6 +27,22 @@ def _prime_sxs_simulations_cache():
         pass
 
 
+def _parse_sxs_reference_eccentricity(ecc):
+    if ecc is None:
+        return 0.0
+    if isinstance(ecc, str):
+        ecc_text = ecc.strip()
+        if ecc_text.lower() in {"", "nan", "none"}:
+            return 0.0
+        if ecc_text[0] in "<>":
+            ecc_text = ecc_text[1:]
+        return float(ecc_text)
+    ecc = float(ecc)
+    if np.isnan(ecc):
+        return 0.0
+    return ecc
+
+
 def _sxs_bitwise_axis(axis, ndim):
 
     if axis < 0:
@@ -565,6 +581,7 @@ def read_NR_metadata(NR_sim, NR_catalog):
                         'Emrg'          : NR_sim.Emrg,
                         'Jmrg'          : NR_sim.Jmrg,
                     }
+            metadata.update(getattr(NR_sim, 'additional_metadata', {}))
         except:
             M = 1.0
             metadata = {
@@ -929,6 +946,7 @@ class NR_simulation():
         
             self.download  = download
             self.q, self.chi1, self.chi2, self.tilt1, self.tilt2, self.ecc, self.Mf, self.af = self.read_SXS_metadata()
+            self.additional_metadata = {}
             
             if self.additional_NR_properties:
                 self.A_peak_22, self.omg_peak_22, self.A_nr_error, self.A_peak22dotdot, self.bmrg, self.Emrg, self.Jmrg = self.load_SXS_addn_metadata(csv_path=self.additional_NR_properties, ID_str=self.NR_ID)
@@ -1544,9 +1562,7 @@ class NR_simulation():
 
         q, Mf            = metadata['reference_mass_ratio'], metadata['remnant_mass']
         chi1, chi2, chif = metadata['reference_dimensionless_spin1'][2], metadata['reference_dimensionless_spin2'][2], metadata['remnant_dimensionless_spin'][2]
-        ecc              = metadata['reference-eccentricity']
-
-        if isinstance(ecc, str): ecc = float(ecc[1:])
+        ecc              = _parse_sxs_reference_eccentricity(metadata['reference-eccentricity'])
 
         return q, chi1, chi2, tilt1, tilt2, ecc, Mf, chif
 
@@ -1554,13 +1570,34 @@ class NR_simulation():
     def load_SXS_addn_metadata(self, csv_path, ID_str):
 
         additional_data = pd.read_csv(csv_path) 
-        A_peak_22 = additional_data.loc[additional_data['ID'] == int(ID_str), 'A_peak22'].values[0]
-        omg_peak_22 = additional_data.loc[additional_data['ID'] == int(ID_str), 'omega_peak22'].values[0]
-        A_nr_error = additional_data.loc[additional_data['ID'] == int(ID_str), 'A_nr_error'].values[0]
-        A_peak22dotdot = additional_data.loc[additional_data['ID'] == int(ID_str), 'A_peak22dotdot'].values[0]
-        bmrg = additional_data.loc[additional_data['ID'] == int(ID_str), 'b_massless_EOB'].values[0]
-        Emrg = additional_data.loc[additional_data['ID'] == int(ID_str), 'Heff_til'].values[0]
-        Jmrg = additional_data.loc[additional_data['ID'] == int(ID_str), 'Jmrg_til'].values[0]
+        row = additional_data.loc[additional_data['ID'] == int(ID_str)]
+        if row.empty:
+            raise ValueError(f"SXS:{ID_str} was not found in properties file `{csv_path}`.")
+        row = row.iloc[0]
+        metadata = {}
+        for column, value in row.items():
+            metadata[column] = value
+            if column.startswith('A_peak') and column.endswith('dotdot'):
+                mode = column[len('A_peak'):-len('dotdot')]
+                if len(mode) == 2 and mode.isdigit():
+                    metadata[f'A_peak{mode}dotdot'] = value
+            elif column.startswith('A_peak'):
+                mode = column[len('A_peak'):]
+                if len(mode) == 2 and mode.isdigit():
+                    metadata[f'A_peak_{mode}'] = value
+            elif column.startswith('omega_peak'):
+                mode = column[len('omega_peak'):]
+                if len(mode) == 2 and mode.isdigit():
+                    metadata[f'omega_peak_{mode}'] = value
+                    metadata[f'omg_peak_{mode}'] = value
+        self.additional_metadata = metadata
+        A_peak_22 = metadata.get('A_peak_22')
+        omg_peak_22 = metadata.get('omg_peak_22')
+        A_nr_error = metadata.get('A_nr_error')
+        A_peak22dotdot = metadata.get('A_peak22dotdot')
+        bmrg = metadata.get('b_massless_EOB')
+        Emrg = metadata.get('Heff_til')
+        Jmrg = metadata.get('Jmrg_til')
 
         return A_peak_22, omg_peak_22, A_nr_error, A_peak22dotdot, bmrg, Emrg, Jmrg
 

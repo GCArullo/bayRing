@@ -435,6 +435,38 @@ def test_collect_local_fit_outputs_reads_sampler_posterior_when_point_estimate_m
     assert float(c3a_rows[0]["sigma"]) > 0.0
 
 
+def test_collect_mismatch_rows_reads_compact_diagnostics_table(tmp_path):
+    job = calib.LocalFitJob(
+        sxs_id="SXS:BBH:0001",
+        mode="22",
+        split="training",
+        config_file=str(tmp_path / "fit.ini"),
+        outdir=str(tmp_path),
+        q=1.0,
+        nu=0.25,
+        chi1z=0.0,
+        chi2z=0.0,
+        chi_eff=0.0,
+        chi_a=0.0,
+        eccentricity=0.0,
+        quality_score=1.0,
+    )
+    mismatch_dir = tmp_path / "Algorithm" / "Mismatch"
+    mismatch_dir.mkdir(parents=True)
+    (mismatch_dir / "mismatch_and_snr_diagnostics.tsv").write_text(
+        "run_id\tdiagnostic_type\tconfidence_interval\tstrain_data\tinclination\tazimuth\tpsi\tmismatch\toptimal_snr\toptimal_snr_fd\n"
+        "run_1\tstrain_components\t50\treal\t\t\t\t0.02\t100\t\n",
+        encoding="utf-8",
+    )
+
+    rows = calib.collect_mismatch_rows(job)
+
+    assert len(rows) == 1
+    assert rows[0]["CI"] == 50.0
+    assert rows[0]["Strain_data"] == "real"
+    assert rows[0]["mismatch"] == 0.02
+
+
 def test_construct_global_fit_uses_nonspinning_base_for_aligned_spin(tmp_path):
     base_fit = {
         "schema": calib.FIT_SCHEMA,

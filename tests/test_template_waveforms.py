@@ -219,6 +219,53 @@ def test_teobpm_waveform_passes_mode_mixing_parent_inputs(monkeypatch):
     assert captured["NR_fit_coeffs"][(2, 2)]["c3A"] == -0.5
 
 
+def test_teobpm_counter_rotating_waveform_uses_time_dependent_teob_branch(monkeypatch):
+    model = _build_model(
+        wf_model="TEOBPM",
+        l_NR=2,
+        m_NR=1,
+        TEOB_counter_rotating=1,
+        TEOB_template="HypTan",
+        TEOB_merger_data=0,
+    )
+
+    captured = {}
+
+    class FakeTEOBPM:
+        def waveform(self, times):
+            captured["times"] = np.array(times)
+            return None, None, None, np.array([1.0, 2.0]), np.array([3.0, 4.0])
+
+    def fake_teobpm(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return FakeTEOBPM()
+
+    monkeypatch.setattr(template_waveforms.wf, "TEOBPM", fake_teobpm, raising=False)
+
+    waveform = model.TEOBPM_counter_rotating_waveform(
+        {
+            "ln_A_counter_scale_2-1": math.log(0.5),
+            "phi_mrg_counter_2-1": 0.7,
+            "c3A_counter_2-1": -0.2,
+            "c3p_counter_2-1": 1.5,
+            "c4p_counter_2-1": 0.4,
+        },
+        {},
+    )
+
+    expected = 0.5 * np.conjugate(np.array([-1.0, -2.0]) + 1j*np.array([3.0, 4.0]))
+
+    assert captured["args"][5][(2, 1)] == 0.7
+    assert captured["args"][9] == [(2, 1)]
+    assert captured["kwargs"]["global_fit"] == 0
+    assert "mode_mixing" not in captured["kwargs"]
+    assert captured["kwargs"]["NR_fit_coeffs"][(2, 1)]["c3A"] == -0.2
+    assert captured["kwargs"]["NR_fit_coeffs"][(2, 1)]["c3p"] == 1.5
+    assert captured["kwargs"]["NR_fit_coeffs"][(2, 1)]["c4p"] == 0.4
+    np.testing.assert_allclose(waveform, expected)
+
+
 def test_teobpm_qc_global_fit_rejects_noncircular_fit_metadata():
     model = _build_model(
         wf_model="TEOBPM",

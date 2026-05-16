@@ -1,5 +1,5 @@
 # Standard python packages
-import corner, h5py, matplotlib.pyplot as plt, numpy as np, os, pickle, qnm, scipy.linalg as sl, seaborn as sns, shutil, numba
+import corner, csv, hashlib, h5py, matplotlib.pyplot as plt, numpy as np, os, pickle, qnm, scipy.linalg as sl, seaborn as sns, shutil, numba
 from scipy.interpolate           import interp1d
 from itertools import product
 import math
@@ -46,6 +46,39 @@ window_key_index = {
     'saturation_DX': 3,
     'saturation_SX': 4,
 }
+mismatch_smoothing_subfolders = {
+    'below': 'Left_smoothing',
+    'above': 'Right_smoothing',
+    'below-and-above': 'Both_edges_smoothing',
+}
+mismatch_and_snr_diagnostics_filename = 'mismatch_and_snr_diagnostics.tsv'
+mismatch_and_snr_parameters_filename = 'mismatch_and_snr_diagnostic_parameters.tsv'
+mismatch_parameter_fieldnames = (
+    'run_id',
+    'diagnostic_type',
+    'remnant_mass_solar_masses',
+    'luminosity_distance_mpc',
+    'start_time_M',
+    'n_fft',
+    'low_frequency_window_hz',
+    'high_frequency_window_hz',
+    'smoothing_steepness',
+    'low_frequency_saturation',
+    'high_frequency_saturation',
+    'smoothing_direction',
+)
+mismatch_diagnostic_fieldnames = (
+    'run_id',
+    'diagnostic_type',
+    'confidence_interval',
+    'strain_data',
+    'inclination',
+    'azimuth',
+    'psi',
+    'mismatch',
+    'optimal_snr',
+    'optimal_snr_fd',
+)
 
 class PointEstimateResults(dict):
 
@@ -199,6 +232,153 @@ def _toeplitz_whitened_norm(acf, waveform):
     whitened = sl.solve_toeplitz(acf, waveform, check_finite=False)
     return whitened, np.sqrt(abs(np.dot(waveform, whitened)))
 
+def _format_diagnostic_value(value):
+    if value is None:
+        return ''
+    np_generic = getattr(np, 'generic', ())
+    if np_generic and isinstance(value, np_generic):
+        value = value.item()
+    if isinstance(value, (int, float)):
+        return "{:.16g}".format(value)
+    return str(value)
+
+def _read_tsv_rows(path):
+    if not(os.path.exists(path)):
+        return []
+    with open(path, 'r', encoding='utf-8', newline='') as handle:
+        reader = csv.DictReader(handle, delimiter='\t')
+        if reader.fieldnames is None:
+            return []
+        return [dict(row) for row in reader]
+
+def _write_tsv_rows(path, fieldnames, rows):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8', newline='') as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter='\t')
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field, '') for field in fieldnames})
+
+def _upsert_tsv_row(path, fieldnames, new_row, key_fields):
+    rows = _read_tsv_rows(path)
+    new_key = tuple(new_row.get(field, '') for field in key_fields)
+    updated = False
+
+    for row in rows:
+        row_key = tuple(row.get(field, '') for field in key_fields)
+        if row_key != new_key:
+            continue
+        for field in fieldnames:
+            value = new_row.get(field, '')
+            if value != '':
+                row[field] = value
+            elif field not in row:
+                row[field] = ''
+        updated = True
+        break
+
+    if not(updated):
+        rows.append({field: new_row.get(field, '') for field in fieldnames})
+
+    _write_tsv_rows(path, fieldnames, rows)
+
+def _mismatch_diagnostics_path(outdir):
+    return os.path.join(_mismatch_root_dir(outdir), mismatch_and_snr_diagnostics_filename)
+
+def _mismatch_parameters_path(outdir):
+    return os.path.join(_mismatch_root_dir(outdir), mismatch_and_snr_parameters_filename)
+
+def _mismatch_run_id(diagnostic_type, M, dL, t_start_g, n_fft, window_size_DX,
+                     window_size_SX, k, saturation_DX, saturation_SX, direction=None):
+    parts = (
+        diagnostic_type,
+        M,
+        dL,
+        t_start_g,
+        n_fft,
+        window_size_DX,
+        window_size_SX,
+        k,
+        saturation_DX,
+        saturation_SX,
+        direction,
+    )
+    digest_source = '\t'.join(_format_diagnostic_value(part) for part in parts)
+    return 'run_' + hashlib.sha1(digest_source.encode('utf-8')).hexdigest()[:12]
+
+def _mismatch_parameter_row(run_id, diagnostic_type, M, dL, t_start_g, n_fft,
+                            window_size_DX, window_size_SX, k, saturation_DX,
+                            saturation_SX, direction=None):
+    return {
+        'run_id': run_id,
+        'diagnostic_type': diagnostic_type,
+        'remnant_mass_solar_masses': _format_diagnostic_value(M),
+        'luminosity_distance_mpc': _format_diagnostic_value(dL),
+        'start_time_M': _format_diagnostic_value(t_start_g),
+        'n_fft': _format_diagnostic_value(n_fft),
+        'low_frequency_window_hz': _format_diagnostic_value(window_size_DX),
+        'high_frequency_window_hz': _format_diagnostic_value(window_size_SX),
+        'smoothing_steepness': _format_diagnostic_value(k),
+        'low_frequency_saturation': _format_diagnostic_value(saturation_DX),
+        'high_frequency_saturation': _format_diagnostic_value(saturation_SX),
+        'smoothing_direction': _format_diagnostic_value(direction),
+    }
+
+def _record_mismatch_diagnostic(
+    outdir,
+    diagnostic_type,
+    M,
+    dL,
+    t_start_g,
+    n_fft,
+    window_size_DX,
+    window_size_SX,
+    k,
+    saturation_DX,
+    saturation_SX,
+    direction=None,
+    confidence_interval=None,
+    strain_data=None,
+    inclination=None,
+    azimuth=None,
+    psi=None,
+    mismatch=None,
+    optimal_snr=None,
+    optimal_snr_fd=None,
+):
+    run_id = _mismatch_run_id(
+        diagnostic_type, M, dL, t_start_g, n_fft, window_size_DX,
+        window_size_SX, k, saturation_DX, saturation_SX, direction
+    )
+    _upsert_tsv_row(
+        _mismatch_parameters_path(outdir),
+        mismatch_parameter_fieldnames,
+        _mismatch_parameter_row(
+            run_id, diagnostic_type, M, dL, t_start_g, n_fft,
+            window_size_DX, window_size_SX, k, saturation_DX,
+            saturation_SX, direction
+        ),
+        ('run_id',),
+    )
+    _upsert_tsv_row(
+        _mismatch_diagnostics_path(outdir),
+        mismatch_diagnostic_fieldnames,
+        {
+            'run_id': run_id,
+            'diagnostic_type': diagnostic_type,
+            'confidence_interval': _format_diagnostic_value(confidence_interval),
+            'strain_data': _format_diagnostic_value(strain_data),
+            'inclination': _format_diagnostic_value(inclination),
+            'azimuth': _format_diagnostic_value(azimuth),
+            'psi': _format_diagnostic_value(psi),
+            'mismatch': _format_diagnostic_value(mismatch),
+            'optimal_snr': _format_diagnostic_value(optimal_snr),
+            'optimal_snr_fd': _format_diagnostic_value(optimal_snr_fd),
+        },
+        ('run_id', 'diagnostic_type', 'confidence_interval', 'strain_data', 'inclination', 'azimuth', 'psi'),
+    )
+    return _mismatch_diagnostics_path(outdir)
+
 def _windowed_result_path(outdir, prefix, M, dL, t_start_g, n_fft, window_size_DX,
                           window_size_SX, k, saturation_DX, saturation_SX,
                           include_saturation=True, fd=False):
@@ -307,15 +487,22 @@ def _hm_sum_output_dir(base_outdir, t_start, n_start_times):
         label = "{:.12g}".format(float(t_start)).replace('-', 'm').replace('+', '').replace('.', 'p')
         outdir = os.path.join(outdir, "t_start_{}M".format(label))
 
-    os.makedirs(os.path.join(outdir, 'Algorithm/Mismatch'), exist_ok=True)
-
     return outdir
 
+def _mismatch_root_dir(outdir):
+    path = os.path.join(outdir, 'Algorithm/Mismatch')
+    os.makedirs(path, exist_ok=True)
+    return path
+
 def _mismatch_subfolder(direction):
-    return "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
+    try:
+        return mismatch_smoothing_subfolders[direction]
+    except KeyError:
+        allowed = "', '".join(mismatch_smoothing_subfolders)
+        raise ValueError("Invalid mismatch smoothing direction '{}'. Choose between '{}'.".format(direction, allowed))
 
 def _mismatch_plot_dir(outdir, direction):
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", _mismatch_subfolder(direction))
+    save_path = os.path.join(_mismatch_root_dir(outdir), _mismatch_subfolder(direction))
     os.makedirs(save_path, exist_ok=True)
     return save_path
 
@@ -1163,20 +1350,13 @@ def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, metho
 
     return
 
-def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, mismatch_print_flag, compare_TD_FD):
+def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, mismatch_print_flag, compare_TD_FD, direction=None):
 
     """
     Compute the mismatch of the model with respect to NR simulations.
     """
 
     print(f"\n* Computing mismatch for plus and cross polarizations assuming: M={M}, D_L={dL}.")
-
-    # File paths for saving results
-    outFile_path = _windowed_result_path(
-        outdir, "Mismatch", M, dL, t_start_g, N_FFT,
-        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX
-    )
-    _initialise_result_files((outFile_path, '#CI\tStrain_data\tMismatch\n'))
 
     for NR_quant, NR_data in _scaled_strain_components(NR_sim, M, dL).items():
         try:
@@ -1217,7 +1397,12 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
 
                 if(perc==50): print(f"* Time-domain mismatch (h {NR_quant}): {TD_mismatch}")
 
-                _append_result(outFile_path, perc, NR_quant, TD_mismatch)
+                _record_mismatch_diagnostic(
+                    outdir, "strain_components", M, dL, t_start_g, N_FFT,
+                    window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+                    direction=direction, confidence_interval=perc,
+                    strain_data=NR_quant, mismatch=TD_mismatch
+                )
 
             except Exception as e:
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
@@ -1225,20 +1410,13 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
 
     return
 
-def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, ra, dec, psi, t_start_g, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX):
+def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, ra, dec, psi, t_start_g, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, direction=None):
 
     """
     Compute the mismatch of the model with respect to NR simulations.
 
     """
     print(f"* Computing mismatch for the strain assuming: M={M}, D_L={dL}, ra={ra}, dec={dec}, psi={psi}")
-
-    # File paths for saving results
-    outFile_path = _windowed_result_path(
-        outdir, "Mismatch_h_tot", M, dL, t_start_g, N_FFT,
-        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX
-    )
-    _initialise_result_files((outFile_path, '#CI\tStrain_data\tMismatch\n'))
 
     # Extract NR waveform components (physical units)
     NR_dict = _scaled_strain_components(NR_sim, M, dL)
@@ -1267,30 +1445,20 @@ def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf,
         TD_match    = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
         TD_mismatch = 1 - TD_match
 
-        _append_result(outFile_path, perc, TD_mismatch)
+        _record_mismatch_diagnostic(
+            outdir, "detector_strain", M, dL, t_start_g, N_FFT,
+            window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+            direction=direction, confidence_interval=perc,
+            strain_data="detector", psi=psi, mismatch=TD_mismatch
+        )
 
     return
 
-def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, compare_TD_FD):
+def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, compare_TD_FD, direction=None):
     """
     Compute the optimal SNR of the model waveform.
     """
     print(f"\n* Optimal SNR computation for plus and cross polarizations assuming: M={M}, D_L={dL}.")
-
-    # File paths for saving results
-    outFile_path = _windowed_result_path(
-        outdir, "Optimal_SNR", M, dL, t_start_g, N_FFT,
-        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX
-    )
-    outFile_path_fd = _windowed_result_path(
-        outdir, "Optimal_SNR", M, dL, t_start_g, N_FFT,
-        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
-        include_saturation=False, fd=True
-    )
-    _initialise_result_files(
-        (outFile_path, '#CI\tStrain_data\tOptimal_SNR\n'),
-        (outFile_path_fd, '#CI\tStrain_data\tOptimal_SNR_FD\n'),
-    )
 
     models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
@@ -1302,7 +1470,12 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
 
                 optimal_SNR_TD = np.sqrt(abs(np.dot(wf_int, sl.solve_toeplitz(acf, wf_int, check_finite=False))))
 
-                _append_result(outFile_path, perc, NR_quant, optimal_SNR_TD)
+                _record_mismatch_diagnostic(
+                    outdir, "strain_components", M, dL, t_start_g, N_FFT,
+                    window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+                    direction=direction, confidence_interval=perc,
+                    strain_data=NR_quant, optimal_snr=optimal_SNR_TD
+                )
 
                 if(perc==50): print(f"* Optimal TD SNR (h {NR_quant}): {optimal_SNR_TD}")
 
@@ -1314,7 +1487,7 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
 
     return
 
-def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, method, acf, acf_tot, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, delta_f, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX):
+def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, method, acf, acf_tot, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, delta_f, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, direction=None):
     """
     Compute the optimal SNR of the model waveform.
 
@@ -1322,23 +1495,6 @@ def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, 
         downsampling_factor (int): The factor by which the waveform will be downsampled. Default is 10.
     """
     print("\nProcessing optimal SNR computation (with TD/FD check) for plus and cross polarizations.\n")
-
-    # File paths for saving results
-    outFile_path = _windowed_result_path(
-        outdir, "Optimal_SNR", M, dL, t_start_g, N_FFT,
-        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX
-    )
-    outFile_path_fd = _windowed_result_path(
-        outdir, "Optimal_SNR", M, dL, t_start_g, N_FFT,
-        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
-        include_saturation=False, fd=True
-    )
-
-    # Open output files to write results
-    _initialise_result_files(
-        (outFile_path, '#CI\tStrain_data\tOptimal_SNR\n'),
-        (outFile_path_fd, '#CI\tStrain_data\tOptimal_SNR_FD\n'),
-    )
 
     models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
@@ -1367,17 +1523,26 @@ def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, 
                 optimal_SNR_FD = compute_pycbc_optimal_SNR(asd_file, h_TS, len(acf_tot), f_min, f_max, delta_f)
 
                 # Print the results for the optimal SNR in FD (and TD, but untill a certain point, or computations can be heavy)
+                optimal_SNR_TD = None
                 if T<0.5:
                     optimal_SNR_TD = np.sqrt(abs(np.dot(wf_int, sl.solve_toeplitz(acf_tot, wf_int, check_finite=False))))
                     print(f"Optimal TD SNR for perc {perc}, {NR_quant} part: {optimal_SNR_TD}")
                 print(f"Optimal FD SNR for perc {perc}, {NR_quant} part: {optimal_SNR_FD}")
+                _record_mismatch_diagnostic(
+                    outdir, "strain_components", M, dL, t_start_g, N_FFT,
+                    window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+                    direction=direction, confidence_interval=perc,
+                    strain_data=NR_quant, optimal_snr=optimal_SNR_TD,
+                    optimal_snr_fd=optimal_SNR_FD
+                )
 
             except Exception as e:
                 print(f"Error processing optimal SNR for {perc}% CI and {NR_quant}: {e}")
                 continue
 
 def compute_higher_mode_sum_mismatch(mode_products, base_parameters, t_start, n_start_times, acf, N_FFT,
-                                     window_size_DX, window_size_SX, k, saturation_DX, saturation_SX):
+                                     window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+                                     direction=None):
 
     base_outdir = base_parameters['I/O']['outdir']
     M, dL, ra, dec, psi = waveform_utils.extract_GW_parameters(base_parameters)
@@ -1387,11 +1552,7 @@ def compute_higher_mode_sum_mismatch(mode_products, base_parameters, t_start, n_
     include_negative_m = bool(base_parameters['Mismatch-GW-parameters']['hm-include-negative-m'])
 
     outdir = _hm_sum_output_dir(base_outdir, t_start, n_start_times)
-    outFile_path = _windowed_result_path(
-        outdir, "Mismatch_HM_sum", M, dL, t_start, N_FFT,
-        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX
-    )
-    _initialise_result_files((outFile_path, '#CI\tinclination\tazimuth\tpsi\tMismatch\n'))
+    diagnostic_path = None
 
     common_time = _common_mode_time(mode_products)
     scale = _physical_strain_scale(M, dL)
@@ -1448,9 +1609,18 @@ def compute_higher_mode_sum_mismatch(mode_products, base_parameters, t_start, n_
                 continue
 
             polarisation, TD_mismatch = best_result
-            _append_result(outFile_path, percentile, inclination, azimuth, polarisation, TD_mismatch)
+            diagnostic_path = _record_mismatch_diagnostic(
+                outdir, "higher_mode_sum", M, dL, t_start, N_FFT,
+                window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+                direction=direction, confidence_interval=percentile,
+                inclination=inclination, azimuth=azimuth, psi=polarisation,
+                mismatch=TD_mismatch
+            )
 
-    print("* HM-summed mismatch written to `{}`.".format(outFile_path))
+    if diagnostic_path is not None:
+        print("* HM-summed mismatch written to `{}`.".format(diagnostic_path))
+    else:
+        print("* No HM-summed mismatch values were written for t-start = {} M.".format(t_start))
 
     return
 
@@ -1489,7 +1659,7 @@ def run_higher_mode_mismatch_scan(run_parameters_list, base_parameters):
         NR_length = len(common_time)
 
         try:
-            apply_window, _, clear_directory_flag, C1_flag, mismatch_print_flag, mismatch_section_plot_flag = \
+            apply_window, _, _, C1_flag, mismatch_print_flag, mismatch_section_plot_flag = \
                 waveform_utils.extract_flags(base_parameters['Flags'])
 
             (f_min, f_max, dt, _, N_points, n_FFT_points, asd_path,
@@ -1502,11 +1672,6 @@ def run_higher_mode_mismatch_scan(run_parameters_list, base_parameters):
             n_fft_values = [N_points] if n_FFT_points == 1 else list(
                 map(int, np.logspace(np.log10(NR_length), np.log10(2 * N_points), n_FFT_points))
             )
-
-            if clear_directory_flag == 1:
-                mismatch_dir = os.path.join(_hm_sum_output_dir(base_parameters['I/O']['outdir'], t_start, len(groups)), "Algorithm/Mismatch")
-                for smoothing_path in ["Left_smoothing", "Right_smoothing", "Both_edges_smoothing"]:
-                    clear_directory(os.path.join(mismatch_dir, smoothing_path))
 
             grid = product(
                 n_fft_values,
@@ -1539,7 +1704,8 @@ def run_higher_mode_mismatch_scan(run_parameters_list, base_parameters):
                     t_ACF, ACF_smoothed, M, 0.0, duration_g, t_NR_s, mismatch_print_flag
                 )
                 compute_higher_mode_sum_mismatch(
-                    mode_products, base_parameters, t_start, len(groups), ACF_truncated_NR, N_fft, *window_args
+                    mode_products, base_parameters, t_start, len(groups), ACF_truncated_NR, N_fft, *window_args,
+                    direction=direction
                 )
 
         except Exception as e:
@@ -2606,15 +2772,7 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_
     """
     try:
 
-        # Determine subfolder based on smoothing direction
-        subfolder = {
-            "below": "Left_smoothing",
-            "above": "Right_smoothing",
-            "below-and-above": "Both_edges_smoothing"
-        }.get(direction, "Unknown_smoothing")
-
-        save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-        os.makedirs(save_path, exist_ok=True)
+        save_path = _mismatch_plot_dir(outdir, direction)
 
         # Set x-axis limits for zoomed regions
         x_min1, x_max1 = f_min * 0.9, (f_min + window_size_DX)  # Zoom near f_min
@@ -3062,6 +3220,17 @@ def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX
     """
 
     save_path = _mismatch_plot_dir(outdir, direction)
+    diagnostic_rows = _read_tsv_rows(_mismatch_diagnostics_path(outdir))
+    mismatches_by_run = {}
+    for row in diagnostic_rows:
+        if row.get('diagnostic_type') != 'strain_components':
+            continue
+        if row.get('confidence_interval') != '50':
+            continue
+        mismatch = row.get('mismatch')
+        if mismatch in (None, ''):
+            continue
+        mismatches_by_run[(row.get('run_id'), row.get('strain_data'))] = float(mismatch)
 
     for (window_DX, window_SX, k, satDX, satSX) in product(
         window_DX_list, window_SX_list, k_list, saturation_DX_list, saturation_SX_list
@@ -3071,12 +3240,26 @@ def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX
         nffts_found = []
 
         for N_fft in N_FFT_list:
-            path = _windowed_result_path(
+            run_id = _mismatch_run_id(
+                "strain_components", M, dL, t_start_g_true, N_fft,
+                window_DX, window_SX, k, satDX, satSX, direction
+            )
+            component_mismatches = {
+                'real': mismatches_by_run.get((run_id, 'real')),
+                'imag': mismatches_by_run.get((run_id, 'imag')),
+            }
+            if all(value is not None for value in component_mismatches.values()):
+                nffts_found.append(N_fft)
+                real_mismatches.append(component_mismatches['real'])
+                imag_mismatches.append(component_mismatches['imag'])
+                continue
+
+            legacy_path = _windowed_result_path(
                 outdir, "Mismatch", M, dL, t_start_g_true, N_fft,
                 window_DX, window_SX, k, satDX, satSX
             )
-            if os.path.exists(path):
-                with open(path, "r") as f:
+            if os.path.exists(legacy_path):
+                with open(legacy_path, "r") as f:
                     component_mismatches = {'real': None, 'imag': None}
                     lines = f.readlines()[1:]
                     for line in lines:
@@ -3088,7 +3271,7 @@ def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX
                         real_mismatches.append(component_mismatches['real'])
                         imag_mismatches.append(component_mismatches['imag'])
             else:
-                print(f"File not found: {os.path.basename(path)}")
+                print(f"No mismatch data found for run_id={run_id}")
 
         if not nffts_found:
             print(f"Skipping: No data for combo wDX={window_DX}, wSX={window_SX}, k={k}, satDX={satDX}, satSX={satSX}")
@@ -3164,7 +3347,7 @@ def run_mismatch_and_SNR_computation(NR_sim, results_object, inference_model, pa
         t_start_g, t_end_g, t_NR_s, NR_length = wf_utils.extract_NR_params(NR_sim, M)
         t_start, t_end = t_start_g * C_mt * M, t_end_g * C_mt * M
 
-        apply_window, compare_TD_FD, clear_directory_flag, C1_flag, mismatch_print_flag, mismatch_section_plot_flag = \
+        apply_window, compare_TD_FD, _, C1_flag, mismatch_print_flag, mismatch_section_plot_flag = \
             wf_utils.extract_flags(parameters['Flags'])
 
         (f_min, f_max, dt, delta_f, N_points, n_FFT_points, asd_path,
@@ -3177,14 +3360,6 @@ def run_mismatch_and_SNR_computation(NR_sim, results_object, inference_model, pa
         n_fft_values = [N_points] if n_FFT_points == 1 else list(
             map(int, np.logspace(np.log10(NR_length), np.log10(2 * N_points), n_FFT_points))
         )
-
-        #---------------------------------------------#
-        # Directory cleanup (optional)
-        #---------------------------------------------#
-        if clear_directory_flag == 1:
-            mismatch_dir = os.path.join(outdir, "Algorithm/Mismatch")
-            for smoothing_path in ["Left_smoothing", "Right_smoothing", "Both_edges_smoothing"]:
-                clear_directory(os.path.join(mismatch_dir, smoothing_path))
 
         #---------------------------------------------#
         # Main iteration loop
@@ -3239,12 +3414,12 @@ def run_mismatch_and_SNR_computation(NR_sim, results_object, inference_model, pa
 
                 compute_mismatch_hplus_hcross(
                     *common_args, t_start_g_true, f_min, f_max, asd_path,
-                    *window_args, mismatch_print_flag, compare_TD_FD
+                    *window_args, mismatch_print_flag, compare_TD_FD, direction=direction
                 )
 
                 compute_optimal_SNR(
                     *common_args, t_start_g_true, t_end_g, f_min, f_max, asd_path,
-                    *window_args, compare_TD_FD
+                    *window_args, compare_TD_FD, direction=direction
                 )
 
                 condition_numbers_data[window_args] = wf_utils.compute_condition_number(ACF_truncated_NR)
