@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 # Standard python packages
+import concurrent.futures
 import copy, matplotlib.pyplot as plt, numpy as np, os, time, traceback
 from scipy.interpolate import interp1d, CubicSpline
 from optparse       import OptionParser
@@ -29,7 +30,7 @@ twopi = 2.*np.pi
 C_mt=(lal.MSUN_SI * lal.G_SI) / (lal.C_SI**3) #s, converts a mass expressed in solar masses into a time in seconds
 C_md=(lal.MSUN_SI * lal.G_SI)/(1e6*lal.PC_SI*lal.C_SI**2) #adimensional, converts a mass expressed in solar masses to a distance in Megaparsec
 
-def _prepare_start_time_parameters(base_parameters, base_outdir, t_start, start_index, n_start_times):
+def _prepare_start_time_parameters(base_parameters, base_outdir, t_start, start_index, n_start_times, parallel_start_time=False):
 
     parameters = copy.deepcopy(base_parameters)
     multi_start = n_start_times > 1
@@ -37,6 +38,7 @@ def _prepare_start_time_parameters(base_parameters, base_outdir, t_start, start_
     parameters['Inference']['t-start'] = t_start
     parameters['I/O']['base-outdir']   = base_outdir
     parameters['I/O']['start-time-output'] = multi_start
+    parameters['I/O']['start-time-parallel'] = parallel_start_time and multi_start
 
     if(multi_start):
         parameters['I/O']['outdir'] = initialise.start_time_output_dir(base_outdir, t_start)
@@ -54,13 +56,14 @@ def _run_single_start(Config, parameters, config_file):
     # =================#
 
     start_time_output = parameters['I/O'].get('start-time-output', False)
+    parallel_start_time = parameters['I/O'].get('start-time-parallel', False)
     initialise.set_output(parameters['I/O']['outdir'],
                           parameters['I/O']['screen-output'],
                           parameters['Inference']['method'],
                           config_file,
                           parameters['I/O']['run-type'],
                           shared_files=not(start_time_output),
-                          redirect_streams=not(start_time_output))
+                          redirect_streams=not(start_time_output) or parallel_start_time)
 
     if(start_time_output):
         pyRing_utils.print_section('Start-time fit {}/{}'.format(parameters['I/O']['start-time-index'], parameters['I/O']['n-start-times']))
@@ -262,6 +265,44 @@ def _run_single_start(Config, parameters, config_file):
 
     return
 
+def _run_start_time_job(config_file, parameters):
+
+    Config = configparser.ConfigParser()
+    Config.read(config_file)
+    _run_single_start(Config, parameters, config_file)
+
+    return
+
+def _run_start_times_parallel(config_file, run_parameters_list, start_time_workers):
+
+    errors = []
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=start_time_workers) as executor:
+        future_to_start_time = {
+            executor.submit(_run_start_time_job, config_file, run_parameters): (
+                run_parameters['I/O']['start-time-index'],
+                run_parameters['Inference']['t-start'],
+                run_parameters['I/O']['outdir'],
+            )
+            for run_parameters in run_parameters_list
+        }
+
+        for future in concurrent.futures.as_completed(future_to_start_time):
+            start_index, t_start, outdir = future_to_start_time[future]
+            try:
+                future.result()
+            except Exception:
+                errors.append((start_index, t_start, outdir, traceback.format_exc()))
+
+    if(errors):
+        for start_index, t_start, outdir, formatted_traceback in errors:
+            print('* Start-time fit {} failed for t-start = {} M.'.format(start_index, t_start))
+            print('* Output directory: `{}`.'.format(outdir))
+            print(formatted_traceback)
+        raise RuntimeError('{} start-time fit(s) failed during the parallel scan.'.format(len(errors)))
+
+    return
+
 def main():
 
     # ==================================================#
@@ -300,16 +341,27 @@ def main():
     base_outdir      = parameters['I/O']['outdir']
     n_start_times    = len(start_times)
     multi_start_time = n_start_times > 1
+    start_time_workers = min(parameters['Inference']['n-start-time-workers'], n_start_times)
+    parallel_start_time = multi_start_time and start_time_workers > 1
 
     if(multi_start_time):
         pyRing_utils.print_section('Start-time scan')
         print('* Repeating the fit for {} start times: {}'.format(n_start_times, start_times))
+        if(parallel_start_time):
+            print('* Running up to {} start-time fits in parallel.'.format(start_time_workers))
         print('* Base output directory: `{}`.\n'.format(base_outdir))
         initialise.set_shared_output(base_outdir, parameters['I/O']['screen-output'], config_file, parameters['I/O']['run-type'])
 
-    for start_index, t_start in enumerate(start_times, start=1):
-        run_parameters = _prepare_start_time_parameters(parameters, base_outdir, t_start, start_index, n_start_times)
-        _run_single_start(Config, run_parameters, config_file)
+    run_parameters_list = [
+        _prepare_start_time_parameters(parameters, base_outdir, t_start, start_index, n_start_times, parallel_start_time)
+        for start_index, t_start in enumerate(start_times, start=1)
+    ]
+
+    if(parallel_start_time):
+        _run_start_times_parallel(config_file, run_parameters_list, start_time_workers)
+    else:
+        for run_parameters in run_parameters_list:
+            _run_single_start(Config, run_parameters, config_file)
 
     # Show plots if the option is enabled
     if parameters['I/O']['show-plots']:

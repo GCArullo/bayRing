@@ -268,6 +268,7 @@ def read_config(Config):
         'seed'             : 1234            ,
         'nnest'            : 1               ,
         'nensemble'        : 1               ,
+        'n-start-time-workers': 1            ,
 
         't-start'          : 20.0 ,
         't-end'            : 140.0,
@@ -357,6 +358,8 @@ def read_config(Config):
 
     if('t-start-list' not in parameters['Inference']):
         parameters['Inference']['t-start-list'] = [float(parameters['Inference']['t-start'])]
+    if(parameters['Inference']['n-start-time-workers'] < 1):
+        raise ValueError("Invalid start-time parallelization option: `n-start-time-workers` must be at least 1.")
 
     # Cleanup specific parameters formatting
     if(parameters['Inference']['sampler'] == 'raynest'):
@@ -586,6 +589,12 @@ A dot is present at the end of each description line and is not to be intended a
         nensemble        Total number of ensemble processes running. nensemble = nnest * N_ev, where N_ev is the number \
                          of live points being substituted at each NS step. Requires N_ev << nlive. \
                          Also n_cpu = nnest+nensemble.                                                                       Default: 1.
+
+        n-start-time-workers
+                         Number of start-time fits to run in parallel when `t-start` supplies multiple values. \
+                         Each fit is run in a separate process and keeps its products under its \
+                         `outdir/t_start_<value>M/` directory. This is in addition to sampler-level \
+                         parallelism set by options such as `nnest` and `nensemble`.                                           Default: 1.
 
         *****************************************
         * Point-estimate specific parameters.   *

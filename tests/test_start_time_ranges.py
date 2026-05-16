@@ -1,5 +1,6 @@
 import configparser
 import os
+import sys
 
 import pytest
 
@@ -25,11 +26,22 @@ def test_read_config_keeps_active_start_and_records_scan_values():
     config = configparser.ConfigParser()
     config.add_section("Inference")
     config.set("Inference", "t-start", "20:30:5")
+    config.set("Inference", "n-start-time-workers", "2")
 
     parameters = initialise.read_config(config)
 
     assert parameters["Inference"]["t-start"] == 20.0
     assert parameters["Inference"]["t-start-list"] == [20.0, 25.0, 30.0]
+    assert parameters["Inference"]["n-start-time-workers"] == 2
+
+
+def test_read_config_rejects_invalid_start_time_worker_count():
+    config = configparser.ConfigParser()
+    config.add_section("Inference")
+    config.set("Inference", "n-start-time-workers", "0")
+
+    with pytest.raises(ValueError, match="n-start-time-workers"):
+        initialise.read_config(config)
 
 
 def test_prepare_start_time_parameters_routes_multi_start_outputs(tmp_path):
@@ -44,12 +56,14 @@ def test_prepare_start_time_parameters_routes_multi_start_outputs(tmp_path):
         25.0,
         2,
         2,
+        parallel_start_time=True,
     )
 
     assert base_parameters["Inference"]["t-start"] == 20.0
     assert run_parameters["Inference"]["t-start"] == 25.0
     assert run_parameters["I/O"]["outdir"] == os.path.join(os.fspath(tmp_path), "t_start_25M")
     assert run_parameters["I/O"]["start-time-output"] is True
+    assert run_parameters["I/O"]["start-time-parallel"] is True
     assert run_parameters["I/O"]["start-time-index"] == 2
 
 
@@ -69,6 +83,33 @@ def test_prepare_start_time_parameters_preserves_scalar_outdir(tmp_path):
 
     assert run_parameters["I/O"]["outdir"] == os.fspath(tmp_path)
     assert run_parameters["I/O"]["start-time-output"] is False
+    assert run_parameters["I/O"]["start-time-parallel"] is False
+
+
+def test_main_dispatches_multi_start_scan_to_parallel_runner(tmp_path, monkeypatch):
+    config_path = tmp_path / "scan.ini"
+    config_path.write_text(
+        "[I/O]\noutdir = {}\n\n[Inference]\nt-start = 20:30:5\nn-start-time-workers = 2\n".format(tmp_path / "out"),
+        encoding="utf-8",
+    )
+    captured = {}
+
+    def fake_run_start_times_parallel(config_file, run_parameters_list, start_time_workers):
+        captured["config_file"] = config_file
+        captured["run_parameters_list"] = run_parameters_list
+        captured["start_time_workers"] = start_time_workers
+
+    monkeypatch.setattr(sys, "argv", ["bayRing", "--config-file", os.fspath(config_path)])
+    monkeypatch.setattr(initialise, "set_shared_output", lambda *args: None)
+    monkeypatch.setattr(bayRing, "_run_start_times_parallel", fake_run_start_times_parallel)
+    monkeypatch.setattr(bayRing, "_run_single_start", lambda *args: pytest.fail("serial start-time runner called"))
+
+    bayRing.main()
+
+    assert captured["config_file"] == os.fspath(config_path)
+    assert captured["start_time_workers"] == 2
+    assert [run["Inference"]["t-start"] for run in captured["run_parameters_list"]] == [20.0, 25.0, 30.0]
+    assert all(run["I/O"]["start-time-parallel"] for run in captured["run_parameters_list"])
 
 
 def test_multi_start_output_keeps_shared_files_in_base_outdir(tmp_path, monkeypatch):

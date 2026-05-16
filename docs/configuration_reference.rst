@@ -223,9 +223,16 @@ version.
    * - ``nensemble``
      - ``1``
      - Number of raynest ensemble processes.
+   * - ``n-start-time-workers``
+     - ``1``
+     - Number of start-time fits to run in parallel when ``t-start``
+       supplies multiple values. This is in addition to sampler-level
+       parallelism.
    * - ``t-start``
      - ``20.0``
-     - Fit start time in ``M`` relative to the selected peak.
+     - Fit start time in ``M`` relative to the selected peak. Accepts a
+       scalar, a comma/list of values, or an inclusive ``start:stop:step``
+       range.
    * - ``t-end``
      - ``140.0``
      - Fit end time in ``M`` relative to the selected peak.
