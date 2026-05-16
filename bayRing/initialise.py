@@ -1,11 +1,139 @@
-import ast, json, os, sys
+import ast, json, os, shutil, subprocess, sys
 try:                import configparser
 except ImportError: import ConfigParser as configparser
 
 import pyRing.utils    as pyRing_utils
 from pyRing.initialise import store_git_info
 
-def set_output(outdir, screen_output, method, config_file, run_type):
+def _clean_float(value):
+
+    value = float(value)
+    if(abs(value) < 1e-12): value = 0.0
+    return float("{:.12g}".format(value))
+
+def parse_start_time_values(raw_value):
+
+    """
+
+    Parse the `t-start` configuration value.
+
+    Accepted forms are:
+    - a scalar value, e.g. `30.0`;
+    - a comma-separated or Python-style list/tuple, e.g. `20,30,40`;
+    - an inclusive colon range, e.g. `20:40:5`.
+
+    """
+
+    raw_value = str(raw_value).strip()
+    if(raw_value == ''):
+        raise ValueError("The `t-start` option cannot be empty.")
+
+    if(':' in raw_value):
+        range_values = [value.strip() for value in raw_value.split(':')]
+        if(len(range_values) != 3):
+            raise ValueError("Invalid `t-start` range `{}`. Use `start:stop:step`.".format(raw_value))
+
+        start, stop, step = [_clean_float(value) for value in range_values]
+        if(step == 0.0):
+            raise ValueError("Invalid `t-start` range `{}`. The step cannot be zero.".format(raw_value))
+        if((stop - start)*step < 0.0):
+            raise ValueError("Invalid `t-start` range `{}`. The step sign must move from start to stop.".format(raw_value))
+
+        values  = []
+        current = start
+        tol     = abs(step)*1e-10 + 1e-12
+        if(step > 0.0):
+            while(current <= stop + tol):
+                values.append(_clean_float(current))
+                current = current + step
+        else:
+            while(current >= stop - tol):
+                values.append(_clean_float(current))
+                current = current + step
+    else:
+        try:
+            literal_value = ast.literal_eval(raw_value)
+        except (ValueError, SyntaxError):
+            literal_value = raw_value
+
+        if(isinstance(literal_value, (list, tuple))):
+            values = [_clean_float(value) for value in literal_value]
+        else:
+            values = [_clean_float(literal_value)]
+
+    if(len(values) == 0):
+        raise ValueError("The `t-start` option must provide at least one value.")
+    if(len(set(values)) != len(values)):
+        raise ValueError("The `t-start` option contains duplicate values: {}.".format(values))
+
+    return values
+
+def format_start_time_label(t_start):
+
+    label = "{:.12g}".format(float(t_start))
+    label = label.replace('-', 'm').replace('+', '').replace('.', 'p')
+
+    return "t_start_{}M".format(label)
+
+def start_time_output_dir(base_outdir, t_start):
+
+    return os.path.join(base_outdir, format_start_time_label(t_start))
+
+def get_start_time_values(parameters):
+
+    return list(parameters['Inference'].get('t-start-list', [parameters['Inference']['t-start']]))
+
+def _copy_config_to_output(config_file, outdir, run_type):
+
+    try:
+        if(run_type == 'full' and config_file is not None):
+            shutil.copy2(config_file, outdir)
+    except: pass
+
+    return
+
+def _redirect_output(outdir, screen_output):
+
+    if not(screen_output):
+        sys.stdout = open(os.path.join(outdir,'stdout_bayRing.txt'), 'w')
+        sys.stderr = open(os.path.join(outdir,'stderr_bayRing.txt'), 'w')
+
+    return
+
+def _is_git_repository():
+
+    try:
+        return subprocess.call(['git', 'rev-parse', '--is-inside-work-tree'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
+    except OSError:
+        return False
+
+def _store_git_info(outdir):
+
+    if not(_is_git_repository()):
+        print("The current directory is not a git repository. Git info will not be stored.")
+        return
+
+    store_git_info(outdir)
+
+    return
+
+def set_shared_output(outdir, screen_output, config_file, run_type):
+
+    """
+
+    Set output files that are shared by all start times in a scan.
+
+    """
+
+    if not os.path.exists(outdir): os.makedirs(outdir)
+
+    _redirect_output(outdir, screen_output)
+    _store_git_info(outdir)
+    _copy_config_to_output(config_file, outdir, run_type)
+
+    return
+
+def set_output(outdir, screen_output, method, config_file, run_type, shared_files=True, redirect_streams=True):
 
     """
 
@@ -40,16 +168,12 @@ def set_output(outdir, screen_output, method, config_file, run_type):
     if not os.path.exists(os.path.join(outdir,'Plots','Results')):     os.makedirs(os.path.join(outdir,'Plots','Results'))
     if not os.path.exists(os.path.join(outdir,'Plots','Comparisons')): os.makedirs(os.path.join(outdir,'Plots','Comparisons'))
 
-    if not(screen_output):
-        sys.stdout = open(os.path.join(outdir,'stdout_bayRing.txt'), 'w')
-        sys.stderr = open(os.path.join(outdir,'stderr_bayRing.txt'), 'w')
+    if(redirect_streams):
+        _redirect_output(outdir, screen_output)
 
-    store_git_info(outdir)
-
-    try:
-        if (run_type=='full'):
-            os.system('cp {} {}/.'.format(config_file, outdir))
-    except: pass
+    if(shared_files):
+        _store_git_info(outdir)
+        _copy_config_to_output(config_file, outdir, run_type)
 
     return
 
@@ -144,6 +268,7 @@ def read_config(Config):
         'seed'             : 1234            ,
         'nnest'            : 1               ,
         'nensemble'        : 1               ,
+        'n-start-time-workers': 1            ,
 
         't-start'          : 20.0 ,
         't-end'            : 140.0,
@@ -205,10 +330,18 @@ def read_config(Config):
         pyRing_utils.print_subsection(f'[{parameters_section}]')
 
         try:
-            for key in parameters[parameters_section].keys():
+            for key in list(parameters[parameters_section].keys()):
                 keytype = type(parameters[parameters_section][key])
-                try                                                     : parameters[parameters_section][key] = keytype(Config.get(parameters_section, key))
-                except (KeyError, configparser.NoOptionError, TypeError): pass
+                try:
+                    raw_value = Config.get(parameters_section, key)
+                    if(parameters_section == 'Inference' and key == 't-start'):
+                        t_start_values = parse_start_time_values(raw_value)
+                        parameters[parameters_section][key] = t_start_values[0]
+                        parameters[parameters_section]['t-start-list'] = t_start_values
+                    else:
+                        parameters[parameters_section][key] = keytype(raw_value)
+                except (KeyError, configparser.NoOptionError, TypeError):
+                    pass
 
                 # Other reading options
                 # if   ('ds-modes'        in key): parameters[parameters_section][key] = json.loads(      Config.get(parameters_section, f'{key}')) # dict
@@ -216,8 +349,17 @@ def read_config(Config):
                 # elif ('Kerr-tail-modes' in key): parameters[parameters_section][key] = eval(            Config.get(parameters_section, f'{key}')) # list
                 # elif ('mode'            in key): parameters[parameters_section][key] = ast.literal_eval(Config.get(parameters_section,    key  )) # lists
                     
-                print("{name} : {value}".format(name=key.ljust(max_len_keyword), value=parameters[parameters_section][key]))
+                print_value = parameters[parameters_section][key]
+                if(parameters_section == 'Inference' and key == 't-start'):
+                    print_value = parameters[parameters_section].get('t-start-list', [parameters[parameters_section][key]])
+                    if(len(print_value) == 1): print_value = print_value[0]
+                print("{name} : {value}".format(name=key.ljust(max_len_keyword), value=print_value))
         except (KeyError, configparser.NoSectionError, configparser.NoOptionError, TypeError): pass
+
+    if('t-start-list' not in parameters['Inference']):
+        parameters['Inference']['t-start-list'] = [float(parameters['Inference']['t-start'])]
+    if(parameters['Inference']['n-start-time-workers'] < 1):
+        raise ValueError("Invalid start-time parallelization option: `n-start-time-workers` must be at least 1.")
 
     # Cleanup specific parameters formatting
     if(parameters['Inference']['sampler'] == 'raynest'):
@@ -419,7 +561,10 @@ A dot is present at the end of each description line and is not to be intended a
         method           Inference method to be used. Available options: ['Nested-sampler', 'Minimization', 'Linear-inversion']. Default: 'Nested-sampler'.
         
         t-start          Start time of the fit and reference time of amplitudes [M units]. \
-            Relative to complex strain amplitude peak time.                                                                  Default: 20.
+            Relative to complex strain amplitude peak time. Can be a scalar, a comma/list of values \
+            such as `20,30,40`, or a colon range `start:stop:step` such as `20:40:5`. \
+            When multiple start times are supplied, bayRing repeats the fit in one process and stores \
+            each run under `outdir/t_start_<value>M/`.                                                                        Default: 20.
         t-end            End time of the fit and reference time of amplitudes [M units]. \
             Relative to complex strain amplitude peak time.                                                                  Default: 140.
         dt-scd           Positive delay between the complex strain amplitude peak time of (child) second order modes \
@@ -444,6 +589,12 @@ A dot is present at the end of each description line and is not to be intended a
         nensemble        Total number of ensemble processes running. nensemble = nnest * N_ev, where N_ev is the number \
                          of live points being substituted at each NS step. Requires N_ev << nlive. \
                          Also n_cpu = nnest+nensemble.                                                                       Default: 1.
+
+        n-start-time-workers
+                         Number of start-time fits to run in parallel when `t-start` supplies multiple values. \
+                         Each fit is run in a separate process and keeps its products under its \
+                         `outdir/t_start_<value>M/` directory. This is in addition to sampler-level \
+                         parallelism set by options such as `nnest` and `nensemble`.                                           Default: 1.
 
         *****************************************
         * Point-estimate specific parameters.   *

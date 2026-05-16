@@ -18,6 +18,8 @@ The corresponding linear-inversion example can be run with:
 
 `bayRing --config-file config_SXS_0305_Kerr_220_linear_inversion.ini`
 
+The `t-start` option accepts a single start time, a list such as `t-start = 20,30,40`, or a colon range such as `t-start = 20:40:5`. If more than one start time is supplied, bayRing repeats the fit for each value in the same invocation and writes each run to a dedicated subdirectory named like `outdir/t_start_20M/`, with its own `Algorithm`, `Peak_quantities`, and `Plots` tree. Set `n-start-time-workers = N` in the `[Inference]` section to run up to `N` of these start-time fits in parallel; this is in addition to sampler-level parallelism.
+
 The other files instead use default priors (very broad), a large chunk of the time axis, the full NR error and conservative sampler settings useful when exploring a high-dimensional parameter space.
 
 Usage of NR catalogs beyond the SXS is considered to be "developer" level, i.e. it requires the user to: i) download the corresponding NR simulations and placing them in the directory structure expected from the code (see the `NR_waveforms.py` module); ii) use the NR error option best suited to the simulation under consideration. Some of the simulations classes implemented might not yet be publicly available.
