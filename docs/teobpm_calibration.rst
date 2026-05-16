@@ -24,7 +24,8 @@ Typical campaign preparation
      --family nonspinning \
      --output-dir runs/teobpm_nonspinning \
      --modes 22,21,33,32,44,43 \
-     --template RatExp
+     --template RatExp \
+     --t-start 0
 
 The command writes:
 
@@ -34,16 +35,58 @@ The command writes:
 * ``local_fit_configs/*.ini`` with one normal bayRing config per fit;
 * ``run_local_fits.sh`` with the corresponding ``bayRing`` commands.
 
+Calibration configs follow pyRing's current TEOBPM time convention. The
+``(2,2)`` peak is the reference, and mode ``lm`` starts at
+``t_peak_22 + DeltaT_lm(q, chi1, chi2)``. The generated ``t-start`` is therefore
+``0`` for ``22`` and pyRing's ``DeltaT_lm`` for higher modes; ``--t-start`` adds
+an extra offset on top of that convention.
+
+This per-mode start is only used while constructing local fit coefficients.
+Once coefficients exist, waveform mismatch evaluation for local-fit plots and
+global-fit checks must compare from the ``(2,2)`` peak with ``t-start = 0`` and
+``tref = peak22``. Higher modes can therefore be empty over the initial
+``0 <= t < DeltaT_lm`` part of the comparison window.
+
 Local fits and collection
 -------------------------
 
-Run the indexed local fits with:
+Run the indexed ``22`` local fits first with:
 
 .. code-block:: bash
 
    bayRing-teobpm-calibrate run-local-fits \
      --campaign-dir runs/teobpm_nonspinning \
      --split training \
+     --modes 22 \
+     --workers 4
+
+Then fill the higher-mode metadata and run every higher mode whose dependencies
+are available. This can include ``32`` because its mixed-mode parent is ``22``;
+hold back ``43`` until ``33`` has completed:
+
+.. code-block:: bash
+
+   bayRing-teobpm-calibrate fill-hm-inputs \
+     --campaign-dir runs/teobpm_nonspinning
+
+   bayRing-teobpm-calibrate run-local-fits \
+     --campaign-dir runs/teobpm_nonspinning \
+     --split training \
+     --modes 21,33,32,31,44,42,41,55 \
+     --workers 4
+
+After ``33`` finishes, fill the mixed ``43`` parent coefficients and run ``43``
+as its own parallel simulation batch:
+
+.. code-block:: bash
+
+   bayRing-teobpm-calibrate fill-hm-inputs \
+     --campaign-dir runs/teobpm_nonspinning
+
+   bayRing-teobpm-calibrate run-local-fits \
+     --campaign-dir runs/teobpm_nonspinning \
+     --split training \
+     --modes 43 \
      --workers 4
 
 The runner skips jobs that already contain
@@ -52,8 +95,8 @@ The runner skips jobs that already contain
 output directories. The ``--split`` option can be used to run the training jobs
 first and the validation jobs only after the global fit has been constructed.
 
-After the jobs complete, collect the bayRing point estimates and mismatch files
-into the long-form table consumed by the global-fit step:
+After the jobs complete, collect the bayRing point estimates and construction
+mismatch files into the long-form table consumed by the global-fit step:
 
 .. code-block:: bash
 
@@ -65,9 +108,35 @@ The collection step writes ``local_fit_summary.csv``, ``mismatch_summary.csv``,
 ``local_fit_collection_failures.csv`` and
 ``local_fit_collection_summary.json``. It also constructs relative mode phases
 ``delta_phi_lm`` from the local ``phi_mrg_lm`` estimates using the ``22`` mode
-as reference. Re-run collection with ``--split all`` after validation local fits
-are available if the same table should drive both global-fit construction and
-validation diagnostics.
+as reference. Representative construction mismatches are stored as
+``construction_mismatch`` in ``local_fit_summary.csv`` so they are not mistaken
+for 22-peak evaluation mismatches. Re-run collection with ``--split all`` after
+validation local fits are available if the same table should drive both
+global-fit construction and validation diagnostics.
+
+Local-fit plots
+---------------
+
+Plot the collected local coefficients with:
+
+.. code-block:: bash
+
+   bayRing-teobpm-calibrate plot-local-fits \
+     --local-fit-table runs/teobpm_nonspinning/local_fit_summary.csv \
+     --output-dir runs/teobpm_nonspinning/local_fit_plots
+
+To include waveform mismatch comparisons in the local-fit plot directory, pass
+one or more explicit evaluation mismatch tables. Those tables must be generated
+after the local fit coefficients exist and with the comparison starting at the
+``22`` peak:
+
+.. code-block:: bash
+
+   bayRing-teobpm-calibrate plot-local-fits \
+     --local-fit-table runs/teobpm_nonspinning/local_fit_summary.csv \
+     --mismatch-table runs/teobpm_nonspinning/local_fit_evaluation_mismatches.csv \
+     --label "Local fit evaluation" \
+     --output-dir runs/teobpm_nonspinning/local_fit_plots
 
 Global fits
 -----------
@@ -94,24 +163,29 @@ Aligned-spin fits must point to the nonspinning fit:
 Validation and reporting
 ------------------------
 
-Validation tables use the same long-form coefficient columns and may include a
-``mismatch`` column. The validation command writes prediction residuals and
-parameter-space/histogram diagnostics. When mismatch values are available, it
-also writes mismatch views over the calibration coordinates: spinning rows are
-shown over ``nu``--``chi_eff`` and nonspinning rows are shown against ``nu``:
+Validation tables use the same long-form coefficient columns. The validation
+command writes prediction residuals and parameter-space/histogram diagnostics.
+Pass explicit evaluation mismatch tables to add waveform mismatch views over
+the calibration coordinates: spinning rows are shown over ``nu``--``chi_eff``
+and nonspinning rows are shown against ``nu``. These evaluation mismatch tables
+must be produced with the comparison starting at the ``22`` peak:
 
 .. code-block:: bash
 
    bayRing-teobpm-calibrate validate \
      --global-fit-file runs/teobpm_aligned/teobpm_global_fit.json \
      --validation-table runs/teobpm_aligned/validation_summary.csv \
+     --mismatch-table runs/teobpm_aligned/global_evaluation_mismatches.csv \
+     --label "New global fit" \
      --output-dir runs/teobpm_aligned/validation
 
 Fixed-coefficient mismatch campaigns can be compared with the same plotting
 convention. The command accepts one or more CSV tables containing ``nu``,
 ``chi_eff`` or equivalent spin columns, and either a representative ``mismatch``
 column or wide comparison columns such as ``new_global_mismatch`` and
-``existing_teobpm_mismatch``:
+``existing_teobpm_mismatch``. If the table declares ``t_start``/``t-start`` or
+``tref``/``reference_time`` metadata, those values are checked against
+``t_start = 0`` and ``tref = peak22``:
 
 .. code-block:: bash
 

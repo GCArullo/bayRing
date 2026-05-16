@@ -186,6 +186,14 @@ the complex NR multipole. It then finds a peak time:
   secondary reference time;
 * a nonzero ``t-peak-22`` overrides those choices.
 
+The TEOBPM calibration workflow follows pyRing's current convention: the
+``(2,2)`` peak is the reference time, and higher-mode local fits start at
+``t_peak_22 + DeltaT_lm`` by writing pyRing's ``DeltaT_lm`` as ``t-start``.
+After local coefficients are constructed, TEOBPM evaluation mismatch
+comparisons for local-fit plots and global-fit checks should instead start from
+the ``(2,2)`` peak with ``t-start = 0`` and ``tref = peak22``; higher modes can
+be zero until their internal ``DeltaT_lm`` start.
+
 The fit interval is:
 
 .. container:: key-equation

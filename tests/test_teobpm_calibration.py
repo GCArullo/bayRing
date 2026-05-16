@@ -66,10 +66,11 @@ def test_aligned_spin_requires_nonspinning_base_fit(tmp_path):
         calib.filter_records(records, config)
 
 
-def test_prepare_campaign_writes_manifests_and_configs(tmp_path):
+def test_prepare_campaign_writes_manifests_and_configs(tmp_path, monkeypatch):
     catalog_path = tmp_path / "catalog.json"
     catalog_path.write_text(json.dumps(_catalog_rows()), encoding="utf-8")
     output_dir = tmp_path / "campaign"
+    monkeypatch.setattr(calib, "_pyRing_teobpm_delta_t", lambda record, mode: 0.0 if mode == (2, 2) else 4.25)
     config = calib.CalibrationConfig(
         family="nonspinning",
         output_dir=str(output_dir),
@@ -103,9 +104,13 @@ def test_prepare_campaign_writes_manifests_and_configs(tmp_path):
     ]
     assert jobs[0].config_file == str(expected_22)
     assert jobs[0].outdir == str(output_dir / "local_fits" / "SXS_BBH_0001" / "mode_22")
-    assert "t-peak-22 = 0.0" in expected_33.read_text(encoding="utf-8")
-    assert "[Priors]" in expected_33.read_text(encoding="utf-8")
-    assert "c3p_33-min = 0.1" in expected_33.read_text(encoding="utf-8")
+    expected_22_text = expected_22.read_text(encoding="utf-8")
+    expected_33_text = expected_33.read_text(encoding="utf-8")
+    assert "t-start = 0.0" in expected_22_text
+    assert "t-peak-22 = 0.0" in expected_33_text
+    assert "t-start = 4.25" in expected_33_text
+    assert "[Priors]" in expected_33_text
+    assert "c3p_33-min = 0.1" in expected_33_text
 
 
 def test_prepare_campaign_allows_zero_validation_fraction(tmp_path):
@@ -142,6 +147,7 @@ def test_prepare_parser_defaults_to_mixed_higher_modes_and_sxs_id_subset(tmp_pat
     assert config.mode_mixing_modes == [(3, 2), (4, 3)]
     assert config.sxs_ids == ["SXS:BBH:0001", "SXS:BBH:0003"]
     assert config.random_fraction == 1.0
+    assert config.t_start == 0.0
 
 
 def test_run_local_fit_job_invokes_bayring_and_writes_logs(tmp_path, monkeypatch):
@@ -382,7 +388,8 @@ def test_collect_local_fit_outputs_reads_estimates_mismatches_and_relative_phase
     metadata_peak = [row for row in rows if row["mode"] == "22" and row["target"] == "A_peak_over_nu"][0]
     assert c3a_22["source"] == "point_estimate"
     assert abs(float(delta_33["value"]) - 0.5) < 1.0e-12
-    assert abs(float(delta_33["mismatch"]) - (0.02**2 + 0.04**2) ** 0.5) < 1.0e-12
+    assert "mismatch" not in delta_33
+    assert abs(float(delta_33["construction_mismatch"]) - (0.02**2 + 0.04**2) ** 0.5) < 1.0e-12
     assert metadata_peak["source"] == "metadata"
     assert abs(float(metadata_peak["value"]) - 0.2) < 1.0e-12
     assert (campaign_dir / "mismatch_summary.csv").exists()
@@ -868,3 +875,119 @@ def test_plot_teobpm_mismatch_comparison_writes_standard_parameter_space_views(t
     assert any(path.endswith("teobpm_mismatch_comparison_nonspinning.png") for path in summary["plots"])
     assert any(path.endswith("teobpm_mismatch_comparison_spinning.png") for path in summary["plots"])
     assert Path(summary["summary_table"]).exists()
+
+
+def test_plot_teobpm_mismatch_comparison_rejects_nonzero_evaluation_start(tmp_path):
+    table = tmp_path / "mismatch_comparison.csv"
+    with table.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["sxs_id", "family", "nu", "q", "chi_eff", "mismatch", "t_start", "tref"])
+        writer.writeheader()
+        writer.writerow({
+            "sxs_id": "SXS:BBH:0001",
+            "family": "spinning",
+            "nu": "0.25",
+            "q": "1.0",
+            "chi_eff": "0.0",
+            "mismatch": "1e-5",
+            "t_start": "4.25",
+            "tref": "peak22",
+        })
+
+    with pytest.raises(ValueError, match="t_start=4.25"):
+        calib.plot_teobpm_mismatch_comparison([table], tmp_path / "plots")
+
+
+def test_plot_local_fit_diagnostics_uses_explicit_evaluation_mismatch_table(tmp_path, monkeypatch):
+    local_table = tmp_path / "local_fit_summary.csv"
+    with local_table.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["split", "mode", "target", "nu", "chi_eff", "value", "construction_mismatch"])
+        writer.writeheader()
+        writer.writerow({
+            "split": "training",
+            "mode": "33",
+            "target": "c3A",
+            "nu": "0.25",
+            "chi_eff": "0.0",
+            "value": "",
+            "construction_mismatch": "9e-5",
+        })
+    evaluation_table = tmp_path / "local_fit_evaluation_mismatch.csv"
+    evaluation_table.write_text(
+        "sxs_id,family,nu,q,chi_eff,mismatch,t_start,tref\n"
+        "SXS:BBH:0001,nonspinning,0.25,1.0,0.0,1e-5,0,peak22\n",
+        encoding="utf-8",
+    )
+    calls = []
+
+    def fake_mismatch_plot(tables, output_dir, labels=None, family="auto"):
+        calls.append((tables, output_dir, labels, family))
+        return {"plots": [str(Path(output_dir) / "fake.png")], "rows": 1}
+
+    monkeypatch.setattr(calib, "plot_teobpm_mismatch_comparison", fake_mismatch_plot)
+
+    summary_without_mismatch = calib.plot_local_fit_diagnostics(local_table, tmp_path / "no_mismatch")
+    assert summary_without_mismatch["mismatch_summary"] == {}
+    assert calls == []
+
+    summary = calib.plot_local_fit_diagnostics(
+        local_table,
+        tmp_path / "with_mismatch",
+        mismatch_tables=[evaluation_table],
+        mismatch_labels=["Local evaluation"],
+    )
+
+    assert summary["mismatch_summary"]["rows"] == 1
+    assert calls == [([evaluation_table], tmp_path / "with_mismatch" / "mismatches", ["Local evaluation"], "auto")]
+
+
+def test_validate_global_fit_uses_explicit_evaluation_mismatch_table(tmp_path, monkeypatch):
+    fit_file = tmp_path / "global_fit.json"
+    fit_file.write_text(
+        json.dumps({"fits": {"22": {"c3A": {"terms": [{"name": "1", "coefficient": 1.0}]}}}}),
+        encoding="utf-8",
+    )
+    validation_table = tmp_path / "validation.csv"
+    with validation_table.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["split", "mode", "target", "q", "nu", "chi_eff", "chi_a", "value", "mismatch"])
+        writer.writeheader()
+        writer.writerow({
+            "split": "validation",
+            "mode": "22",
+            "target": "c3A",
+            "q": "1.0",
+            "nu": "0.25",
+            "chi_eff": "0.0",
+            "chi_a": "0.0",
+            "value": "1.2",
+            "mismatch": "9e-5",
+        })
+    evaluation_table = tmp_path / "global_evaluation_mismatch.csv"
+    evaluation_table.write_text(
+        "sxs_id,family,nu,q,chi_eff,mismatch,t_start,tref\n"
+        "SXS:BBH:0001,nonspinning,0.25,1.0,0.0,1e-5,0,peak22\n",
+        encoding="utf-8",
+    )
+    calls = []
+
+    def fake_validation_plot(predictions, output_dir):
+        assert predictions[0]["mismatch"] == "9e-5"
+        return []
+
+    def fake_mismatch_plot(tables, output_dir, labels=None, family="auto"):
+        calls.append((tables, output_dir, labels, family))
+        return {"plots": [], "rows": 1}
+
+    monkeypatch.setattr(calib, "plot_validation_diagnostics", fake_validation_plot)
+    monkeypatch.setattr(calib, "plot_teobpm_mismatch_comparison", fake_mismatch_plot)
+
+    summary = calib.validate_global_fit(
+        fit_file,
+        validation_table,
+        tmp_path / "validation_plots",
+        mismatch_tables=[evaluation_table],
+        mismatch_labels=["Global evaluation"],
+        family="nonspinning",
+    )
+
+    assert summary["mismatch_summary"]["rows"] == 1
+    assert calls == [([evaluation_table], tmp_path / "validation_plots" / "mismatches", ["Global evaluation"], "nonspinning")]

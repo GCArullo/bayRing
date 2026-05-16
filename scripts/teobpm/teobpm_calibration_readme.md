@@ -90,6 +90,17 @@ Run the hierarchy in order:
 3. `spinning`
 
 Do not start a higher level until the lower-level JSON checked above exists.
+Generated calibration configs follow pyRing's current TEOBPM time convention:
+the `22` peak is the reference, and mode `lm` starts at
+`t_peak_22 + DeltaT_lm(q, chi1, chi2)`. Therefore the generated `t-start` is
+`DeltaT_lm` for higher modes and `0` for `22`; `--t-start` adds an extra offset
+on top of that convention.
+
+That per-mode start is only for constructing local fit coefficients. Once local
+fits have been constructed, waveform mismatch comparisons used by local-fit
+plots and global-fit checks must start at the `22` peak with `t-start = 0` and
+`tref = peak22`. Higher modes may be empty over the initial `0 <= t < DeltaT_lm`
+stretch of the comparison.
 
 ## 1. Local Fits
 
@@ -110,15 +121,15 @@ bayRing-teobpm-calibrate prepare \
   --validation-fraction 0.33
 ```
 
-Run non-mixed modes first:
+Run the `22` modes first:
 
 ```bash
 OMP_NUM_THREADS=1 bayRing-teobpm-calibrate run-local-fits \
   --campaign-dir "$CAMPAIGN_DIR" \
-  --modes 22,21,33,31,44,42,41,55
+  --modes 22
 ```
 
-Fill higher-mode inputs from completed parent fits:
+Fill higher-mode inputs from the completed `22` fits:
 
 ```bash
 bayRing-teobpm-calibrate fill-hm-inputs \
@@ -126,15 +137,29 @@ bayRing-teobpm-calibrate fill-hm-inputs \
   --mode-mixing-modes "$MIXED_MODES"
 ```
 
-Run mixed modes:
+Run the higher modes whose dependencies are available. This includes `32`
+because its parent is `22`; hold back `43` until `33` has completed:
 
 ```bash
 OMP_NUM_THREADS=1 bayRing-teobpm-calibrate run-local-fits \
   --campaign-dir "$CAMPAIGN_DIR" \
-  --modes "$MIXED_MODES"
+  --modes 21,33,32,31,44,42,41,55
 ```
 
-Collect local coefficients, mismatch files, and failures:
+Fill the `43` parent coefficients from the completed `33` fits and run `43` as
+its own parallel simulation batch:
+
+```bash
+bayRing-teobpm-calibrate fill-hm-inputs \
+  --campaign-dir "$CAMPAIGN_DIR" \
+  --mode-mixing-modes "$MIXED_MODES"
+
+OMP_NUM_THREADS=1 bayRing-teobpm-calibrate run-local-fits \
+  --campaign-dir "$CAMPAIGN_DIR" \
+  --modes 43
+```
+
+Collect local coefficients, construction mismatch files, and failures:
 
 ```bash
 bayRing-teobpm-calibrate collect-local-fits \
@@ -142,11 +167,13 @@ bayRing-teobpm-calibrate collect-local-fits \
   --split all
 ```
 
-Inspect `local_fit_collection_failures.csv` before moving on.
+Inspect `local_fit_collection_failures.csv` before moving on. Representative
+construction mismatches are written as `construction_mismatch` in
+`local_fit_summary.csv`; they are not used as evaluation mismatches.
 
 ## 2. Local-Fit Plots
 
-Plot local coefficients and local mismatch diagnostics:
+Plot local coefficients:
 
 ```bash
 bayRing-teobpm-calibrate plot-local-fits \
@@ -155,9 +182,21 @@ bayRing-teobpm-calibrate plot-local-fits \
   --family auto
 ```
 
-The coefficient plots go in `local_fit_plots/coefficients/`. Mismatch plots and
-tables go in `local_fit_plots/mismatches/` when the collected table contains a
-`mismatch` column.
+The coefficient plots go in `local_fit_plots/coefficients/`. To add waveform
+mismatch plots, pass an explicit evaluation mismatch table built after the local
+fits and evaluated from the `22` peak:
+
+```bash
+bayRing-teobpm-calibrate plot-local-fits \
+  --local-fit-table "$CAMPAIGN_DIR/local_fit_summary.csv" \
+  --mismatch-table "$CAMPAIGN_DIR/local_fit_evaluation_mismatches.csv" \
+  --label "Local fit evaluation" \
+  --output-dir "$CAMPAIGN_DIR/local_fit_plots" \
+  --family auto
+```
+
+Mismatch plots and tables from explicit evaluation mismatch inputs go in
+`local_fit_plots/mismatches/`.
 
 ## 3. Global Fits
 
@@ -181,14 +220,16 @@ terms.
 
 ## 4. Global-Fit Plots
 
-Plot global coefficient residuals on the validation split. If the validation
-table contains mismatch values, this command also writes the standard mismatch
-views:
+Plot global coefficient residuals on the validation split. Pass explicit
+evaluation mismatch tables to also write the standard mismatch views; those
+tables must use the `22`-peak comparison start:
 
 ```bash
 bayRing-teobpm-calibrate validate \
   --global-fit-file "$GLOBAL_FIT" \
   --validation-table "$CAMPAIGN_DIR/local_fit_summary.csv" \
+  --mismatch-table "$CAMPAIGN_DIR/global_evaluation_mismatches.csv" \
+  --label "New global fit" \
   --output-dir "$CAMPAIGN_DIR/global_fit_plots"
 ```
 
@@ -204,4 +245,6 @@ bayRing-teobpm-calibrate plot-mismatch-comparison \
 ```
 
 Nonspinning mismatch plots use `nu`. Spinning mismatch plots use `nu` and
-`chi_eff`.
+`chi_eff`. If a mismatch table declares `t_start`/`t-start` or
+`tref`/`reference_time`, the plotting command checks that the comparison uses
+`t_start = 0` and `tref = peak22`.

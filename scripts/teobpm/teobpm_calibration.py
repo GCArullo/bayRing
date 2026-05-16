@@ -105,7 +105,7 @@ class CalibrationConfig:
     nr_data_dir: str = ""
     extrap_order: int = 2
     resolution_level: int = -1
-    t_start: float = 20.0
+    t_start: float = 0.0
     t_end: float = 140.0
     method: str = "Minimization"
     min_method: str = "trf"
@@ -563,12 +563,53 @@ def _local_prior_text(mode: tuple[int, int], template: str) -> str:
     return "\n".join(lines)
 
 
+def _pyRing_teobpm_delta_t(record: SimulationRecord, mode: tuple[int, int]) -> float:
+    """Return pyRing's TEOBPM mode start offset relative to the 22 peak."""
+    if mode == (2, 2):
+        return 0.0
+    try:
+        import pyRing.waveform as wf
+    except Exception as exc:
+        raise RuntimeError("Preparing TEOBPM calibration configs requires importable pyRing.waveform.") from exc
+
+    q = record.q
+    if not math.isfinite(q) or q <= 0.0:
+        raise ValueError(f"Cannot compute TEOBPM DeltaT for {record.sxs_id}: invalid q={record.q}.")
+    m1 = q / (1.0 + q)
+    m2 = 1.0 / (1.0 + q)
+    try:
+        teobpm = wf.TEOBPM(
+            0.0,
+            m1,
+            m2,
+            record.chi1z,
+            record.chi2z,
+            {},
+            1.0,
+            0.0,
+            0.0,
+            [mode],
+            {},
+            geom=1,
+        )
+        return float(teobpm.DeltaT(mode[0], mode[1]))
+    except Exception as exc:
+        raise RuntimeError(
+            f"Could not compute pyRing TEOBPM DeltaT for {record.sxs_id} mode {_mode_label(mode)}."
+        ) from exc
+
+
+def _local_fit_t_start(record: SimulationRecord, mode: tuple[int, int], config: CalibrationConfig) -> float:
+    return float(config.t_start) + _pyRing_teobpm_delta_t(record, mode)
+
+
 def local_config_text(record: SimulationRecord, mode: tuple[int, int], config: CalibrationConfig) -> str:
     mode_label = _mode_label(mode)
     outdir = Path(config.output_dir) / "local_fits" / record.sxs_id.replace(":", "_") / f"mode_{mode_label}"
     merger_data = 1 if _teobpm_requires_merger_peak_data(config.template) else 0
     global_fit = 0
     mode_mixing = 1 if mode in config.mode_mixing_modes else 0
+    t_start = _local_fit_t_start(record, mode, config)
     return f"""[I/O]
 outdir = {outdir}
 screen-output = 1
@@ -601,7 +642,7 @@ TEOB-mode-mixing = {mode_mixing}
 method = {config.method}
 min-method = {config.min_method}
 n-random-seeds = {config.n_random_seeds}
-t-start = {config.t_start}
+t-start = {t_start}
 t-end = {config.t_end}
 n-mode-workers = {config.n_mode_workers}
 """
@@ -1147,7 +1188,14 @@ def _record_metadata_targets(record: SimulationRecord | None, job: LocalFitJob) 
     return rows
 
 
-def _local_fit_row(job: LocalFitJob, target: str, value: float, sigma: float, source: str, mismatch: float | None = None) -> dict[str, Any]:
+def _local_fit_row(
+    job: LocalFitJob,
+    target: str,
+    value: float,
+    sigma: float,
+    source: str,
+    construction_mismatch: float | None = None,
+) -> dict[str, Any]:
     row = {
         "sxs_id": job.sxs_id,
         "split": job.split,
@@ -1166,8 +1214,8 @@ def _local_fit_row(job: LocalFitJob, target: str, value: float, sigma: float, so
         "quality_score": job.quality_score,
         "outdir": job.outdir,
     }
-    if mismatch is not None:
-        row["mismatch"] = mismatch
+    if construction_mismatch is not None:
+        row["construction_mismatch"] = construction_mismatch
     return row
 
 
@@ -1268,9 +1316,18 @@ def collect_local_fit_outputs(campaign_dir: str | Path, output_table: str | Path
             if target is None:
                 continue
             if target == "phi_mrg":
-                phases[(job.sxs_id, job.mode)] = {"job": job, **estimate, "mismatch": mismatch}
+                phases[(job.sxs_id, job.mode)] = {"job": job, **estimate, "construction_mismatch": mismatch}
             else:
-                rows.append(_local_fit_row(job, target, estimate["value"], estimate["sigma"], source=estimate_source, mismatch=mismatch))
+                rows.append(
+                    _local_fit_row(
+                        job,
+                        target,
+                        estimate["value"],
+                        estimate["sigma"],
+                        source=estimate_source,
+                        construction_mismatch=mismatch,
+                    )
+                )
         rows.extend(_record_metadata_targets(records_by_id.get(job.sxs_id), job))
 
     for (sxs_id, mode), phase_data in sorted(phases.items()):
@@ -1284,7 +1341,16 @@ def collect_local_fit_outputs(campaign_dir: str | Path, output_table: str | Path
         sigma = math.nan
         if math.isfinite(_as_float(phase_data.get("sigma"), default=math.nan)) and math.isfinite(_as_float(reference.get("sigma"), default=math.nan)):
             sigma = math.sqrt(phase_data["sigma"] ** 2 + reference["sigma"] ** 2)
-        rows.append(_local_fit_row(phase_data["job"], f"{PHASE_TARGET_PREFIX}{mode}", delta, sigma, source="relative_phase", mismatch=phase_data.get("mismatch")))
+        rows.append(
+            _local_fit_row(
+                phase_data["job"],
+                f"{PHASE_TARGET_PREFIX}{mode}",
+                delta,
+                sigma,
+                source="relative_phase",
+                construction_mismatch=phase_data.get("construction_mismatch"),
+            )
+        )
 
     _write_rows_csv(rows, output_table)
     _write_rows_csv(mismatch_rows, campaign_dir / "mismatch_summary.csv")
@@ -1536,6 +1602,23 @@ MISMATCH_WIDE_COLUMNS = (
     ("past_mismatch", "Past fit"),
     ("local_mismatch", "Local fit"),
 )
+MISMATCH_T_START_COLUMNS = ("t_start", "t-start", "comparison_t_start", "analysis_t_start", "window_start")
+MISMATCH_REFERENCE_COLUMNS = ("tref", "t_ref", "reference_time", "reference_peak", "comparison_reference")
+MISMATCH_PEAK22_REFERENCE_VALUES = {
+    "0",
+    "0.0",
+    "22peak",
+    "peak22",
+    "peak-22",
+    "peak_22",
+    "22-peak",
+    "22_peak",
+    "tpeak22",
+    "t-peak-22",
+    "t_peak_22",
+    "mode22-peak",
+    "mode22_peak",
+}
 
 
 def _first_finite(row: dict[str, Any], columns: Iterable[str], default: float = math.nan) -> float:
@@ -1547,6 +1630,70 @@ def _first_finite(row: dict[str, Any], columns: Iterable[str], default: float = 
         if math.isfinite(parsed):
             return parsed
     return default
+
+
+def _normalised_reference_text(value: Any) -> str:
+    return str(value).strip().lower().replace(" ", "").replace("__", "_")
+
+
+def _check_peak22_mismatch_window(table_path: Path, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    t_start_rows = 0
+    reference_rows = 0
+    for row in rows:
+        for column in MISMATCH_T_START_COLUMNS:
+            raw_value = row.get(column)
+            if raw_value in (None, ""):
+                continue
+            value = _as_float(raw_value, default=math.nan)
+            if not math.isfinite(value):
+                normalised = _normalised_reference_text(raw_value)
+                if normalised in MISMATCH_PEAK22_REFERENCE_VALUES:
+                    t_start_rows += 1
+                    break
+                raise ValueError(
+                    f"Mismatch table `{table_path}` declares nonnumeric {column}={raw_value!r}. "
+                    "Evaluation comparisons must declare the 22-peak reference or numeric t_start=0."
+                )
+            t_start_rows += 1
+            if abs(value) > 1.0e-9:
+                raise ValueError(
+                    f"Mismatch table `{table_path}` declares {column}={value}. "
+                    "Evaluation comparisons must start at the 22 peak, so use t_start=0."
+                )
+            break
+
+        for column in MISMATCH_REFERENCE_COLUMNS:
+            raw_value = row.get(column)
+            if raw_value in (None, ""):
+                continue
+            value = _as_float(raw_value, default=math.nan)
+            if math.isfinite(value):
+                if abs(value) > 1.0e-9:
+                    raise ValueError(
+                        f"Mismatch table `{table_path}` declares {column}={value}. "
+                        "Evaluation comparisons must use tref=peak22 or numeric tref=0."
+                    )
+                reference_rows += 1
+                break
+            normalised = _normalised_reference_text(raw_value)
+            if normalised not in MISMATCH_PEAK22_REFERENCE_VALUES:
+                raise ValueError(
+                    f"Mismatch table `{table_path}` declares {column}={raw_value!r}. "
+                    "Evaluation comparisons must use the 22-peak reference."
+                )
+            reference_rows += 1
+            break
+
+    status = "verified" if (t_start_rows or reference_rows) else "unverified"
+    return {
+        "table": str(table_path),
+        "expected_reference": "peak22",
+        "expected_t_start": 0.0,
+        "rows": len(rows),
+        "rows_with_t_start_metadata": t_start_rows,
+        "rows_with_reference_metadata": reference_rows,
+        "status": status,
+    }
 
 
 def _nu_from_row(row: dict[str, Any]) -> float:
@@ -1899,6 +2046,7 @@ def plot_teobpm_mismatch_comparison(
 
     rows: list[dict[str, Any]] = []
     input_tables = []
+    window_checks = []
     for index, table in enumerate(mismatch_tables):
         table_path = Path(table)
         source_label = labels[index] if labels is not None else table_path.stem.replace("_", " ")
@@ -1906,7 +2054,9 @@ def plot_teobpm_mismatch_comparison(
         if not table_path.exists():
             raise FileNotFoundError(f"Mismatch table `{table_path}` does not exist.")
         family_hint = family if family in {"nonspinning", "spinning"} else None
-        rows.extend(_normalise_mismatch_rows(_read_table(table_path), source_label, family_hint=family_hint))
+        table_rows = _read_table(table_path)
+        window_checks.append(_check_peak22_mismatch_window(table_path, table_rows))
+        rows.extend(_normalise_mismatch_rows(table_rows, source_label, family_hint=family_hint))
 
     if family not in {"auto", "all"}:
         rows = [row for row in rows if row["family"] == family]
@@ -1925,6 +2075,11 @@ def plot_teobpm_mismatch_comparison(
         "rows": len(rows),
         "families": sorted({row["family"] for row in rows}),
         "notes": "Nonspinning mismatch plots use nu. Spinning mismatch plots use nu-chi_eff.",
+        "comparison_window": {
+            "expected_reference": "peak22",
+            "expected_t_start": 0.0,
+            "tables": window_checks,
+        },
     }
     (output_path / "teobpm_mismatch_comparison_summary.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     return payload
@@ -1938,6 +2093,8 @@ def plot_local_fit_diagnostics(
     local_fit_table: str | Path,
     output_dir: str | Path,
     family: str = "auto",
+    mismatch_tables: list[str | Path] | None = None,
+    mismatch_labels: list[str] | None = None,
 ) -> dict[str, Any]:
     import matplotlib.pyplot as plt
 
@@ -1993,14 +2150,19 @@ def plot_local_fit_diagnostics(
         coefficient_plots.append(path)
 
     mismatch_summary: dict[str, Any] = {}
-    if any(row.get("mismatch") not in (None, "") for row in rows):
-        mismatch_summary = plot_teobpm_mismatch_comparison([local_fit_table], mismatch_dir, labels=["Local fits"], family=family)
+    if mismatch_tables:
+        mismatch_summary = plot_teobpm_mismatch_comparison(mismatch_tables, mismatch_dir, labels=mismatch_labels, family=family)
 
     payload = {
         "local_fit_table": str(local_fit_table),
         "coefficient_plots": [str(path) for path in coefficient_plots],
         "mismatch_summary": mismatch_summary,
         "plots": [str(path) for path in coefficient_plots] + list(mismatch_summary.get("plots", [])),
+        "notes": (
+            "Local-fit coefficient plots use the collected construction table. "
+            "Mismatch plots are written only from explicit evaluation mismatch tables, "
+            "which must use the 22-peak comparison start."
+        ),
     }
     (output_path / "local_fit_plot_summary.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     return payload
@@ -2051,40 +2213,32 @@ def plot_validation_diagnostics(predictions: list[dict[str, Any]], output_dir: s
     plt.close(fig)
     plot_paths.append(hist_path)
 
-    mismatch_values = [_as_float(row.get("mismatch"), default=math.nan) for row in predictions if row.get("mismatch") not in (None, "")]
-    mismatch_values = [value for value in mismatch_values if math.isfinite(value)]
-    if mismatch_values:
-        validation_mismatch_rows = _normalise_mismatch_rows(predictions, "Validation")
-        plot_paths.extend(
-            _plot_standard_mismatch_parameter_space(
-                validation_mismatch_rows,
-                output_path,
-                prefix="validation_parameter_space_mismatch",
-                title_prefix="Validation mismatch",
-            )
-        )
-
-        fig, ax = plt.subplots()
-        ax.hist(mismatch_values, bins=min(30, max(5, int(math.sqrt(len(mismatch_values))))), color="#525b76", edgecolor="white")
-        ax.set_xlabel("Mismatch")
-        ax.set_ylabel("Count")
-        ax.set_title("Validation mismatch histogram")
-        fig.tight_layout()
-        mismatch_path = output_path / "validation_mismatch_histogram.png"
-        fig.savefig(mismatch_path, dpi=220)
-        plt.close(fig)
-        plot_paths.append(mismatch_path)
-
     return plot_paths
 
 
-def validate_global_fit(global_fit_file: str | Path, validation_table: str | Path, output_dir: str | Path) -> dict[str, Any]:
+def validate_global_fit(
+    global_fit_file: str | Path,
+    validation_table: str | Path,
+    output_dir: str | Path,
+    mismatch_tables: list[str | Path] | None = None,
+    mismatch_labels: list[str] | None = None,
+    family: str = "auto",
+) -> dict[str, Any]:
     fit_payload = _load_global_fit(global_fit_file)
     predictions = _prediction_rows(validation_table, fit_payload)
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     _write_prediction_csv(predictions, output_path / "validation_predictions.csv")
     plot_paths = plot_validation_diagnostics(predictions, output_path)
+    mismatch_summary: dict[str, Any] = {}
+    if mismatch_tables:
+        mismatch_summary = plot_teobpm_mismatch_comparison(
+            mismatch_tables,
+            output_path / "mismatches",
+            labels=mismatch_labels,
+            family=family,
+        )
+        plot_paths.extend(Path(path) for path in mismatch_summary.get("plots", []))
     if predictions:
         abs_residuals = sorted(float(row["abs_residual"]) for row in predictions)
         middle = len(abs_residuals) // 2
@@ -2097,9 +2251,10 @@ def validate_global_fit(global_fit_file: str | Path, validation_table: str | Pat
             "median_abs_residual": float(median_abs_residual),
             "max_abs_residual": float(max(abs_residuals)),
             "plots": [str(path) for path in plot_paths],
+            "mismatch_summary": mismatch_summary,
         }
     else:
-        summary = {"n": 0, "plots": [str(path) for path in plot_paths]}
+        summary = {"n": 0, "plots": [str(path) for path in plot_paths], "mismatch_summary": mismatch_summary}
     (output_path / "validation_summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
     return summary
 
@@ -3804,7 +3959,7 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--nr-data-dir", default="")
     prepare.add_argument("--extrap-order", type=int, default=2)
     prepare.add_argument("--resolution-level", type=int, default=-1)
-    prepare.add_argument("--t-start", type=float, default=20.0)
+    prepare.add_argument("--t-start", type=float, default=0.0)
     prepare.add_argument("--t-end", type=float, default=140.0)
     prepare.add_argument("--method", choices=["Minimization", "Nested-sampler"], default="Minimization")
     prepare.add_argument("--min-method", default="trf")
@@ -3831,7 +3986,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--split", choices=["all", "training", "validation"], default="all")
     run.add_argument("--modes", default="", help="Optional comma-separated mode subset to run, e.g. 22 or 21,33.")
 
-    collect = subparsers.add_parser("collect-local-fits", help="Collect point estimates and mismatch diagnostics from local-fit outputs.")
+    collect = subparsers.add_parser("collect-local-fits", help="Collect point estimates and construction mismatch diagnostics from local-fit outputs.")
     collect.add_argument("--campaign-dir", required=True)
     collect.add_argument("--output-table", default=None)
     collect.add_argument("--split", choices=["all", "training", "validation"], default="all")
@@ -3907,6 +4062,9 @@ def build_parser() -> argparse.ArgumentParser:
     validate.add_argument("--global-fit-file", required=True)
     validate.add_argument("--validation-table", required=True)
     validate.add_argument("--output-dir", required=True)
+    validate.add_argument("--mismatch-table", action="append", default=None, help="Evaluation mismatch CSV table. May be repeated; rows should declare t_start=0 or tref=peak22 when metadata are present.")
+    validate.add_argument("--label", action="append", default=None, help="Series label for the corresponding --mismatch-table. May be repeated.")
+    validate.add_argument("--family", choices=["auto", "all", "nonspinning", "spinning"], default="auto")
 
     mismatch_compare = subparsers.add_parser(
         "plot-mismatch-comparison",
@@ -3917,10 +4075,12 @@ def build_parser() -> argparse.ArgumentParser:
     mismatch_compare.add_argument("--output-dir", required=True)
     mismatch_compare.add_argument("--family", choices=["auto", "all", "nonspinning", "spinning"], default="auto")
 
-    local_plot = subparsers.add_parser("plot-local-fits", help="Plot collected local-fit coefficients and mismatch diagnostics.")
+    local_plot = subparsers.add_parser("plot-local-fits", help="Plot collected local-fit coefficients and optional 22-peak evaluation mismatch diagnostics.")
     local_plot.add_argument("--local-fit-table", required=True)
     local_plot.add_argument("--output-dir", required=True)
     local_plot.add_argument("--family", choices=["auto", "all", "nonspinning", "spinning"], default="auto")
+    local_plot.add_argument("--mismatch-table", action="append", default=None, help="Evaluation mismatch CSV table. May be repeated; rows should declare t_start=0 or tref=peak22 when metadata are present.")
+    local_plot.add_argument("--label", action="append", default=None, help="Series label for the corresponding --mismatch-table. May be repeated.")
 
     report = subparsers.add_parser("report", help="Render and optionally compile a campaign report.")
     report.add_argument("--campaign-dir", required=True)
@@ -4012,7 +4172,14 @@ def main(argv: list[str] | None = None) -> None:
             rao_fit_file=args.rao_fit_file,
         )
     elif args.command == "validate":
-        summary = validate_global_fit(args.global_fit_file, args.validation_table, args.output_dir)
+        summary = validate_global_fit(
+            args.global_fit_file,
+            args.validation_table,
+            args.output_dir,
+            mismatch_tables=args.mismatch_table,
+            mismatch_labels=args.label,
+            family=args.family,
+        )
     elif args.command == "plot-mismatch-comparison":
         summary = plot_teobpm_mismatch_comparison(
             args.mismatch_table,
@@ -4025,6 +4192,8 @@ def main(argv: list[str] | None = None) -> None:
             args.local_fit_table,
             args.output_dir,
             family=args.family,
+            mismatch_tables=args.mismatch_table,
+            mismatch_labels=args.label,
         )
     elif args.command == "report":
         pdf = render_report(args.campaign_dir, args.output_tex, compile_pdf=not args.no_compile)
