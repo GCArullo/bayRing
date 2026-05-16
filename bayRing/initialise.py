@@ -116,6 +116,7 @@ def read_config(Config):
         'times'            : 'from-SXS-NR',
         'noise'            : None,
         'tail'             : 0.0,
+        'parameters'       : '',
         'Kerr-parameters'  : '',
         },
 
@@ -244,10 +245,17 @@ def read_config(Config):
     else                                                                                                : parameters['Model']['charge'] = 0
 
     if not(parameters['NR-data']['add-const']==None): parameters['NR-data']['add-const'] = [float(value) for value in parameters['NR-data']['add-const'].split(',')]
-    if not(parameters['Injection-data']['Kerr-parameters']==''):
-        parameters['Injection-data']['Kerr-parameters'] = ast.literal_eval(parameters['Injection-data']['Kerr-parameters'])
+    injection_parameters      = parameters['Injection-data']['parameters']
+    legacy_kerr_parameters   = parameters['Injection-data']['Kerr-parameters']
+    if not(injection_parameters=='') and not(legacy_kerr_parameters==''):
+        raise ValueError("Specify only one of [Injection-data] parameters or Kerr-parameters.")
+    if not(injection_parameters==''):
+        parameters['Injection-data']['parameters'] = ast.literal_eval(injection_parameters)
+    elif not(legacy_kerr_parameters==''):
+        parameters['Injection-data']['parameters'] = ast.literal_eval(legacy_kerr_parameters)
     else:
-        parameters['Injection-data']['Kerr-parameters'] = None
+        parameters['Injection-data']['parameters'] = None
+    parameters['Injection-data']['Kerr-parameters'] = parameters['Injection-data']['parameters']
 
     if ((parameters['Model']['template']=='KerrBinary' or parameters['Model']['template']=='TEOBPM') and not(parameters['NR-data']['l-NR']==2 and parameters['NR-data']['m']==2) and parameters['NR-data']['t-peak-22']==0.0): raise ValueError("The time of the peak of the 22 mode must be provided for the KerrBinary and TEOBPM models when fitting the HMs, to correctly rescale the NR-calibrated quantities.")
 
@@ -307,7 +315,7 @@ A dot is present at the end of each description line and is not to be intended a
         
         dir                     Absolute path of NR local data.                                                                     Default: ''.
         
-        catalog                 NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'fake_NR']. Default: 'SXS'.
+        catalog                 NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'injections']. Default: 'SXS'.
         
         ID                      Simulation ID to be considered. Example for SXS: 0305. Example for Teukolsky: \
                                 `a_0.7_A_0.141_w_1.4_ingoing_ang_15`.                                                               Default: 0305.
@@ -334,7 +342,7 @@ A dot is present at the end of each description line and is not to be intended a
         error                   Method to compute the NR error. Available options for `SXS`: \
                                 ['constant-X', 'align-with-mismatch-all', 'align-with-mismatch-res-only', 'align-at-peak'], \
                                 for `Teukolsky`: ['constant-X', 'resolution'] where X is the constant value selected by the user, \
-                                for `RIT`: ['constant-X', 'late-time-const-error']. For 'fake_NR': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
+                                for `RIT`: ['constant-X', 'late-time-const-error']. For 'injections': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
                                 deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-res-only'.
         
         error-t-min             Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_min_mm = t_peak * (1-`error-t-min`). Default: 3e-1.
@@ -364,14 +372,17 @@ A dot is present at the end of each description line and is not to be intended a
                          'from-SXS-NR']. If the error is taken from the SXS simulation, the times must be taken \
                          from the SXS sim as well.                                                                           Default: 'from-SXS-NR'.
         
-        noise            Noise injection option. If None, the noise is not added to the simulated Kerr QNMs data; \
+        noise            Noise injection option. If None, the noise is not added to the injection data; \
             if '1', the noise is added to the data. Options: None, '1'.                                                      Default: None.
         
-        tail             Option to add the tail to the simulated Kerr QNMs data; if '1', the tail is added to the data. \
+        tail             Option to add the Kerr tail to the injection data; if '1', the tail is added to the data. \
             Options: None, '1'.                                                                                              Default: None.
-        Kerr-parameters  Dictionary used to generate a Kerr injection from config values when catalog='fake_NR'. \
-                         Required keys are: `t_start`, `t_end`, `dt`, `q`, `Mf`, `af`, and one pair `A_lmn`, `phi_lmn` \
-                         for each injected mode. Optional keys for tails are `A_lm_tail`, `phi_lm_tail`, `p_lm_tail`.     Default: ''.
+        parameters       Dictionary used to generate a template injection from config values when catalog='injections'. \
+                         Required keys are: `t_start`, `t_end`, `dt`, `q`, `Mf`, `af`; waveform keys match the selected \
+                         template parameter names, e.g. `ln_A_220`, `phi_220`, `f_0`, `tau_0`, `phi`, `phi_mrg_22`. \
+                         Legacy Kerr amplitude keys `A_lmn` and tail keys `A_lm_tail`, `phi_lm_tail`, `p_lm_tail` \
+                         are also accepted.                                                                                  Default: ''.
+        Kerr-parameters  Deprecated alias for `parameters`.                                                                  Default: ''.
 
     ***************************************************
     * Parameters to be passed to the [Model] section. *

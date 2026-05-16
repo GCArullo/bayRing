@@ -64,11 +64,28 @@ Supported catalogue names in the current parser are:
    * - ``charged_raw``
      - Local raw charged-waveform files
      - Reads raw ``times`` and ``cross`` files from ``NR-data dir``.
-   * - ``fake_NR``
-     - Internal Kerr-QNM synthetic data
-     - Builds a fake NR waveform from metadata and requested injection modes.
+   * - ``injections``
+     - Internal synthetic data
+     - Builds an injection waveform from the selected template and supplied
+       injection parameters. The legacy catalogue name ``fake_NR`` is still
+       accepted.
 
 The default catalogue is ``SXS`` and the default simulation ID is ``0305``.
+
+Synthetic Template Injections
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For ``catalog = injections``, the ``[Injection-data] parameters`` dictionary
+defines the synthetic waveform.  It must include ``t_start``, ``t_end``,
+``dt``, ``q``, ``Mf`` and ``af``.  The remaining entries use the same
+parameter names as the selected ``[Model] template``.  For example,
+``Damped-sinusoids`` accepts names such as ``ln_A_0``, ``phi_0``, ``f_0`` and
+``tau_0``; ``KerrBinary`` accepts ``phi``; and ``TEOBPM`` accepts
+``phi_mrg_22`` plus local fit coefficients when global fits are disabled.
+
+Legacy Kerr-style amplitudes such as ``A_220`` and tail entries such as
+``A_22_tail``, ``phi_22_tail`` and ``p_22_tail`` are still accepted and are
+converted internally to the corresponding sampled parameter names.
 
 Local Data Paths
 ~~~~~~~~~~~~~~~~
@@ -247,9 +264,9 @@ Catalogue-dependent options include:
        available. For ``RWZ-env``, compare against the next lower available
        ``RL`` file.
    * - ``gaussian-X``
-     - For ``fake_NR``, set a Gaussian-noise scale ``X``.
+     - For ``injections``, set a Gaussian-noise scale ``X``.
    * - ``from-SXS-NR``
-     - For ``fake_NR``, reuse the SXS-derived error vector.
+     - For ``injections``, reuse the SXS-derived error vector.
 
 Mismatch-alignment options use:
 

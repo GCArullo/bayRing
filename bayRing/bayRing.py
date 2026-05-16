@@ -76,7 +76,7 @@ def main():
     # ==============#
 
     pyRing_utils.print_section('NR data loading')
-    parameters['Injection-data']['modes-list'] = NR_waveforms.read_fake_NR(parameters['NR-data']['catalog'], parameters['Injection-data']['modes'])
+    parameters['Injection-data']['modes-list'] = NR_waveforms.read_injection_modes(parameters['NR-data']['catalog'], parameters['Injection-data']['modes'])
     for optional_path in ['properties-file', 'fits-file']:
         parameters['NR-data'][optional_path] = utils.normalize_optional_path(parameters['NR-data'][optional_path])
 
@@ -93,11 +93,12 @@ def main():
                                              parameters['Injection-data']['times']                  ,
                                              parameters['Injection-data']['noise']                  ,
                                              parameters['Injection-data']['tail']                   ,
-                                             parameters['Injection-data']['Kerr-parameters']        ,
+                                             parameters['Injection-data']['parameters']              ,
                                              parameters['NR-data']['l-NR']                          ,
                                              parameters['NR-data']['m']                             ,
                                              parameters['I/O']['outdir']                            ,
 
+                                             injection_model_parameters = parameters['Model']       ,
                                              waveform_type  = parameters['NR-data']['waveform-type'],
                                              download       = parameters['NR-data']['download']     ,
                                              NR_error       = parameters['NR-data']['error']        ,
