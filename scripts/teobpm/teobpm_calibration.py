@@ -27,6 +27,7 @@ import numpy as np
 
 DEFAULT_MODES = [(2, 2), (2, 1), (3, 3), (3, 2), (3, 1), (4, 4), (4, 3), (4, 2), (4, 1), (5, 5)]
 TEOB_MODE_MIXING_PARENTS = {(3, 2): (2, 2), (4, 3): (3, 3)}
+DEFAULT_MODE_MIXING_MODES = sorted(TEOB_MODE_MIXING_PARENTS)
 LOCAL_FIT_TARGETS_HYPTAN = ("A_peak_over_nu", "omg_peak", "c3A", "c3p", "c4p")
 LOCAL_FIT_TARGETS_RATEXP = ("A_peak_over_nu", "A_peakdotdot_over_nu", "omg_peak", "c2A", "c3A", "c2p", "c3p", "c4p")
 PHASE_TARGET_PREFIX = "delta_phi_"
@@ -88,14 +89,17 @@ class CalibrationConfig:
     family: str
     output_dir: str
     modes: list[tuple[int, int]] = field(default_factory=lambda: list(DEFAULT_MODES))
-    mode_mixing_modes: list[tuple[int, int]] = field(default_factory=list)
+    mode_mixing_modes: list[tuple[int, int]] = field(default_factory=lambda: list(DEFAULT_MODE_MIXING_MODES))
     template: str = "RatExp"
     teob_calibration: str = "qc"
     validation_fraction: float = 0.33
     seed: int = 1234
+    sxs_ids: list[str] = field(default_factory=list)
+    random_fraction: float = 1.0
     max_eccentricity: float = 1.0e-3
     max_transverse_spin: float = 1.0e-6
     nonspinning_spin_tolerance: float = 1.0e-6
+    equal_mass_tolerance: float = 1.0e-6
     min_quality_score: float | None = None
     bayring_executable: str = "bayRing"
     nr_data_dir: str = ""
@@ -192,13 +196,19 @@ def _spin_components(raw: dict[str, Any], body: int) -> tuple[float, float, floa
 
 def _normalise_sxs_id(raw_id: Any) -> str:
     text = str(raw_id).strip()
+    text = text.replace("SXS_BBH_", "SXS:BBH:").replace("SXS-BBH-", "SXS:BBH:")
     if text.startswith("SXS:BBH:"):
-        return text
+        prefix, number = text.rsplit(":", 1)
+        return f"{prefix}:{int(number):04d}" if number.isdigit() else text
     if text.startswith("BBH:"):
         return "SXS:" + text
     if text.isdigit():
         return "SXS:BBH:" + text.zfill(4)
     return text
+
+
+def _default_worker_count() -> int:
+    return max(1, os.cpu_count() or 1)
 
 
 def _mode_label(mode: tuple[int, int]) -> str:
@@ -246,6 +256,39 @@ def parse_modes(raw_modes: str | Iterable[Any] | None) -> list[tuple[int, int]]:
     if len(set(modes)) != len(modes):
         raise ValueError(f"Repeated TEOBPM modes requested: {modes}.")
     return modes
+
+
+def parse_sxs_ids(raw_ids: str | Iterable[str] | None) -> list[str]:
+    if raw_ids in (None, ""):
+        return []
+    if isinstance(raw_ids, str):
+        tokens = raw_ids.replace("\n", ",").split(",")
+    else:
+        tokens = list(raw_ids)
+    ids = [_normalise_sxs_id(token) for token in tokens]
+    ids = [sxs_id for sxs_id in ids if sxs_id]
+    return sorted(set(ids))
+
+
+def read_sxs_id_file(path: str | Path | None) -> list[str]:
+    if not path:
+        return []
+    tokens = []
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        text = line.split("#", 1)[0].strip()
+        if text:
+            tokens.extend(item.strip() for item in text.split(",") if item.strip())
+    return parse_sxs_ids(tokens)
+
+
+def _normalise_family(family: str) -> str:
+    if family == "aligned-spin":
+        return "spinning"
+    return family
+
+
+def _is_spin_family(family: str) -> bool:
+    return _normalise_family(family) in {"equal-mass-spinning", "spinning"}
 
 
 def symmetric_mass_ratio_from_q(q: float) -> float:
@@ -371,27 +414,55 @@ def load_catalog(catalog_file: str | None = None) -> list[SimulationRecord]:
 
 
 def filter_records(records: Iterable[SimulationRecord], config: CalibrationConfig) -> list[SimulationRecord]:
-    if config.family not in {"nonspinning", "aligned-spin"}:
-        raise ValueError("`family` must be either `nonspinning` or `aligned-spin`.")
-    if config.family == "aligned-spin" and not config.base_nonspinning_fit:
-        raise ValueError("Aligned-spin TEOBPM calibration requires `base_nonspinning_fit`.")
+    family = _normalise_family(config.family)
+    if family not in {"nonspinning", "equal-mass-spinning", "spinning"}:
+        raise ValueError("`family` must be one of: nonspinning, equal-mass-spinning, spinning.")
+    if _is_spin_family(config.family) and not config.base_nonspinning_fit:
+        raise ValueError("Spinning TEOBPM calibration requires `base_nonspinning_fit`.")
 
+    selected_ids = set(parse_sxs_ids(config.sxs_ids))
     filtered = []
     for record in records:
+        if selected_ids and record.sxs_id not in selected_ids:
+            continue
         if record.eccentricity > config.max_eccentricity:
             continue
         if record.spin1_perp > config.max_transverse_spin or record.spin2_perp > config.max_transverse_spin:
             continue
-        if config.family == "nonspinning":
+        is_nonspinning = (
+            abs(record.chi1z) <= config.nonspinning_spin_tolerance
+            and abs(record.chi2z) <= config.nonspinning_spin_tolerance
+        )
+        if family == "nonspinning":
             if abs(record.chi1z) > config.nonspinning_spin_tolerance:
                 continue
             if abs(record.chi2z) > config.nonspinning_spin_tolerance:
+                continue
+        elif family == "equal-mass-spinning":
+            if abs(record.q - 1.0) > config.equal_mass_tolerance and abs(record.nu - 0.25) > config.equal_mass_tolerance:
+                continue
+            if is_nonspinning:
+                continue
+        elif family == "spinning":
+            if is_nonspinning:
                 continue
         if config.min_quality_score is not None and record.quality_score < config.min_quality_score:
             continue
         filtered.append(record)
 
     return filtered
+
+
+def apply_random_fraction(records: Iterable[SimulationRecord], random_fraction: float, seed: int) -> list[SimulationRecord]:
+    records = list(records)
+    if not (0.0 < random_fraction <= 1.0):
+        raise ValueError("`random_fraction` must be greater than 0 and at most 1.")
+    if random_fraction >= 1.0 or not records:
+        return records
+    n_selected = max(1, int(math.ceil(len(records) * random_fraction)))
+    rng = np.random.default_rng(seed)
+    indices = sorted(int(index) for index in rng.choice(len(records), size=n_selected, replace=False))
+    return [records[index] for index in indices]
 
 
 def _bin_key(record: SimulationRecord) -> tuple[int, int]:
@@ -622,6 +693,8 @@ def prepare_campaign(catalog_file: str | None, config: CalibrationConfig) -> dic
     output_dir.mkdir(parents=True, exist_ok=True)
     records = load_catalog(catalog_file)
     filtered = filter_records(records, config)
+    n_before_random_fraction = len(filtered)
+    filtered = apply_random_fraction(filtered, config.random_fraction, config.seed)
     training, validation = split_train_validation(filtered, config.validation_fraction, config.seed)
     all_split = training + validation
     jobs = local_fit_jobs(all_split, config)
@@ -637,6 +710,8 @@ def prepare_campaign(catalog_file: str | None, config: CalibrationConfig) -> dic
 
     return {
         "total_catalog_records": len(records),
+        "filtered_records_before_random_fraction": n_before_random_fraction,
+        "random_fraction": config.random_fraction,
         "selected_records": len(filtered),
         "training_records": len(training),
         "validation_records": len(validation),
@@ -681,11 +756,20 @@ def _campaign_config(campaign_dir: str | Path) -> dict[str, Any]:
     return {}
 
 
+def _local_fit_completion_sentinel(outdir: str | Path) -> Path | None:
+    algorithm_dir = Path(outdir) / "Algorithm"
+    for filename in ("point_estimates.dat", "posterior.dat"):
+        path = algorithm_dir / filename
+        if path.exists() and path.stat().st_size > 0:
+            return path
+    return None
+
+
 def run_local_fit_job(job: LocalFitJob, bayring_executable: str = "bayRing", force: bool = False, timeout: float | None = None) -> dict[str, Any]:
     outdir = Path(job.outdir)
-    point_estimates = outdir / "Algorithm" / "point_estimates.dat"
-    if point_estimates.exists() and not force:
-        print(f"* Skipping existing local fit {job.sxs_id} mode {job.mode}.", flush=True)
+    completion_sentinel = _local_fit_completion_sentinel(outdir)
+    if completion_sentinel is not None and not force:
+        print(f"* Skipping existing local fit {job.sxs_id} mode {job.mode}: found {completion_sentinel.name}.", flush=True)
         return {
             "sxs_id": job.sxs_id,
             "mode": job.mode,
@@ -693,6 +777,7 @@ def run_local_fit_job(job: LocalFitJob, bayring_executable: str = "bayRing", for
             "outdir": job.outdir,
             "returncode": 0,
             "status": "skipped-existing",
+            "completion_file": str(completion_sentinel),
         }
 
     outdir.mkdir(parents=True, exist_ok=True)
@@ -756,6 +841,30 @@ def _select_jobs(jobs: Iterable[LocalFitJob], split: str = "all", modes: Iterabl
     return selected
 
 
+def _progress_bar(done: int, total: int, width: int = 28) -> str:
+    if total <= 0:
+        return "[" + "-" * width + "] 0/0"
+    filled = int(round(width * done / total))
+    filled = min(width, max(0, filled))
+    return "[" + "#" * filled + "-" * (width - filled) + f"] {done}/{total}"
+
+
+def _print_local_fit_progress(done: int, total: int, results: list[dict[str, Any]]) -> None:
+    counts = {
+        "completed": sum(1 for row in results if row.get("status") == "completed"),
+        "failed": sum(1 for row in results if row.get("status") == "failed"),
+        "timeout": sum(1 for row in results if row.get("status") == "timeout"),
+        "skipped": sum(1 for row in results if row.get("status") == "skipped-existing"),
+    }
+    print(
+        "* Progress {bar} completed={completed} skipped={skipped} failed={failed} timeout={timeout}".format(
+            bar=_progress_bar(done, total),
+            **counts,
+        ),
+        flush=True,
+    )
+
+
 def run_local_fits(
     campaign_dir: str | Path,
     workers: int = 1,
@@ -772,12 +881,21 @@ def run_local_fits(
     if workers < 1:
         raise ValueError("`workers` must be at least 1.")
 
+    print(f"* Local-fit campaign: {len(jobs)} jobs, split={split}, workers={workers}.", flush=True)
+    if not jobs:
+        _print_local_fit_progress(0, 0, [])
+
+    results: list[dict[str, Any]] = []
     if workers == 1:
-        results = [run_local_fit_job(job, executable, force=force, timeout=timeout) for job in jobs]
+        for index, job in enumerate(jobs, start=1):
+            results.append(run_local_fit_job(job, executable, force=force, timeout=timeout))
+            _print_local_fit_progress(index, len(jobs), results)
     else:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
             futures = [executor.submit(run_local_fit_job, job, executable, force, timeout) for job in jobs]
-            results = [future.result() for future in concurrent.futures.as_completed(futures)]
+            for index, future in enumerate(concurrent.futures.as_completed(futures), start=1):
+                results.append(future.result())
+                _print_local_fit_progress(index, len(jobs), results)
         results.sort(key=lambda row: (row["sxs_id"], row["mode"]))
 
     summary_path = campaign_dir / "local_fit_run_summary.csv"
@@ -813,6 +931,61 @@ def read_point_estimates(path: str | Path) -> dict[str, dict[str, float]]:
                 "sigma": _as_float(pieces[2], default=math.nan) if len(pieces) > 2 else math.nan,
             }
     return estimates
+
+
+def read_posterior_estimates(path: str | Path) -> dict[str, dict[str, float]]:
+    path = Path(path)
+    delimiter = None
+    header: list[str] = []
+    rows: list[list[str]] = []
+    with path.open("r", encoding="utf-8") as posterior_file:
+        for line in posterior_file:
+            stripped = line.strip()
+            if stripped:
+                stripped = stripped.lstrip("#").strip()
+                delimiter = "," if "," in stripped else None
+                header = [item.strip() for item in stripped.split(delimiter) if item.strip()] if delimiter else stripped.split()
+                break
+
+        for line in posterior_file:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            rows.append([item.strip() for item in stripped.split(delimiter) if item.strip()] if delimiter else stripped.split())
+
+    estimates: dict[str, dict[str, float]] = {}
+    skipped_names = {"logL", "logPrior", "logL_birth", "log_w", "log_wt", "logwt"}
+    for index, name in enumerate(header):
+        if name in skipped_names:
+            continue
+        values = [
+            _as_float(row[index], default=math.nan)
+            for row in rows
+            if index < len(row)
+        ]
+        values = [value for value in values if math.isfinite(value)]
+        if not values:
+            continue
+        sigma = math.nan
+        if len(values) > 1:
+            mean = sum(values) / len(values)
+            sigma = math.sqrt(sum((value - mean) ** 2 for value in values) / (len(values) - 1))
+        estimates[name] = {
+            "value": _median(values),
+            "sigma": sigma,
+        }
+    return estimates
+
+
+def read_local_fit_estimates(outdir: str | Path) -> tuple[dict[str, dict[str, float]], str]:
+    algorithm_dir = Path(outdir) / "Algorithm"
+    point_path = algorithm_dir / "point_estimates.dat"
+    if point_path.exists() and point_path.stat().st_size > 0:
+        return read_point_estimates(point_path), "point_estimate"
+    posterior_path = algorithm_dir / "posterior.dat"
+    if posterior_path.exists() and posterior_path.stat().st_size > 0:
+        return read_posterior_estimates(posterior_path), "posterior_median"
+    return {}, "missing"
 
 
 def _read_peak_time(path: str | Path) -> float | None:
@@ -863,9 +1036,9 @@ def fill_higher_mode_inputs(
         peak_time = _read_peak_time(Path(job.outdir) / "Peak_quantities" / "Peak_time.txt")
         if job.mode == "22" and peak_time is not None:
             peak_times[job.sxs_id] = peak_time
-        point_path = Path(job.outdir) / "Algorithm" / "point_estimates.dat"
-        if point_path.exists():
-            estimates_by_job[(job.sxs_id, job.mode)] = read_point_estimates(point_path)
+        estimates, _ = read_local_fit_estimates(job.outdir)
+        if estimates:
+            estimates_by_job[(job.sxs_id, job.mode)] = estimates
 
     configs_updated = 0
     parent_fixes_added = 0
@@ -1080,17 +1253,16 @@ def collect_local_fit_outputs(campaign_dir: str | Path, output_table: str | Path
     phases: dict[tuple[str, str], dict[str, Any]] = {}
 
     for job in jobs:
-        point_path = Path(job.outdir) / "Algorithm" / "point_estimates.dat"
         job_mismatch_rows = collect_mismatch_rows(job)
         mismatch_rows.extend(job_mismatch_rows)
         mismatch = representative_mismatch(job_mismatch_rows)
+        estimates, estimate_source = read_local_fit_estimates(job.outdir)
 
-        if not point_path.exists():
-            failures.append({"sxs_id": job.sxs_id, "mode": job.mode, "outdir": job.outdir, "reason": "missing point_estimates.dat"})
+        if not estimates:
+            failures.append({"sxs_id": job.sxs_id, "mode": job.mode, "outdir": job.outdir, "reason": "missing point_estimates.dat or posterior.dat"})
             rows.extend(_record_metadata_targets(records_by_id.get(job.sxs_id), job))
             continue
 
-        estimates = read_point_estimates(point_path)
         for parameter, estimate in estimates.items():
             target = _target_from_parameter(parameter, job.mode)
             if target is None:
@@ -1098,7 +1270,7 @@ def collect_local_fit_outputs(campaign_dir: str | Path, output_table: str | Path
             if target == "phi_mrg":
                 phases[(job.sxs_id, job.mode)] = {"job": job, **estimate, "mismatch": mismatch}
             else:
-                rows.append(_local_fit_row(job, target, estimate["value"], estimate["sigma"], source="point_estimate", mismatch=mismatch))
+                rows.append(_local_fit_row(job, target, estimate["value"], estimate["sigma"], source=estimate_source, mismatch=mismatch))
         rows.extend(_record_metadata_targets(records_by_id.get(job.sxs_id), job))
 
     for (sxs_id, mode), phase_data in sorted(phases.items()):
@@ -1131,40 +1303,62 @@ def collect_local_fit_outputs(campaign_dir: str | Path, output_table: str | Path
     return summary
 
 
-def _term_values(term_names: Iterable[str], row: dict[str, Any]) -> list[float]:
-    values = []
+def _term_power_name(variable: str, power: int) -> str:
+    return variable if power == 1 else f"{variable}^{power}"
+
+
+def _evaluate_term(term_name: str, row: dict[str, Any]) -> float:
+    if term_name == "1":
+        return 1.0
     variables = {
-        "1": 1.0,
         "nu": _as_float(row.get("nu")),
-        "nu^2": _as_float(row.get("nu")) ** 2,
-        "nu^3": _as_float(row.get("nu")) ** 3,
         "chi_eff": _as_float(row.get("chi_eff")),
         "chi_a": _as_float(row.get("chi_a")),
-        "chi_eff^2": _as_float(row.get("chi_eff")) ** 2,
-        "chi_a^2": _as_float(row.get("chi_a")) ** 2,
-        "nu*chi_eff": _as_float(row.get("nu")) * _as_float(row.get("chi_eff")),
-        "nu*chi_a": _as_float(row.get("nu")) * _as_float(row.get("chi_a")),
     }
-    for term in term_names:
-        values.append(variables[term])
-    return values
+    value = 1.0
+    for factor in term_name.split("*"):
+        if "^" in factor:
+            variable, raw_power = factor.split("^", 1)
+            power = int(raw_power)
+        else:
+            variable = factor
+            power = 1
+        value *= variables[variable] ** power
+    return value
+
+
+def _term_values(term_names: Iterable[str], row: dict[str, Any]) -> list[float]:
+    return [_evaluate_term(term, row) for term in term_names]
 
 
 def evaluate_terms(terms: Iterable[dict[str, float]], row: dict[str, Any]) -> float:
     return sum(float(term["coefficient"]) * _term_values([term["name"]], row)[0] for term in terms)
 
 
-def _candidate_bases(family: str) -> list[list[str]]:
-    nonspinning = [["1"], ["1", "nu"], ["1", "nu", "nu^2"], ["1", "nu", "nu^2", "nu^3"]]
-    if family == "nonspinning":
-        return nonspinning
-    return [
-        ["chi_eff"],
-        ["chi_eff", "chi_a"],
-        ["chi_eff", "chi_a", "nu*chi_eff"],
-        ["chi_eff", "chi_a", "nu*chi_eff", "nu*chi_a"],
-        ["chi_eff", "chi_a", "nu*chi_eff", "nu*chi_a", "chi_eff^2", "chi_a^2"],
+def _candidate_bases(family: str, max_polynomial_degree: int = 3) -> list[list[str]]:
+    max_degree = max(0, int(max_polynomial_degree))
+    if _normalise_family(family) == "nonspinning":
+        bases = []
+        for degree in range(max_degree + 1):
+            terms = ["1"]
+            terms.extend(_term_power_name("nu", power) for power in range(1, degree + 1))
+            bases.append(terms)
+        return bases
+
+    spin_terms_by_degree = [
+        (1, "chi_eff"),
+        (1, "chi_a"),
+        (2, "nu*chi_eff"),
+        (2, "nu*chi_a"),
+        (2, "chi_eff^2"),
+        (2, "chi_a^2"),
     ]
+    bases = []
+    for degree in range(1, max_degree + 1):
+        terms = [term for term_degree, term in spin_terms_by_degree if term_degree <= degree]
+        if terms and terms not in bases:
+            bases.append(terms)
+    return bases
 
 
 def _solve_linear_system(matrix: list[list[float]], vector: list[float]) -> list[float]:
@@ -1253,9 +1447,10 @@ def construct_global_fit(
     template: str = "RatExp",
     teob_calibration: str = "qc",
     base_nonspinning_file: str | None = None,
+    max_polynomial_degree: int = 3,
 ) -> dict[str, Any]:
-    if family == "aligned-spin" and not base_nonspinning_file:
-        raise ValueError("Aligned-spin global fits require a nonspinning base fit file.")
+    if _is_spin_family(family) and not base_nonspinning_file:
+        raise ValueError("Spinning global fits require a nonspinning base fit file.")
     base_fit = _load_global_fit(base_nonspinning_file) if base_nonspinning_file else None
     rows = _read_table(local_fit_table)
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
@@ -1274,16 +1469,17 @@ def construct_global_fit(
         "template": template,
         "calibration": teob_calibration,
         "base_nonspinning_file": str(base_nonspinning_file or ""),
+        "max_polynomial_degree": int(max_polynomial_degree),
         "fits": {},
         "relative_phase_reference": "22",
-        "notes": "Aligned-spin fits are constructed as spin corrections on top of the nonspinning terms when a base file is provided.",
+        "notes": "Spinning fits are constructed as spin corrections on top of the nonspinning terms when a base file is provided.",
     }
     for (mode_label, target), target_rows in sorted(grouped.items()):
         if len(target_rows) < 2:
             continue
         base_terms = _base_terms_for(base_fit, mode_label, target)
         candidates = []
-        for term_names in _candidate_bases(family):
+        for term_names in _candidate_bases(family, max_polynomial_degree=max_polynomial_degree):
             if len(target_rows) < len(term_names):
                 continue
             candidates.append(_fit_basis(target_rows, target, term_names, base_terms=base_terms))
@@ -1731,6 +1927,82 @@ def plot_teobpm_mismatch_comparison(
         "notes": "Nonspinning mismatch plots use nu. Spinning mismatch plots use nu-chi_eff.",
     }
     (output_path / "teobpm_mismatch_comparison_summary.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    return payload
+
+
+def _safe_filename_token(text: Any) -> str:
+    return "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in str(text))
+
+
+def plot_local_fit_diagnostics(
+    local_fit_table: str | Path,
+    output_dir: str | Path,
+    family: str = "auto",
+) -> dict[str, Any]:
+    import matplotlib.pyplot as plt
+
+    output_path = Path(output_dir)
+    coefficient_dir = output_path / "coefficients"
+    mismatch_dir = output_path / "mismatches"
+    coefficient_dir.mkdir(parents=True, exist_ok=True)
+
+    rows = [
+        row for row in _read_table(local_fit_table)
+        if row.get("value") not in (None, "") and row.get("target") not in (None, "")
+    ]
+    plt.rcParams.update({
+        "figure.figsize": (7.0, 4.8),
+        "axes.grid": True,
+        "grid.alpha": 0.25,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+    })
+
+    coefficient_plots: list[Path] = []
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for row in rows:
+        grouped.setdefault((str(row.get("mode", "")), str(row.get("target", ""))), []).append(row)
+
+    for (mode_label, target), target_rows in sorted(grouped.items()):
+        values = np.array([_as_float(row.get("value"), math.nan) for row in target_rows])
+        finite_mask = np.isfinite(values)
+        if not finite_mask.any():
+            continue
+        finite_rows = [row for row, keep in zip(target_rows, finite_mask) if keep]
+        values = values[finite_mask]
+        chi_eff = np.array([_as_float(row.get("chi_eff"), 0.0) for row in finite_rows])
+        nu = np.array([_as_float(row.get("nu"), math.nan) for row in finite_rows])
+
+        fig, ax = plt.subplots()
+        if np.all(np.abs(chi_eff) <= 1.0e-8):
+            ax.scatter(nu, values, s=42, edgecolor="black", linewidth=0.25)
+            ax.set_xlabel(r"$\nu$")
+        else:
+            scatter = ax.scatter(nu, chi_eff, c=values, cmap="viridis", s=52, edgecolor="black", linewidth=0.25)
+            cbar = fig.colorbar(scatter, ax=ax)
+            cbar.set_label(target)
+            ax.set_xlabel(r"$\nu$")
+            ax.set_ylabel(r"$\chi_\mathrm{eff}$")
+        ax.set_title(f"Local fit {target}, mode {mode_label}")
+        if np.all(np.abs(chi_eff) <= 1.0e-8):
+            ax.set_ylabel(target)
+        path = coefficient_dir / f"local_fit_coefficients_mode_{_safe_filename_token(mode_label)}_{_safe_filename_token(target)}.png"
+        fig.tight_layout()
+        fig.savefig(path, dpi=220)
+        plt.close(fig)
+        coefficient_plots.append(path)
+
+    mismatch_summary: dict[str, Any] = {}
+    if any(row.get("mismatch") not in (None, "") for row in rows):
+        mismatch_summary = plot_teobpm_mismatch_comparison([local_fit_table], mismatch_dir, labels=["Local fits"], family=family)
+
+    payload = {
+        "local_fit_table": str(local_fit_table),
+        "coefficient_plots": [str(path) for path in coefficient_plots],
+        "mismatch_summary": mismatch_summary,
+        "plots": [str(path) for path in coefficient_plots] + list(mismatch_summary.get("plots", [])),
+    }
+    (output_path / "local_fit_plot_summary.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     return payload
 
 
@@ -3484,9 +3756,12 @@ def _config_from_args(args: argparse.Namespace) -> CalibrationConfig:
         teob_calibration=args.teob_calibration,
         validation_fraction=args.validation_fraction,
         seed=args.seed,
+        sxs_ids=sorted(set(parse_sxs_ids(getattr(args, "sxs_ids", "")) + read_sxs_id_file(getattr(args, "sxs_id_file", "")))),
+        random_fraction=args.random_fraction,
         max_eccentricity=args.max_eccentricity,
         max_transverse_spin=args.max_transverse_spin,
         nonspinning_spin_tolerance=args.nonspinning_spin_tolerance,
+        equal_mass_tolerance=args.equal_mass_tolerance,
         min_quality_score=args.min_quality_score,
         bayring_executable=args.bayring_executable,
         nr_data_dir=args.nr_data_dir,
@@ -3508,18 +3783,22 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     prepare = subparsers.add_parser("prepare", help="Discover/filter SXS metadata and generate local-fit configs.")
-    prepare.add_argument("--family", choices=["nonspinning", "aligned-spin"], required=True)
+    prepare.add_argument("--family", choices=["nonspinning", "equal-mass-spinning", "spinning", "aligned-spin"], required=True)
     prepare.add_argument("--output-dir", required=True)
     prepare.add_argument("--catalog-file", default=None)
     prepare.add_argument("--modes", default=",".join(_mode_label(mode) for mode in DEFAULT_MODES))
-    prepare.add_argument("--mode-mixing-modes", default="", help="Comma-separated TEOBPM modes that should enable TEOB mode-mixing, e.g. 32,43.")
+    prepare.add_argument("--mode-mixing-modes", default=",".join(_mode_label(mode) for mode in DEFAULT_MODE_MIXING_MODES), help="Comma-separated TEOBPM modes that should enable TEOB mode-mixing, e.g. 32,43.")
     prepare.add_argument("--template", choices=["HypTan", "RatExp"], default="RatExp")
     prepare.add_argument("--teob-calibration", choices=["qc", "noncirc"], default="qc")
     prepare.add_argument("--validation-fraction", type=float, default=0.33)
     prepare.add_argument("--seed", type=int, default=1234)
+    prepare.add_argument("--sxs-ids", default="", help="Optional comma-separated SXS IDs to keep after loading the catalog.")
+    prepare.add_argument("--sxs-id-file", default="", help="Optional text file with one SXS ID per line, or comma-separated IDs.")
+    prepare.add_argument("--random-fraction", type=float, default=1.0, help="Randomly keep this fraction of the filtered catalog, using --seed.")
     prepare.add_argument("--max-eccentricity", type=float, default=1.0e-3)
     prepare.add_argument("--max-transverse-spin", type=float, default=1.0e-6)
     prepare.add_argument("--nonspinning-spin-tolerance", type=float, default=1.0e-6)
+    prepare.add_argument("--equal-mass-tolerance", type=float, default=1.0e-6)
     prepare.add_argument("--min-quality-score", type=float, default=None)
     prepare.add_argument("--bayring-executable", default="bayRing")
     prepare.add_argument("--nr-data-dir", default="")
@@ -3537,14 +3816,15 @@ def build_parser() -> argparse.ArgumentParser:
     fit = subparsers.add_parser("global-fit", help="Construct the versioned pyRing-ingestable global-fit file.")
     fit.add_argument("--local-fit-table", required=True)
     fit.add_argument("--output-file", required=True)
-    fit.add_argument("--family", choices=["nonspinning", "aligned-spin"], required=True)
+    fit.add_argument("--family", choices=["nonspinning", "equal-mass-spinning", "spinning", "aligned-spin"], required=True)
     fit.add_argument("--template", choices=["HypTan", "RatExp"], default="RatExp")
     fit.add_argument("--teob-calibration", choices=["qc", "noncirc"], default="qc")
     fit.add_argument("--base-nonspinning-file", default=None)
+    fit.add_argument("--max-polynomial-degree", type=int, default=3)
 
     run = subparsers.add_parser("run-local-fits", help="Run the local-fit jobs listed in a prepared campaign.")
     run.add_argument("--campaign-dir", required=True)
-    run.add_argument("--workers", type=int, default=1)
+    run.add_argument("--workers", type=int, default=_default_worker_count())
     run.add_argument("--bayring-executable", default=None)
     run.add_argument("--force", action="store_true")
     run.add_argument("--timeout", type=float, default=None)
@@ -3637,6 +3917,11 @@ def build_parser() -> argparse.ArgumentParser:
     mismatch_compare.add_argument("--output-dir", required=True)
     mismatch_compare.add_argument("--family", choices=["auto", "all", "nonspinning", "spinning"], default="auto")
 
+    local_plot = subparsers.add_parser("plot-local-fits", help="Plot collected local-fit coefficients and mismatch diagnostics.")
+    local_plot.add_argument("--local-fit-table", required=True)
+    local_plot.add_argument("--output-dir", required=True)
+    local_plot.add_argument("--family", choices=["auto", "all", "nonspinning", "spinning"], default="auto")
+
     report = subparsers.add_parser("report", help="Render and optionally compile a campaign report.")
     report.add_argument("--campaign-dir", required=True)
     report.add_argument("--output-tex", required=True)
@@ -3658,6 +3943,7 @@ def main(argv: list[str] | None = None) -> None:
             template=args.template,
             teob_calibration=args.teob_calibration,
             base_nonspinning_file=args.base_nonspinning_file,
+            max_polynomial_degree=args.max_polynomial_degree,
         )
         summary = {"output_file": args.output_file, "n_modes": len(payload["fits"])}
     elif args.command == "run-local-fits":
@@ -3732,6 +4018,12 @@ def main(argv: list[str] | None = None) -> None:
             args.mismatch_table,
             args.output_dir,
             labels=args.label,
+            family=args.family,
+        )
+    elif args.command == "plot-local-fits":
+        summary = plot_local_fit_diagnostics(
+            args.local_fit_table,
+            args.output_dir,
             family=args.family,
         )
     elif args.command == "report":

@@ -28,7 +28,7 @@ license = "MIT"
 
 [project.scripts]
 bayRing = "bayRing.bayRing:main"
-bayRing-teobpm-calibrate = "bayRing.teobpm_calibration:main"
+bayRing-teobpm-calibrate = "scripts.teobpm.teobpm_calibration:main"
 
 [project.optional-dependencies]
 docs = [

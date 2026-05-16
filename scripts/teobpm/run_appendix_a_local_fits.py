@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the reusable Appendix A local-fit workflow.
 
-This wrapper intentionally delegates to ``bayRing.teobpm_calibration`` instead
+This wrapper intentionally delegates to ``scripts.teobpm.teobpm_calibration`` instead
 of storing generated per-job shell commands.  It is meant to be run from any
 checkout with explicit campaign paths.
 """
@@ -13,6 +13,10 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
+
+def _default_worker_count() -> int:
+    return max(1, os.cpu_count() or 1)
 
 
 def _add_common_environment_args(parser: argparse.ArgumentParser) -> None:
@@ -49,7 +53,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--campaign-dir", required=True, help="Appendix A campaign directory to create or reuse.")
     parser.add_argument("--nc-ringdown-dir", default=None, help="Path to the nc_ringdown checkout.")
-    parser.add_argument("--workers", type=int, default=4, help="Number of parallel bayRing local-fit workers.")
+    parser.add_argument("--workers", type=int, default=_default_worker_count(), help="Number of parallel bayRing local-fit workers.")
     parser.add_argument("--timeout", type=float, default=None, help="Per-job timeout in seconds.")
     parser.add_argument("--bayring-executable", default="bayRing", help="bayRing executable used by run-local-fits.")
     parser.add_argument("--skip-prepare", action="store_true", help="Do not run appendix-a-prepare.")
@@ -68,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     campaign_dir = Path(args.campaign_dir)
     env = _env_from_args(args)
-    module = [sys.executable, "-m", "bayRing.teobpm_calibration"]
+    module = [sys.executable, "-m", "scripts.teobpm.teobpm_calibration"]
 
     if not args.skip_prepare:
         command = module + ["appendix-a-prepare", "--output-dir", str(campaign_dir), "--bayring-executable", args.bayring_executable]

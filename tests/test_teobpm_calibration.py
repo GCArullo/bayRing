@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from bayRing import teobpm_calibration as calib
+from scripts.teobpm import teobpm_calibration as calib
 
 
 def _catalog_rows():
@@ -126,6 +126,24 @@ def test_prepare_campaign_allows_zero_validation_fraction(tmp_path):
     assert json.loads((output_dir / "manifests" / "validation_manifest.json").read_text(encoding="utf-8")) == []
 
 
+def test_prepare_parser_defaults_to_mixed_higher_modes_and_sxs_id_subset(tmp_path):
+    args = calib.build_parser().parse_args([
+        "prepare",
+        "--family",
+        "nonspinning",
+        "--output-dir",
+        str(tmp_path / "campaign"),
+        "--sxs-ids",
+        "1,SXS_BBH_0003",
+    ])
+
+    config = calib._config_from_args(args)
+
+    assert config.mode_mixing_modes == [(3, 2), (4, 3)]
+    assert config.sxs_ids == ["SXS:BBH:0001", "SXS:BBH:0003"]
+    assert config.random_fraction == 1.0
+
+
 def test_run_local_fit_job_invokes_bayring_and_writes_logs(tmp_path, monkeypatch):
     config_file = tmp_path / "fit.ini"
     config_file.write_text("[I/O]\n", encoding="utf-8")
@@ -171,6 +189,40 @@ def test_run_local_fit_job_invokes_bayring_and_writes_logs(tmp_path, monkeypatch
     assert calls[0]["timeout"] == 12.5
     assert (tmp_path / "out" / "campaign_logs" / "stdout.txt").read_text(encoding="utf-8") == "stdout text\n"
     assert (tmp_path / "out" / "campaign_logs" / "stderr.txt").read_text(encoding="utf-8") == "stderr text\n"
+
+
+def test_run_local_fit_job_skips_existing_sampler_posterior(tmp_path, monkeypatch):
+    config_file = tmp_path / "fit.ini"
+    config_file.write_text("[Inference]\nmethod = Nested-sampler\n", encoding="utf-8")
+    outdir = tmp_path / "out"
+    (outdir / "Algorithm").mkdir(parents=True)
+    posterior_path = outdir / "Algorithm" / "posterior.dat"
+    posterior_path.write_text("c3A_22\tlogL\tlogPrior\n1.0\t-2.0\t0.0\n", encoding="utf-8")
+    job = calib.LocalFitJob(
+        sxs_id="SXS:BBH:0001",
+        mode="22",
+        split="training",
+        config_file=str(config_file),
+        outdir=str(outdir),
+        q=1.0,
+        nu=0.25,
+        chi1z=0.0,
+        chi2z=0.0,
+        chi_eff=0.0,
+        chi_a=0.0,
+        eccentricity=0.0,
+        quality_score=1.0,
+    )
+
+    def fail_run(*args, **kwargs):
+        raise AssertionError("existing sampler posterior should skip execution")
+
+    monkeypatch.setattr(calib.subprocess, "run", fail_run)
+
+    summary = calib.run_local_fit_job(job)
+
+    assert summary["status"] == "skipped-existing"
+    assert summary["completion_file"] == str(posterior_path)
 
 
 def test_run_local_fits_filters_requested_split(tmp_path, monkeypatch):
@@ -337,6 +389,45 @@ def test_collect_local_fit_outputs_reads_estimates_mismatches_and_relative_phase
     assert (campaign_dir / "local_fit_collection_summary.json").exists()
 
 
+def test_collect_local_fit_outputs_reads_sampler_posterior_when_point_estimate_missing(tmp_path):
+    campaign_dir = tmp_path / "campaign"
+    outdir = campaign_dir / "local_fits" / "SXS_BBH_0001" / "mode_22"
+    (outdir / "Algorithm").mkdir(parents=True)
+    (outdir / "Algorithm" / "posterior.dat").write_text(
+        "c3A_22\tphi_mrg_22\tlogL\tlogPrior\n"
+        "1.0\t0.1\t-5.0\t0.0\n"
+        "2.0\t0.2\t-4.0\t0.0\n"
+        "3.0\t0.3\t-3.0\t0.0\n",
+        encoding="utf-8",
+    )
+    job = calib.LocalFitJob(
+        sxs_id="SXS:BBH:0001",
+        mode="22",
+        split="training",
+        config_file=str(campaign_dir / "fit.ini"),
+        outdir=str(outdir),
+        q=1.0,
+        nu=0.25,
+        chi1z=0.0,
+        chi2z=0.0,
+        chi_eff=0.0,
+        chi_a=0.0,
+        eccentricity=0.0,
+        quality_score=1.0,
+    )
+    calib.write_local_fit_index([job], campaign_dir / "local_fit_index.csv")
+
+    summary = calib.collect_local_fit_outputs(campaign_dir)
+
+    rows = list(csv.DictReader((campaign_dir / "local_fit_summary.csv").open(encoding="utf-8")))
+    c3a_rows = [row for row in rows if row["mode"] == "22" and row["target"] == "c3A"]
+    assert summary["failures"] == 0
+    assert len(c3a_rows) == 1
+    assert c3a_rows[0]["source"] == "posterior_median"
+    assert abs(float(c3a_rows[0]["value"]) - 2.0) < 1.0e-12
+    assert float(c3a_rows[0]["sigma"]) > 0.0
+
+
 def test_construct_global_fit_uses_nonspinning_base_for_aligned_spin(tmp_path):
     base_fit = {
         "schema": calib.FIT_SCHEMA,
@@ -384,6 +475,42 @@ def test_construct_global_fit_uses_nonspinning_base_for_aligned_spin(tmp_path):
     assert terms[0]["name"] == "1"
     assert any(term["name"] == "chi_eff" for term in terms)
     assert output_path.exists()
+
+
+def test_construct_global_fit_respects_max_polynomial_degree(tmp_path):
+    table_path = tmp_path / "local.csv"
+    with table_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["split", "mode", "target", "nu", "chi_eff", "chi_a", "value"])
+        writer.writeheader()
+        for nu in [0.16, 0.19, 0.22, 0.25]:
+            writer.writerow({
+                "split": "training",
+                "mode": "22",
+                "target": "c3A",
+                "nu": nu,
+                "chi_eff": 0.0,
+                "chi_a": 0.0,
+                "value": 1.0 + 2.0 * nu + 4.0 * nu * nu,
+            })
+
+    linear_payload = calib.construct_global_fit(
+        table_path,
+        tmp_path / "linear.json",
+        "nonspinning",
+        max_polynomial_degree=1,
+    )
+    quadratic_payload = calib.construct_global_fit(
+        table_path,
+        tmp_path / "quadratic.json",
+        "nonspinning",
+        max_polynomial_degree=2,
+    )
+
+    linear_terms = [term["name"] for term in linear_payload["fits"]["22"]["c3A"]["terms"]]
+    quadratic_terms = [term["name"] for term in quadratic_payload["fits"]["22"]["c3A"]["terms"]]
+    assert "nu^2" not in linear_terms
+    assert "nu^2" in quadratic_terms
+    assert quadratic_payload["max_polynomial_degree"] == 2
 
 
 def test_prediction_rows_use_validation_split_when_available(tmp_path):

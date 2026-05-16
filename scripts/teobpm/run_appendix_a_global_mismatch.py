@@ -10,6 +10,10 @@ import sys
 from pathlib import Path
 
 
+def _default_worker_count() -> int:
+    return max(1, os.cpu_count() or 1)
+
+
 def _add_common_environment_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--pythonpath", default=None, help="Optional PYTHONPATH to prepend while running bayRing.")
     parser.add_argument("--numba-cache-dir", default=None, help="Optional NUMBA_CACHE_DIR for numba/SXS imports.")
@@ -45,7 +49,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--appendix-campaign-dir", required=True, help="Completed Appendix A coefficient-fit campaign directory.")
     parser.add_argument("--campaign-dir", required=True, help="Mismatch campaign directory to create or reuse.")
     parser.add_argument("--nc-ringdown-dir", default=None, help="Path to the nc_ringdown checkout.")
-    parser.add_argument("--workers", type=int, default=4, help="Number of parallel bayRing local-fit workers.")
+    parser.add_argument("--workers", type=int, default=_default_worker_count(), help="Number of parallel bayRing local-fit workers.")
     parser.add_argument("--timeout", type=float, default=None, help="Per-job timeout in seconds.")
     parser.add_argument("--n-random-seeds", type=int, default=1, help="Minimization random seeds per fit.")
     parser.add_argument("--bayring-executable", default="bayRing", help="bayRing executable used by run-local-fits.")
@@ -65,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     appendix_campaign_dir = Path(args.appendix_campaign_dir)
     campaign_dir = Path(args.campaign_dir)
     env = _env_from_args(args)
-    module = [sys.executable, "-m", "bayRing.teobpm_calibration"]
+    module = [sys.executable, "-m", "scripts.teobpm.teobpm_calibration"]
 
     if not args.skip_prepare:
         command = module + [
