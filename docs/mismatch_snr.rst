@@ -191,8 +191,11 @@ percentiles and plot percentiles from ``bayRing.postprocess``:
    summary_percentiles = (5, 50, 95)
    plot_percentiles = (50,)
 
-For point-estimate methods, ``bayRing`` writes a Gaussian approximation to
-``Algorithm/posterior.dat`` so the same percentile-based machinery can be used.
+For point-estimate methods with ``point-estimate-posterior-samples = 0``,
+``bayRing`` builds waveform percentiles from the central point estimate and
+one-at-a-time ``+/- 1 sigma`` parameter perturbations. Positive
+``point-estimate-posterior-samples`` values also write a Gaussian approximation
+to ``Algorithm/posterior.dat`` for diagnostic use.
 
 Output Files
 ~~~~~~~~~~~~

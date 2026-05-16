@@ -74,8 +74,9 @@ Point-estimate methods also write:
    * - ``Algorithm/point_estimates.dat``
      - Best-fit values and one-sigma error estimates.
    * - ``Algorithm/posterior.dat``
-     - Synthetic Gaussian posterior approximation centred on the point
-       estimate. This is generated so plotting code can run.
+     - Optional synthetic Gaussian posterior approximation centred on the point
+       estimate, written only when
+       ``point-estimate-posterior-samples > 0``.
 
 The synthetic point-estimate posterior is not a replacement for nested
 sampling. It is a convenience product for diagnostic plots.
@@ -151,8 +152,9 @@ To regenerate diagnostics without rerunning inference:
    sampler = cpnest
 
 The method and sampler still matter because they tell post-processing how to
-read the saved results. For point-estimate methods, post-processing reads the
-stored ``Algorithm/posterior.dat`` approximation.
+read the saved results. For point-estimate methods, post-processing reads
+``Algorithm/point_estimates.dat`` by default and uses ``Algorithm/posterior.dat``
+only when ``point-estimate-posterior-samples > 0``.
 
 NR-Only Plotting
 ~~~~~~~~~~~~~~~~

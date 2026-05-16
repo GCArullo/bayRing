@@ -461,6 +461,7 @@ def read_config(Config):
         'min-method'       : 'trf',
         'min-iter-max'     : 1000,
         'n-random-seeds'   : 16  ,
+        'point-estimate-posterior-samples': 0,
         'linear-inversion-eigenvalue-tol': 1e-10,
         },
 
@@ -581,6 +582,8 @@ def read_config(Config):
         raise ValueError("Invalid start-time parallelization option: `n-start-time-workers` must be at least 1.")
     if(parameters['Inference']['n-mode-workers'] < 1):
         raise ValueError("Invalid mode parallelization option: `n-mode-workers` must be at least 1.")
+    if(parameters['Inference']['point-estimate-posterior-samples'] < 0):
+        raise ValueError("Invalid point-estimate posterior option: `point-estimate-posterior-samples` must be non-negative.")
 
     if('NR-mode-list' not in parameters['NR-data']):
         l_values = parameters['NR-data'].get('l-NR-list', [parameters['NR-data']['l-NR']])
@@ -877,6 +880,10 @@ A dot is present at the end of each description line and is not to be intended a
             min-iter-max     Maximum number of iterations for the minimization algorithm.                                        Default: 1000.
             
             n-random-seeds   Number of random seeds to be used to initialize the minimization.                                   Default: 16.
+
+            point-estimate-posterior-samples
+                             Number of Gaussian posterior samples to draw from the local point-estimate covariance. \
+                             Set to 0 to skip this file and post-process from the point estimate and one-sigma errors.             Default: 0.
 
             The linear inversion:
 

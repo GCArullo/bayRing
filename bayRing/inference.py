@@ -1155,8 +1155,23 @@ def run_inference(parameters, inference_model):
         
         point_estimate = dict(zip(inference_model.names, minimization_results))
         postprocess.save_point_estimates(point_estimate, parameters['I/O']['outdir'], errors=minimization.errors)
-        postprocess.save_point_estimate_posterior(point_estimate, parameters['I/O']['outdir'], covariance=minimization.covariance, errors=minimization.errors, seed=parameters['Inference']['seed'])
-        results_object = postprocess.read_posterior_samples(parameters['I/O']['outdir'])
+        results_object = postprocess.PointEstimateResults(point_estimate, errors=minimization.errors, covariance=minimization.covariance)
+
+        point_estimate_posterior_samples = int(parameters['Inference'].get('point-estimate-posterior-samples', postprocess.point_estimate_posterior_samples))
+        if(point_estimate_posterior_samples < 0):
+            raise ValueError("Invalid point-estimate posterior option: `point-estimate-posterior-samples` must be non-negative.")
+        if(point_estimate_posterior_samples > 0):
+            postprocess.save_point_estimate_posterior(
+                point_estimate,
+                parameters['I/O']['outdir'],
+                covariance=minimization.covariance,
+                errors=minimization.errors,
+                seed=parameters['Inference']['seed'],
+                n_samples=point_estimate_posterior_samples,
+            )
+            results_object = postprocess.read_posterior_samples(parameters['I/O']['outdir'])
+        else:
+            postprocess.remove_point_estimate_posterior(parameters['I/O']['outdir'])
 
     elif(is_linear_inversion_method(parameters['Inference']['method'])):
 
@@ -1167,8 +1182,23 @@ def run_inference(parameters, inference_model):
         
         point_estimate = dict(zip(inference_model.names, linear_inversion_results))
         postprocess.save_point_estimates(point_estimate, parameters['I/O']['outdir'], errors=linear_inversion.errors)
-        postprocess.save_point_estimate_posterior(point_estimate, parameters['I/O']['outdir'], covariance=linear_inversion.covariance, errors=linear_inversion.errors, seed=parameters['Inference']['seed'])
-        results_object = postprocess.read_posterior_samples(parameters['I/O']['outdir'])
+        results_object = postprocess.PointEstimateResults(point_estimate, errors=linear_inversion.errors, covariance=linear_inversion.covariance)
+
+        point_estimate_posterior_samples = int(parameters['Inference'].get('point-estimate-posterior-samples', postprocess.point_estimate_posterior_samples))
+        if(point_estimate_posterior_samples < 0):
+            raise ValueError("Invalid point-estimate posterior option: `point-estimate-posterior-samples` must be non-negative.")
+        if(point_estimate_posterior_samples > 0):
+            postprocess.save_point_estimate_posterior(
+                point_estimate,
+                parameters['I/O']['outdir'],
+                covariance=linear_inversion.covariance,
+                errors=linear_inversion.errors,
+                seed=parameters['Inference']['seed'],
+                n_samples=point_estimate_posterior_samples,
+            )
+            results_object = postprocess.read_posterior_samples(parameters['I/O']['outdir'])
+        else:
+            postprocess.remove_point_estimate_posterior(parameters['I/O']['outdir'])
 
     elif(parameters['Inference']['method'] == 'Nested-sampler'):
         

@@ -255,7 +255,7 @@ def _run_single_start(Config, parameters, config_file):
     postprocess.print_point_estimate(results_object, inference_model.access_names(), parameters['Inference']['method'])
 
     pyRing_utils.print_subsection('Waveform metrics')
-    postprocess.l2norm_residual_vs_nr(results_object, inference_model, NR_sim, parameters['I/O']['outdir'])
+    postprocess.l2norm_residual_vs_nr(results_object, inference_model, NR_sim, parameters['I/O']['outdir'], parameters['Inference']['method'])
 
     # Not needed now that we define everything directly at the peak.
     # if(parameters['Model']['template']=='Kerr'): postprocess.post_process_amplitudes(parameters['Inference']['t-start'], results_object, NR_metadata, qnm_cached, Kerr_modes, Kerr_quad_modes, parameters['I/O']['outdir'])

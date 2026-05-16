@@ -268,6 +268,10 @@ version.
    * - ``n-random-seeds``
      - ``16``
      - Number of minimization starts.
+   * - ``point-estimate-posterior-samples``
+     - ``0``
+     - Optional Gaussian samples drawn from the point-estimate covariance.
+       ``0`` skips ``Algorithm/posterior.dat`` for point-estimate methods.
    * - ``linear-inversion-eigenvalue-tol``
      - ``1e-10``
      - Fisher eigenvalue floor for linear inversion.

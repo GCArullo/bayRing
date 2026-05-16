@@ -204,6 +204,36 @@ def test_save_point_estimate_posterior_writes_gaussian_samples(tmp_path):
     assert np.mean(posterior["phi_220"]) == pytest.approx(0.3, abs=0.03)
 
 
+def test_save_point_estimate_posterior_zero_samples_skips_file(tmp_path):
+    output_dir = tmp_path / "Algorithm"
+    output_dir.mkdir(parents=True)
+
+    posterior_path = inference.postprocess.save_point_estimate_posterior(
+        {"ln_A_220": 1.2},
+        str(tmp_path),
+        errors={"ln_A_220": 0.04},
+        n_samples=0,
+    )
+
+    assert posterior_path is None
+    assert not (output_dir / "posterior.dat").exists()
+
+
+def test_point_estimate_parameter_samples_use_one_sigma_errors():
+    results = inference.postprocess.PointEstimateResults(
+        {"ln_A_220": 1.2, "phi_220": 0.3},
+        errors={"ln_A_220": 0.04, "phi_220": float("nan")},
+    )
+
+    samples = inference.postprocess.waveform_parameter_samples(results, "Minimization")
+
+    assert samples[0] == {"ln_A_220": 1.2, "phi_220": 0.3}
+    assert abs(samples[1]["ln_A_220"] - 1.16) < 1e-12
+    assert samples[1]["phi_220"] == 0.3
+    assert abs(samples[2]["ln_A_220"] - 1.24) < 1e-12
+    assert samples[2]["phi_220"] == 0.3
+
+
 def test_read_point_estimate_postprocessing_uses_posterior_file(tmp_path):
     if not hasattr(inference.np, "genfromtxt"):
         pytest.skip("requires real numpy genfromtxt")
@@ -223,7 +253,30 @@ def test_read_point_estimate_postprocessing_uses_posterior_file(tmp_path):
     assert results["phi_220"][1] == pytest.approx(0.4)
 
 
-def test_point_estimate_inference_writes_summary_but_returns_posterior(monkeypatch, tmp_path):
+def test_read_point_estimate_postprocessing_prefers_point_file_when_zero_samples(tmp_path):
+    output_dir = tmp_path / "Algorithm"
+    output_dir.mkdir(parents=True)
+    (output_dir / "point_estimates.dat").write_text(
+        "# parameter\tvalue\tsigma\nln_A_220\t1.2\t0.04\n",
+        encoding="utf-8",
+    )
+    (output_dir / "posterior.dat").write_text(
+        "# ln_A_220\n9.0\n",
+        encoding="utf-8",
+    )
+    parameters = {
+        "I/O": {"outdir": str(tmp_path)},
+        "Inference": {"method": "Minimization", "point-estimate-posterior-samples": 0},
+    }
+
+    results = inference.postprocess.read_results_object_from_previous_inference(parameters)
+
+    assert isinstance(results, inference.postprocess.PointEstimateResults)
+    assert abs(results["ln_A_220"] - 1.2) < 1e-12
+    assert abs(results.errors["ln_A_220"] - 0.04) < 1e-12
+
+
+def test_point_estimate_inference_defaults_to_point_results(monkeypatch, tmp_path):
     calls = []
 
     class FakeModel:
@@ -252,24 +305,66 @@ def test_point_estimate_inference_writes_summary_but_returns_posterior(monkeypat
     def fake_save_point_estimates(results, outdir, errors=None):
         calls.append(("summary", dict(results), outdir, dict(errors)))
 
-    def fake_save_point_estimate_posterior(results, outdir, covariance=None, errors=None, seed=None):
-        calls.append(("posterior", dict(results), outdir, covariance, dict(errors), seed))
+    def fake_save_point_estimate_posterior(*args, **kwargs):
+        raise AssertionError("default point-estimate inference should not write posterior samples")
 
     monkeypatch.setattr(inference, "Minimization_Algorithm", FakeMinimization)
     monkeypatch.setattr(inference, "KerrLinearInversion_Algorithm", FakeLinearInversion)
     monkeypatch.setattr(inference.postprocess, "save_point_estimates", fake_save_point_estimates)
     monkeypatch.setattr(inference.postprocess, "save_point_estimate_posterior", fake_save_point_estimate_posterior)
-    monkeypatch.setattr(inference.postprocess, "read_posterior_samples", lambda outdir: {"posterior": outdir})
+    monkeypatch.setattr(inference.postprocess, "read_posterior_samples", lambda outdir: (_ for _ in ()).throw(AssertionError("posterior should not be read")))
 
+    results = []
     for method in ["Minimization", "Linear-inversion"]:
         parameters = {"I/O": {"outdir": str(tmp_path)}, "Inference": {"method": method, "seed": 1234}}
-        assert inference.run_inference(parameters, FakeModel()) == {"posterior": str(tmp_path)}
+        results.append(inference.run_inference(parameters, FakeModel()))
+
+    assert [dict(result) for result in results] == [{"x": 1.0}, {"x": 2.0}]
+    assert results[0].errors == {"x": 0.1}
+    assert results[1].errors == {"x": 0.2}
 
     assert calls == [
         ("summary", {"x": 1.0}, str(tmp_path), {"x": 0.1}),
-        ("posterior", {"x": 1.0}, str(tmp_path), "minimization-covariance", {"x": 0.1}, 1234),
         ("summary", {"x": 2.0}, str(tmp_path), {"x": 0.2}),
-        ("posterior", {"x": 2.0}, str(tmp_path), "linear-covariance", {"x": 0.2}, 1234),
+    ]
+
+
+def test_point_estimate_inference_optionally_writes_posterior(monkeypatch, tmp_path):
+    calls = []
+
+    class FakeModel:
+        names = ["x"]
+
+    class FakeMinimization:
+        errors = {"x": 0.1}
+        covariance = "minimization-covariance"
+
+        def __init__(self, inference_model, parameters):
+            pass
+
+        def minimize_likelihood(self):
+            return [1.0]
+
+    def fake_save_point_estimates(results, outdir, errors=None):
+        calls.append(("summary", dict(results), outdir, dict(errors)))
+
+    def fake_save_point_estimate_posterior(results, outdir, covariance=None, errors=None, seed=None, n_samples=0):
+        calls.append(("posterior", dict(results), outdir, covariance, dict(errors), seed, n_samples))
+
+    monkeypatch.setattr(inference, "Minimization_Algorithm", FakeMinimization)
+    monkeypatch.setattr(inference.postprocess, "save_point_estimates", fake_save_point_estimates)
+    monkeypatch.setattr(inference.postprocess, "save_point_estimate_posterior", fake_save_point_estimate_posterior)
+    monkeypatch.setattr(inference.postprocess, "read_posterior_samples", lambda outdir: {"posterior": outdir})
+
+    parameters = {
+        "I/O": {"outdir": str(tmp_path)},
+        "Inference": {"method": "Minimization", "seed": 1234, "point-estimate-posterior-samples": 64},
+    }
+
+    assert inference.run_inference(parameters, FakeModel()) == {"posterior": str(tmp_path)}
+    assert calls == [
+        ("summary", {"x": 1.0}, str(tmp_path), {"x": 0.1}),
+        ("posterior", {"x": 1.0}, str(tmp_path), "minimization-covariance", {"x": 0.1}, 1234, 64),
     ]
 
 

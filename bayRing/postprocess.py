@@ -2,6 +2,7 @@
 import corner, h5py, matplotlib.pyplot as plt, numpy as np, os, pickle, qnm, scipy.linalg as sl, seaborn as sns, shutil, numba
 from scipy.interpolate           import interp1d
 from itertools import product
+import math
 
 # GW-packages
 from pycbc.psd                   import from_txt
@@ -37,7 +38,7 @@ strain_components = ('real', 'imag')
 summary_percentiles = (5, 50, 95)
 plot_percentiles = (50,)
 point_estimate_methods = ('Minimization', 'Linear-inversion')
-point_estimate_posterior_samples = 10000
+point_estimate_posterior_samples = 0
 window_key_index = {
     'window_DX': 0,
     'window_SX': 1,
@@ -46,9 +47,17 @@ window_key_index = {
     'saturation_SX': 4,
 }
 
+class PointEstimateResults(dict):
+
+    def __init__(self, values, errors=None, covariance=None):
+
+        super().__init__(values)
+        self.errors     = {} if errors is None else dict(errors)
+        self.covariance = covariance
+
 def read_posterior_samples(outdir):
 
-    posterior_path = os.path.join(outdir, 'Algorithm/posterior.dat')
+    posterior_path = _posterior_path(outdir)
     delimiter = None
 
     with open(posterior_path, 'r') as posterior_file:
@@ -60,10 +69,101 @@ def read_posterior_samples(outdir):
 
     return np.genfromtxt(posterior_path, names=True, deletechars="", delimiter=delimiter)
 
+def _point_estimate_path(outdir):
+
+    return os.path.join(outdir, 'Algorithm', 'point_estimates.dat')
+
+def _posterior_path(outdir):
+
+    return os.path.join(outdir, 'Algorithm', 'posterior.dat')
+
+def read_point_estimates(outdir):
+
+    point_estimates_path = _point_estimate_path(outdir)
+    values = {}
+    errors = {}
+
+    with open(point_estimates_path, 'r') as point_estimates_file:
+        for line in point_estimates_file:
+            line = line.strip()
+            if(line == '' or line.startswith('#')):
+                continue
+
+            fields = line.split()
+            if(len(fields) < 2):
+                continue
+
+            values[fields[0]] = float(fields[1])
+            if(len(fields) > 2):
+                try:
+                    errors[fields[0]] = float(fields[2])
+                except ValueError:
+                    errors[fields[0]] = getattr(np, 'nan', float('nan'))
+
+    if(len(values) == 0):
+        raise ValueError("No point estimates found in {}.".format(point_estimates_path))
+
+    return PointEstimateResults(values, errors=errors)
+
+def _finite_point_estimate_errors(results, errors=None):
+
+    if(errors is None):
+        errors = getattr(results, 'errors', {})
+
+    finite_errors = {}
+    for name in results.keys():
+        try:
+            error = float(errors.get(name, 0.0))
+        except (AttributeError, TypeError, ValueError):
+            error = 0.0
+        if(math.isfinite(error) and error > 0.0):
+            finite_errors[name] = error
+
+    return finite_errors
+
+def point_estimate_parameter_samples(results, errors=None):
+
+    mean_sample = dict(results)
+    samples = [mean_sample]
+
+    for name, error in _finite_point_estimate_errors(results, errors=errors).items():
+        try:
+            mean_value = float(mean_sample[name])
+        except (TypeError, ValueError):
+            continue
+
+        upper_sample = dict(mean_sample)
+        lower_sample = dict(mean_sample)
+        upper_sample[name] = mean_value + error
+        lower_sample[name] = mean_value - error
+        samples.extend([lower_sample, upper_sample])
+
+    return samples
+
+def _structured_point_estimate_parameter_samples(results):
+
+    names = results.dtype.names
+    values = {}
+    errors = {}
+
+    for name in names:
+        samples = np.atleast_1d(results[name])
+        values[name] = float(np.mean(samples))
+        if(len(samples) > 1):
+            errors[name] = float(np.std(samples))
+
+    return point_estimate_parameter_samples(values, errors=errors)
+
 def waveform_parameter_samples(results, method=None):
 
     if isinstance(results, dict):
-        return [results]
+        if(method in point_estimate_methods):
+            return point_estimate_parameter_samples(results)
+        else:
+            return [results]
+
+    if(method in point_estimate_methods and getattr(results, 'dtype', None) is not None and results.dtype.names is not None):
+        return _structured_point_estimate_parameter_samples(results)
 
     if(getattr(results, 'shape', None) == ()):
         return [results]
@@ -235,7 +335,16 @@ def read_results_object_from_previous_inference(parameters):
 
     if(parameters['Inference']['method'] in point_estimate_methods):
 
-        results_object = read_posterior_samples(parameters['I/O']['outdir'])
+        n_samples = int(parameters['Inference'].get('point-estimate-posterior-samples', point_estimate_posterior_samples))
+        posterior_path = _posterior_path(parameters['I/O']['outdir'])
+        point_estimates_path = _point_estimate_path(parameters['I/O']['outdir'])
+
+        if(n_samples > 0 and os.path.exists(posterior_path)):
+            results_object = read_posterior_samples(parameters['I/O']['outdir'])
+        elif(os.path.exists(point_estimates_path)):
+            results_object = read_point_estimates(parameters['I/O']['outdir'])
+        else:
+            results_object = read_posterior_samples(parameters['I/O']['outdir'])
 
     elif(parameters['Inference']['method'] == 'Nested-sampler'):
 
@@ -277,17 +386,8 @@ def print_point_estimate(results_object, names, method):
 
     if(isinstance(results_object, dict)):
         longest_name_length = utils.find_longest_name_length(results_object.keys())
-        errors = getattr(results_object, 'errors', {})
         for key in results_object.keys():
-            try:
-                has_finite_error = key in errors and np.isfinite(errors[key])
-            except AttributeError:
-                has_finite_error = key in errors and errors[key] == errors[key]
-
-            if(has_finite_error):
-                print('{} : {:.12f} +/- {:.12f}'.format(key.ljust(longest_name_length), results_object[key], errors[key]))
-            else:
-                print('{} : {:.12f}'.format(key.ljust(longest_name_length), results_object[key]))
+            print('{} : {:.12f}'.format(key.ljust(longest_name_length), results_object[key]))
     else:
         longest_name_length = utils.find_longest_name_length(names)
         for key in names:
@@ -304,15 +404,15 @@ def save_point_estimates(results, outdir, errors=None):
 
     Save the point estimates and one-sigma errors for point-estimate methods.
 
-    This file is an auxiliary summary product. Post-processing and plotting use
-    the posterior samples in Algorithm/posterior.dat.
+    Post-processing reads this file directly when no Gaussian point-estimate
+    posterior is requested.
 
     """
 
     if(errors is None):
         errors = getattr(results, 'errors', {})
 
-    point_estimates_path = os.path.join(outdir, 'Algorithm', 'point_estimates.dat')
+    point_estimates_path = _point_estimate_path(outdir)
     missing_error = getattr(np, 'nan', float('nan'))
 
     with open(point_estimates_path, 'w') as outfile:
@@ -363,6 +463,12 @@ def save_point_estimate_posterior(results, outdir, covariance=None, errors=None,
 
     """
 
+    n_samples = int(n_samples)
+    if(n_samples < 0):
+        raise ValueError("Cannot save a point-estimate posterior with a negative number of samples.")
+    if(n_samples == 0):
+        return None
+
     names = list(results.keys())
     if(len(names)==0):
         raise ValueError("Cannot save a point-estimate posterior with no parameters.")
@@ -375,10 +481,19 @@ def save_point_estimate_posterior(results, outdir, covariance=None, errors=None,
     rng     = np.random.default_rng(seed)
     samples = rng.multivariate_normal(mean, covariance, size=n_samples)
 
-    posterior_path = os.path.join(outdir, 'Algorithm', 'posterior.dat')
+    posterior_path = _posterior_path(outdir)
     np.savetxt(posterior_path, samples, header='\t'.join(names), delimiter='\t')
 
     return posterior_path
+
+def remove_point_estimate_posterior(outdir):
+
+    posterior_path = _posterior_path(outdir)
+    if(os.path.exists(posterior_path)):
+        os.remove(posterior_path)
+        return posterior_path
+
+    return None
 
 def store_and_print_amp_phi(amp_name, phi_name, t0, omega, tau, results_object, longest_name_length, outdir):
 
@@ -530,7 +645,7 @@ def post_process_amplitudes(t0, results_object, NR_metadata, qnm_cached, modes, 
 
     return
 
-def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir):
+def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir, method=None):
 
     """
 
@@ -564,7 +679,7 @@ def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir):
     NR_r, NR_i         = np.real(NR_sim.NR_cpx_cut)     , np.imag(NR_sim.NR_cpx_cut)
     t_cut = NR_sim.t_NR_cut
 
-    models_re_list, models_im_list = model_component_lists(results_object, inference_model)
+    models_re_list, models_im_list = model_component_lists(results_object, inference_model, method)
 
     wf_r = np.percentile(np.array(models_re_list),[50], axis=0)[0]
     wf_i = np.percentile(np.array(models_im_list),[50], axis=0)[0]
