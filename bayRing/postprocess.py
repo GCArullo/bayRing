@@ -1,5 +1,5 @@
 # Standard python packages
-import corner, h5py, matplotlib.pyplot as plt, numpy as np, os, qnm, scipy.linalg as sl, seaborn as sns, shutil, numba
+import corner, h5py, matplotlib.pyplot as plt, numpy as np, os, pickle, qnm, scipy.linalg as sl, seaborn as sns, shutil, numba
 from scipy.interpolate           import interp1d
 from itertools import product
 
@@ -122,6 +122,94 @@ def _initialise_result_files(*path_headers):
 def _append_result(path, *values):
     with open(path, 'a') as outfile:
         outfile.write('\t'.join(map(str, values)) + '\n')
+
+def _mode_series_with_negative_m_symmetry(mode_series, include_negative_m):
+
+    explicit_modes = set(mode_series.keys())
+    expanded = dict(mode_series)
+    if not(include_negative_m):
+        return expanded
+
+    for (l_value, m_value), series in mode_series.items():
+        if(m_value == 0):
+            continue
+        counterpart = (l_value, -m_value)
+        if(counterpart not in explicit_modes and counterpart not in expanded):
+            expanded[counterpart] = ((-1)**l_value) * np.conjugate(series)
+
+    return expanded
+
+def _project_modes_to_polarizations(mode_series, inclination, azimuth, include_negative_m=True):
+
+    projected_strain = 0.0j
+    for (l_value, m_value), series in _mode_series_with_negative_m_symmetry(mode_series, include_negative_m).items():
+        y_lm = lal.SpinWeightedSphericalHarmonic(inclination, azimuth, -2, l_value, m_value)
+        projected_strain = projected_strain + series * y_lm
+
+    return np.real(projected_strain), -np.imag(projected_strain)
+
+def _project_modes_to_detector(mode_series, inclination, azimuth, F_plus, F_cross, include_negative_m=True):
+
+    h_plus, h_cross = _project_modes_to_polarizations(mode_series, inclination, azimuth, include_negative_m)
+
+    return F_plus * h_plus + F_cross * h_cross
+
+def _mode_percentile_waveform(model_samples, percentile):
+
+    samples = np.asarray(model_samples)
+
+    return (
+        np.percentile(np.real(samples), percentile, axis=0)
+        + 1j*np.percentile(np.imag(samples), percentile, axis=0)
+    )
+
+def _load_hm_mode_products(run_parameters):
+
+    product_path = os.path.join(run_parameters['I/O']['outdir'], 'NR_sim.pkl')
+    with open(product_path, 'rb') as product_file:
+        NR_sim, model_samples, _ = pickle.load(product_file)
+
+    return {
+        'mode': (run_parameters['NR-data']['l-NR'], run_parameters['NR-data']['m']),
+        'outdir': run_parameters['I/O']['outdir'],
+        'time': np.asarray(NR_sim.t_NR_cut),
+        'nr': np.asarray(NR_sim.NR_r_cut) + 1j*np.asarray(NR_sim.NR_i_cut),
+        'model_samples': np.asarray(model_samples),
+    }
+
+def _common_mode_time(mode_products):
+
+    t_start = max(product['time'][0] for product in mode_products)
+    t_end   = min(product['time'][-1] for product in mode_products)
+    if(t_end <= t_start):
+        raise ValueError("The selected NR modes do not have an overlapping fit interval.")
+
+    n_points = min(len(product['time']) for product in mode_products)
+
+    return np.linspace(t_start, t_end, n_points)
+
+def _interpolate_mode_series(mode_products, common_time, percentile=None):
+
+    interpolated = {}
+    for product in mode_products:
+        if(percentile is None):
+            series = product['nr']
+        else:
+            series = _mode_percentile_waveform(product['model_samples'], percentile)
+        interpolated[product['mode']] = interp1d(product['time'], series, bounds_error=False, fill_value=0.0)(common_time)
+
+    return interpolated
+
+def _hm_sum_output_dir(base_outdir, t_start, n_start_times):
+
+    outdir = os.path.join(base_outdir, 'HM_sum')
+    if(n_start_times > 1):
+        label = "{:.12g}".format(float(t_start)).replace('-', 'm').replace('+', '').replace('.', 'p')
+        outdir = os.path.join(outdir, "t_start_{}M".format(label))
+
+    os.makedirs(os.path.join(outdir, 'Algorithm/Mismatch'), exist_ok=True)
+
+    return outdir
 
 def _mismatch_subfolder(direction):
     return "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
@@ -1172,6 +1260,159 @@ def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, 
             except Exception as e:
                 print(f"Error processing optimal SNR for {perc}% CI and {NR_quant}: {e}")
                 continue
+
+def compute_higher_mode_sum_mismatch(mode_products, base_parameters, t_start, n_start_times, acf, N_FFT,
+                                     window_size_DX, window_size_SX, k, saturation_DX, saturation_SX):
+
+    base_outdir = base_parameters['I/O']['outdir']
+    M, dL, ra, dec, psi = waveform_utils.extract_GW_parameters(base_parameters)
+    azimuth = base_parameters['Mismatch-GW-parameters']['azimuth']
+    inclinations = base_parameters['Mismatch-GW-parameters']['inclination-list']
+    include_negative_m = bool(base_parameters['Mismatch-GW-parameters']['hm-include-negative-m'])
+
+    outdir = _hm_sum_output_dir(base_outdir, t_start, n_start_times)
+    outFile_path = _windowed_result_path(
+        outdir, "Mismatch_HM_sum", M, dL, t_start, N_FFT,
+        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX
+    )
+    _initialise_result_files((outFile_path, '#CI\tinclination\tazimuth\tpsi\tMismatch\n'))
+
+    common_time = _common_mode_time(mode_products)
+    scale = _physical_strain_scale(M, dL)
+    nr_modes = {
+        mode: series * scale
+        for mode, series in _interpolate_mode_series(mode_products, common_time).items()
+    }
+    model_modes_by_percentile = {
+        percentile: {
+            mode: series * scale
+            for mode, series in _interpolate_mode_series(mode_products, common_time, percentile).items()
+        }
+        for percentile in summary_percentiles
+    }
+
+    resp = AntennaResponse('H1', ra=ra, dec=dec, psi=psi, tensor=True, times=1126259462.43)
+    F_plus, F_cross = resp.plus, resp.cross
+
+    for inclination in inclinations:
+        NR_data = _project_modes_to_detector(
+            nr_modes, inclination, azimuth, F_plus, F_cross, include_negative_m
+        )
+        whiten_whiten_h_NR, h_NR_h_NR_sqrt = _toeplitz_whitened_norm(acf, NR_data)
+        if(h_NR_h_NR_sqrt == 0.0):
+            print("* Skipping HM-summed mismatch at inclination {} because the NR norm is zero.".format(inclination))
+            continue
+
+        for percentile in summary_percentiles:
+            wf = _project_modes_to_detector(
+                model_modes_by_percentile[percentile], inclination, azimuth, F_plus, F_cross, include_negative_m
+            )
+            _, h_wf_h_wf_sqrt = _toeplitz_whitened_norm(acf, wf)
+            if(h_wf_h_wf_sqrt == 0.0):
+                print("* Skipping HM-summed mismatch for percentile {} at inclination {} because the model norm is zero.".format(percentile, inclination))
+                continue
+            h_wf_h_NR = np.dot(wf, whiten_whiten_h_NR)
+            TD_match = abs(h_wf_h_NR) / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
+            TD_match = np.minimum(1 - abs(1 - TD_match), TD_match)
+            TD_mismatch = 1 - TD_match
+            _append_result(outFile_path, percentile, inclination, azimuth, psi, TD_mismatch)
+
+    print("* HM-summed mismatch written to `{}`.".format(outFile_path))
+
+    return
+
+def run_higher_mode_mismatch_scan(run_parameters_list, base_parameters):
+
+    groups = {}
+    for run_parameters in run_parameters_list:
+        if not(run_parameters['I/O'].get('mode-output', False)):
+            continue
+        key = run_parameters['Inference']['t-start']
+        groups.setdefault(key, []).append(run_parameters)
+
+    if not(groups):
+        return
+
+    print('\n* Computing higher-mode summed mismatch diagnostics.\n')
+    M, _, _, _, _ = waveform_utils.extract_GW_parameters(base_parameters)
+
+    for t_start, group_parameters in sorted(groups.items()):
+        mode_products = []
+        for run_parameters in group_parameters:
+            product_path = os.path.join(run_parameters['I/O']['outdir'], 'NR_sim.pkl')
+            if not(os.path.exists(product_path)):
+                print("* Skipping HM-summed mismatch for t-start = {} M because `{}` is missing.".format(t_start, product_path))
+                mode_products = []
+                break
+            mode_products.append(_load_hm_mode_products(run_parameters))
+
+        if(len(mode_products) < 2):
+            continue
+
+        common_time = _common_mode_time(mode_products)
+        duration_g = common_time[-1] - common_time[0]
+        t_NR_s = (common_time - common_time[0]) * M * C_mt
+        t_start_s, t_end_s = 0.0, duration_g * C_mt * M
+        NR_length = len(common_time)
+
+        try:
+            apply_window, _, clear_directory_flag, C1_flag, mismatch_print_flag, mismatch_section_plot_flag = \
+                waveform_utils.extract_flags(base_parameters['Flags'])
+
+            (f_min, f_max, dt, _, N_points, n_FFT_points, asd_path,
+             n_iterations_C1, window_sizes_DX, window_sizes_SX,
+             steepness_values, saturation_DX_values, saturation_SX_values,
+             direction) = waveform_utils.extract_and_compute_psd_parameters(
+                base_parameters['Mismatch-PSD-settings'], mismatch_print_flag
+            )
+
+            n_fft_values = [N_points] if n_FFT_points == 1 else list(
+                map(int, np.logspace(np.log10(NR_length), np.log10(2 * N_points), n_FFT_points))
+            )
+
+            if clear_directory_flag == 1:
+                mismatch_dir = os.path.join(_hm_sum_output_dir(base_parameters['I/O']['outdir'], t_start, len(groups)), "Algorithm/Mismatch")
+                for smoothing_path in ["Left_smoothing", "Right_smoothing", "Both_edges_smoothing"]:
+                    clear_directory(os.path.join(mismatch_dir, smoothing_path))
+
+            grid = product(
+                n_fft_values,
+                window_sizes_DX,
+                window_sizes_SX,
+                steepness_values,
+                saturation_DX_values,
+                saturation_SX_values,
+            )
+
+            for N_fft, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX in grid:
+                if (t_end_s - t_start_s) > 1 / (f_min + window_size_DX) and direction != 'above':
+                    print("Please provide (t_end-t_start) < 1/(f_min+window_DX) for HM-summed mismatch.")
+                    print("Forbidden frequency:", f_min + window_size_DX)
+                    continue
+
+                window_args = (window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)
+                if apply_window == 1:
+                    PSD_smoothed, ACF_smoothed = waveform_utils.acf_from_asd_with_smoothing(
+                        asd_path, f_min, f_max, N_fft, *window_args,
+                        direction, C1_flag, n_iterations_C1
+                    )
+                else:
+                    PSD_smoothed, ACF_smoothed = waveform_utils.acf_from_asd_no_window_at_edges(
+                        asd_path, f_min, f_max, N_fft
+                    )
+
+                t_ACF = np.linspace(0, N_fft * dt, len(ACF_smoothed))
+                ACF_truncated_NR = truncate_and_interpolate_acf(
+                    t_ACF, ACF_smoothed, M, 0.0, duration_g, t_NR_s, mismatch_print_flag
+                )
+                compute_higher_mode_sum_mismatch(
+                    mode_products, base_parameters, t_start, len(groups), ACF_truncated_NR, N_fft, *window_args
+                )
+
+        except Exception as e:
+            print("* HM-summed mismatch failed for t-start = {} M: {}".format(t_start, e))
+
+    return
 
 def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdir, method, tail_flag, extract_damping_time_flag):
 

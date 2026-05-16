@@ -117,6 +117,27 @@ data. It does not force every model QNM to have the same ``l``. In the Kerr
 template, multiple spheroidal QNMs with the same azimuthal index can contribute
 to the selected spherical multipole.
 
+Several NR multipoles can be fitted from one configuration. Either pass paired
+lists to ``l-NR`` and ``m``:
+
+.. code-block:: ini
+
+   [NR-data]
+   l-NR = 2,3,4
+   m = 2,3,4
+
+or pass explicit pairs with ``NR-modes``:
+
+.. code-block:: ini
+
+   [NR-data]
+   NR-modes = [(2,2),(3,3),(4,4)]
+
+Compact mode tokens such as ``NR-modes = 22,33,4-4`` are also accepted. When
+several modes are supplied, bayRing repeats the analysis for each mode and
+writes mode-dependent products below ``outdir/mode_l<l>_m<m>/``. Set
+``n-mode-workers`` in ``[Inference]`` to run multiple mode fits concurrently.
+
 For informed-amplitude fits using the ``(2,2)`` peak time as reference, provide
 the time of the ``(2,2)`` peak:
 

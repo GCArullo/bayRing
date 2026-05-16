@@ -199,13 +199,13 @@ class _FakeNumpy(types.ModuleType):
         return _FakeArray(bool(a and b) for a, b in zip(left, right))
 
     def real(self, values):
-        if isinstance(values, _FakeArray):
-            return _FakeArray((v.real if isinstance(v, complex) else v) for v in values)
+        if isinstance(values, (list, tuple, _FakeArray)):
+            return _FakeArray(self.real(v) for v in values)
         return values.real if isinstance(values, complex) else values
 
     def imag(self, values):
-        if isinstance(values, _FakeArray):
-            return _FakeArray((v.imag if isinstance(v, complex) else 0.0) for v in values)
+        if isinstance(values, (list, tuple, _FakeArray)):
+            return _FakeArray(self.imag(v) for v in values)
         return values.imag if isinstance(values, complex) else 0.0
 
     def exp(self, values):
@@ -233,6 +233,32 @@ class _FakeNumpy(types.ModuleType):
 
     def asarray(self, value):
         return self.array(value)
+
+    def isscalar(self, value):
+        return isinstance(value, (int, float, complex, bool))
+
+    def conjugate(self, values):
+        if isinstance(values, _FakeArray):
+            return _FakeArray(self.conjugate(value) for value in values)
+        return values.conjugate() if isinstance(values, complex) else values
+
+    def percentile(self, values, percentile, axis=None):
+        def percentile_1d(sequence):
+            ordered = sorted(sequence)
+            if not ordered:
+                return 0.0
+            rank = (len(ordered) - 1) * percentile / 100.0
+            lower = int(math.floor(rank))
+            upper = int(math.ceil(rank))
+            if lower == upper:
+                return ordered[lower]
+            weight = rank - lower
+            return ordered[lower] * (1.0 - weight) + ordered[upper] * weight
+
+        if axis == 0 and values and isinstance(values[0], (list, tuple, _FakeArray)):
+            return _FakeArray(percentile_1d(column) for column in zip(*values))
+
+        return percentile_1d(values)
 
     def column_stack(self, values):
         if not values:
@@ -461,6 +487,7 @@ if "lal" not in sys.modules:
     fake_lal.G_SI = 1.0
     fake_lal.C_SI = 1.0
     fake_lal.PC_SI = 1.0
+    fake_lal.SpinWeightedSphericalHarmonic = lambda theta, phi, s, l, m: complex(math.cos(theta) + 0.1*l, math.sin(phi) + 0.1*m)
     fake_lal_antenna.AntennaResponse = _FakeAntennaResponse
     fake_lal.antenna = fake_lal_antenna
 
