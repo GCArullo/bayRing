@@ -303,14 +303,14 @@ def store_and_print_amp_phi(amp_name, phi_name, t0, omega, tau, results_object, 
 
     amp_name : str
         Name of the amplitude parameter.
-    
+
     phi_name : str
         Name of the phase parameter.
 
     t0 : float
         Time at which the amplitude and phase are defined.
 
-    omega : float   
+    omega : float
         Frequency of the mode.
 
     tau : float
@@ -407,7 +407,7 @@ def post_process_amplitudes(t0, results_object, NR_metadata, qnm_cached, modes, 
 
     Mf = NR_metadata['Mf']
     af = NR_metadata['af']
-    
+
     if 'qf' in NR_metadata.keys(): qf = NR_metadata['qf']
     else                         : qf = None
 
@@ -440,10 +440,10 @@ def post_process_amplitudes(t0, results_object, NR_metadata, qnm_cached, modes, 
 
                 store_and_print_amp_phi(amp_name, phi_name, t0, omega, tau, results_object, longest_name_length, outdir)
 
-    return 
+    return
 
 def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir):
-    
+
     """
 
     Compare the residual of the fit with the NR error.
@@ -455,9 +455,9 @@ def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir):
 
     results_object : dict
         Dictionary containing the results of the inference algorithm.
-    
+
     inference_model : Nested sampler object
-        Nested sampler object. 
+        Nested sampler object.
 
     NR_sim : NR_sim
         NR simulation object.
@@ -493,12 +493,12 @@ def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir):
     outFile_L2_errors.write('# L2 norm of NR error is \n')
     outFile_L2_errors.write(f'{l2_NR} \n')
 
-    return 
+    return
 
 def init_plotting():
 
     """
-    
+
     Function to set the default plotting parameters.
 
     Parameters
@@ -508,11 +508,11 @@ def init_plotting():
     Returns
     -------
     Nothing, but sets the default plotting parameters.
-    
+
     """
-    
+
     plt.rcParams['figure.max_open_warning'] = 0
-    
+
     plt.rcParams['mathtext.fontset']  = 'stix'
     plt.rcParams['font.family']       = 'STIXGeneral'
 
@@ -531,16 +531,16 @@ def init_plotting():
     plt.rcParams['ytick.minor.size']  = 3
     plt.rcParams['ytick.major.width'] = 1
     plt.rcParams['ytick.minor.width'] = 1
-    
+
     plt.rcParams['legend.frameon']             = False
     plt.rcParams['legend.loc']                 = 'center left'
     plt.rcParams['contour.negative_linestyle'] = 'solid'
-    
+
     plt.gca().spines['right'].set_color('none')
     plt.gca().spines['top'].set_color('none')
     plt.gca().xaxis.set_ticks_position('bottom')
     plt.gca().yaxis.set_ticks_position('left')
-    
+
     return
 
 def compare_with_GR_QNMs(results_object, qnm_cached, NR_sim, outdir):
@@ -586,7 +586,7 @@ def interpolate_waveform(t_start_g, t_end_g, M, wf_lNR, acf):
 
     """
     Interpolates the waveform to match the length of the autocovariance function (ACF).
-    
+
     Parameters
     ----------
     - t_start_g (float) : Start time in geometrical units.
@@ -628,19 +628,19 @@ def convert_asd_to_pycbc_psd(asd_file, delta_f):
 
     pycbc.types.FrequencySeries: The computed PSD as a FrequencySeries object.
     """
-    
+
     # Load ASD data from file
     data       = np.loadtxt(asd_file)
     asd_values = data[:, 1]   # Second column: ASD values
-    
+
     # Compute PSD by squaring ASD values
     psd_values = asd_values ** 2
-    
+
     print(f"Loaded ASD file: {asd_file}, PSD length: {len(psd_values)}")
 
     # Convert to PyCBC FrequencySeries
     psd = FrequencySeries(psd_values, delta_f=delta_f)
-    
+
     return psd
 
 def clear_directory(directory_path):
@@ -715,7 +715,7 @@ def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_N
         print("\nACF time array expr. in [s] (first half, associated to positive frequencies): ", t_ACF_half)
         print("\nTruncated ACF time array expr. in [s] : ", t_ACF_truncated)
         print("\nTruncated waveform time array expr. in geometrical units : ", t_NR_s/(M*C_mt))
-    
+
     return ACF_trunc
 
 def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf, M, dL, t_start_g, t_end_g, window_size_DX, window_size_SX, k):
@@ -752,7 +752,7 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
 
     Returns
     -------
-    
+
     Nothing, only creates sanity plots.
     """
 
@@ -890,7 +890,7 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
     return
 
 def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size, k, compare_TD_FD, sanity_check_mm):
-   
+
     """
     OLD VERSION. Compute the mismatch of the model with respect to NR simulations.
     """
@@ -920,7 +920,7 @@ def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, metho
         except Exception as e:
             print(f"Error in NR scalar product for {NR_quant}: {e}")
             continue
-        
+
         # Load waveform template
         models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
@@ -961,7 +961,7 @@ def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, metho
     return
 
 def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, mismatch_print_flag, compare_TD_FD):
-   
+
     """
     Compute the mismatch of the model with respect to NR simulations.
     """
@@ -985,7 +985,7 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
         except Exception as e:
             print(f"Error in NR scalar product for {NR_quant}: {e}")
             continue
-        
+
         # Load waveform template
         models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
@@ -1023,10 +1023,10 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
     return
 
 def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, ra, dec, psi, t_start_g, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX):
-    
+
     """
     Compute the mismatch of the model with respect to NR simulations.
-    
+
     """
     print(f"* Computing mismatch for the strain assuming: M={M}, D_L={dL}, ra={ra}, dec={dec}, psi={psi}")
 
@@ -1065,8 +1065,8 @@ def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf,
         TD_mismatch = 1 - TD_match
 
         _append_result(outFile_path, perc, TD_mismatch)
-        
-    return 
+
+    return
 
 def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, compare_TD_FD):
     """
@@ -1114,7 +1114,7 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
 def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, method, acf, acf_tot, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, delta_f, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX):
     """
     Compute the optimal SNR of the model waveform.
-    
+
     Parameters:
         downsampling_factor (int): The factor by which the waveform will be downsampled. Default is 10.
     """
@@ -1211,7 +1211,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     """
 
     init_plotting()
-    
+
     #take NR elements
     NR_r, NR_i, NR_r_err, NR_i_err, NR_amp, NR_f, t_NR, t_peak                                                = NR_sim.NR_r, NR_sim.NR_i, np.real(NR_sim.NR_err_cmplx), np.imag(NR_sim.NR_err_cmplx), NR_sim.NR_amp, NR_sim.NR_freq, NR_sim.t_NR, NR_sim.t_peak
     t_cut, tM_start, tM_end, NR_r_cut, NR_i_cut, NR_r_err_cut, NR_i_err_cut, NR_amp_cut, NR_phi_cut, NR_f_cut = NR_sim.t_NR_cut, NR_sim.tM_start, NR_sim.tM_end, NR_sim.NR_r_cut, NR_sim.NR_i_cut, np.real(NR_sim.NR_cpx_err_cut), np.imag(NR_sim.NR_cpx_err_cut), NR_sim.NR_amp_cut, NR_sim.NR_phi_cut, NR_sim.NR_freq_cut
@@ -1225,7 +1225,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
 
     plot_overtones_flag = 0
     f_rd_overtones      = {}
-    for n in [1,3,7,9]: 
+    for n in [1,3,7,9]:
         omega_n, _, _     = qnm.modes_cache(s=-2,l=l,m=m,n=n)(a=np.abs(metadata['af']))
         f_rd_overtones[n] = (np.real(omega_n) / metadata['Mf']) * (1./twopi)
 
@@ -1265,7 +1265,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
         color_f_ring    = 'forestgreen'
 
     if(not(tail_flag) and not(wf_data_type=='psi4') and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): tM_end = 80
-    if(wf_data_type=='psi4'): 
+    if(wf_data_type=='psi4'):
         tM_end = 120
         label_data = '\psi_{4,%s%s}'%(l,m)
     else:
@@ -1279,7 +1279,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
         f   = plt.figure(figsize=(8,12))
         ax2 = plt.subplot(2,1,1)
         ax4 = plt.subplot(2,1,2)
-        
+
         rescale = 1.4
     else:
         f   = plt.figure(figsize=(12,8))
@@ -1287,7 +1287,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
         ax2 = plt.subplot(2,2,2)
         ax3 = plt.subplot(2,2,3)
         ax4 = plt.subplot(2,2,4)
-  
+
         ax1.set_xlim([-10, tM_end])
         ax3.set_xlim(ax1.get_xlim())
 
@@ -1312,22 +1312,22 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
         ax3.set_ylabel(r'$\mathrm{Im[%s]}$'%(label_data), fontsize=fontsize_labels)
         ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
 
-    if not(tail_flag): 
-        if(extract_damping_time_flag): 
+    if not(tail_flag):
+        if(extract_damping_time_flag):
             ax2.semilogy(t_NR - t_peak, NR_amp*np.e**((t_NR - t_peak)/tau_rd_fundamental), label=r'$\mathrm{NR}$', c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
         else:
             ax2.semilogy(t_NR - t_peak, NR_amp                                           , label=r'$\mathrm{NR}$', c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
-    else             : 
+    else             :
         ax2.semilogy(    t_NR - t_peak, NR_amp                                           , label=r'$\mathrm{NR}$', c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
     ax2.axvline(tM_start,                                                                                          c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
     if(not(tail_flag)): ax2.axvline(0.0,                                                                           c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
-    
-    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): 
+
+    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')):
         if(extract_damping_time_flag):
             ax2.set_ylim([1e-1*amp_peak, 10*amp_peak])
         else:
             ax2.set_ylim([1e-3*amp_peak, 2*amp_peak ])
-    elif(  tail_flag  and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): 
+    elif(  tail_flag  and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')):
         ax2.set_ylim(    [2*1e-4, 2*np.max(NR_amp)])
 
     ax2.set_xlabel(r'$\mathrm{t - t_{peak} \, [M}]$', fontsize=fontsize_labels)
@@ -1335,22 +1335,22 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     ax4.plot(t_NR - t_peak, NR_f,                                                          c=color_NR,      lw=lw_std,     alpha=alpha_std, ls='-' )
     ax4.axhline(f_rd_fundamental, label=r'$\mathit{f_{%d%d0}}$'%(l,m),                     c=color_f_ring,  lw=lw_std,     alpha=alpha_std, ls=ls_f)
     if(plot_overtones_flag):
-        for n in [1,3,9]: 
+        for n in [1,3,9]:
             if(n==1): leg = r'$\mathit{f_{%d%dn}}$'%(l,m)
             else    : leg = None
             ax4.axhline(f_rd_overtones[n], label=leg,         c=color_f_overt, lw=lw_std*0.4, alpha=alpha_std, ls=ls_f)
 
-    if(tail_flag): 
+    if(tail_flag):
         ax4.axhline(0.0,      label=r'$\mathit{f_{\rm tail}}$',                            c=color_model,   lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax4.axvline(tM_start, label=r'$\mathrm{t_{start} = t_{peak} \, + %d M}$'%tM_start, c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax4.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
-    else         : 
+    else         :
         ax4.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
     ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$'    , fontsize=fontsize_labels)
 
     # Find the index of zero
     t_peak_idx = np.argmin(np.abs(t_NR - t_peak))
-    
+
     if not(tail_flag):
         try   : ax4.set_ylim([-1.5*NR_f[t_peak_idx], 3.5*NR_f[t_peak_idx]])
         except: pass
@@ -1360,7 +1360,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     ################################
     # Plot waveform reconstruction #
     ################################
-    
+
     if not(inference_model==None):
 
         models_re_list, models_im_list = model_component_lists(results, inference_model, method)
@@ -1372,12 +1372,12 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
 
             wf_amp, wf_phi = waveform_utils.amp_phase_from_re_im(wf_r, wf_i)
             wf_f           = np.gradient(wf_phi, t_cut)/(twopi)
-            
+
             if(perc==50):
                 if not(tail_flag):
                     ax1.plot(t_cut - t_peak, wf_r,                                               c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-')
                     ax3.plot(t_cut - t_peak, wf_i,                                               c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-')
-                    if(extract_damping_time_flag): 
+                    if(extract_damping_time_flag):
                         ax2.semilogy(t_cut - t_peak, wf_amp*np.e**((t_cut - t_peak)/tau_rd_fundamental), label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
                     else:
                         ax2.semilogy(t_cut - t_peak, wf_amp                                            , label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
@@ -1388,7 +1388,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
                 if not(tail_flag):
                     ax1.plot(        t_cut - t_peak, wf_r                                                                                          , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--')
                     ax3.plot(        t_cut - t_peak, wf_i                                                                                          , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--')
-                    if(extract_damping_time_flag): 
+                    if(extract_damping_time_flag):
                         ax2.semilogy(t_cut - t_peak, wf_amp*np.e**((t_cut - t_peak)/tau_rd_fundamental)                                            , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--')
                     else:
                         ax2.semilogy(t_cut - t_peak, wf_amp                                                                                        , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--')
@@ -1401,7 +1401,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
             # Plot QNM waveform reconstruction
             qnm_samples = [_sample_with_suppressed_tail(sample, template) for sample in waveform_parameter_samples(results, method)]
             models_re_list, models_im_list = _model_component_lists_from_samples(qnm_samples, inference_model)
-            
+
             for perc in [50, 5, 95]:
 
                 wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
@@ -1409,7 +1409,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
 
                 wf_amp, wf_phi = waveform_utils.amp_phase_from_re_im(wf_r, wf_i)
                 wf_f           = np.gradient(wf_phi, t_cut)/(twopi)
-                
+
                 if(perc==50):
                     ax2.semilogy(t_cut - t_peak, wf_amp, label=r'$\mathrm{%s \,\, QNMs}$'%(template.wf_model), c='royalblue', lw=lw_large*1.4, alpha=alpha_std, ls='-' )
                     ax4.plot(    t_cut - t_peak, wf_f,                                                         c='royalblue', lw=lw_large*1.4, alpha=alpha_std, ls='-' )
@@ -1428,7 +1428,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     ax2.legend(    loc='best', fontsize=fontsize_legend, shadow=True)
     ax4.legend(    loc='best', fontsize=fontsize_legend, shadow=True)
 
-    if not(tail_flag): 
+    if not(tail_flag):
         ax1.legend(loc='best', fontsize=fontsize_legend, shadow=True)
         ax3.legend(loc='best', fontsize=fontsize_legend, shadow=True)
         ax1.set_xlim(ax3.get_xlim())
@@ -1466,7 +1466,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     ax3.errorbar(t_cut - t_peak, np.zeros(len(NR_i_cut)), yerr=np.array(NR_i_err_cut),                               c=color_NR, lw=lw_small, alpha=alpha_std, ls='-', capsize=0.15)
 
     for perc in [50, 5, 95]:
-    
+
         wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
         wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
         wf_amp, wf_phi = waveform_utils.amp_phase_from_re_im(wf_r, wf_i)
@@ -1493,7 +1493,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
     ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
 
-    ax3.set_xlim(ax1.get_xlim())  
+    ax3.set_xlim(ax1.get_xlim())
     ax4.set_xlim(ax2.get_xlim())
     ax1.set_xticklabels([])
     ax2.set_xticklabels([])
@@ -1516,7 +1516,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
 
         models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
         models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
-        
+
         for perc in [50, 5, 95]:
             wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
             wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
@@ -2019,13 +2019,13 @@ def plot_fancy_reconstruction(NR_sim, template, metadata, results, inference_mod
 def global_corner(x, names, output, truths=None):
 
     """
-    
+
     Create a corner plot of all parameters.
-    
+
     Parameters
     ----------
 
-    x       : dictionary    
+    x       : dictionary
         Dictionary of parameters.
     names   : list
         List of parameter names.
@@ -2049,11 +2049,15 @@ def global_corner(x, names, output, truths=None):
     if len(mask) == 0:
         print('* Skipping corner plot: all samples are constant.')
         return
+    labels  = list(np.array(names)[mask])
+
+    if not(truths is None):
+        truths = [truths[i] for i in mask]
 
     fig = plt.figure(figsize=(10,10))
     C   = corner.corner(samples[:,mask],
                         quantiles     = [0.05, 0.5, 0.95],
-                        labels        = names,
+                        labels        = labels,
                         color         = 'darkred',
                         show_titles   = True,
                         title_kwargs  = {"fontsize": 12},
@@ -2063,6 +2067,17 @@ def global_corner(x, names, output, truths=None):
     plt.savefig(os.path.join(output, 'Plots', 'Results', 'corner.pdf'), bbox_inches='tight')
 
     return
+
+def read_injection_truths(names, NR_sim):
+
+    if not(hasattr(NR_sim, 'injection_truths')) or NR_sim.injection_truths is None:
+        return None
+
+    truths = []
+    for name in names:
+        truths.append(NR_sim.injection_truths.get(name, None))
+
+    return truths
 
 def plot_multiple_psd(psd_data, f_min, f_max, outdir, direction, window):
     """
@@ -2137,7 +2152,7 @@ def plot_psd_and_acf(psd_data, acf_data, asd_filepath, f_min, f_max, outdir, dir
 
         # Load ASD file and convert it to PSD
         freq_file, asd_file = np.loadtxt(asd_filepath, unpack=True)
-        psd_file            = asd_file**2 
+        psd_file            = asd_file**2
 
         save_path = _mismatch_plot_dir(outdir, direction)
 
@@ -2202,7 +2217,7 @@ def plot_psd_and_acf(psd_data, acf_data, asd_filepath, f_min, f_max, outdir, dir
 def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_SX, outdir, direction):
     """
     Plot PSD curves near f_min and f_max in a single figure with two side-by-side subplots.
-    
+
     Parameters:
         psd_data (dict): Dictionary where keys are labels (str) and values are PSD arrays (np.ndarray).
         f_min (float): Minimum frequency.
@@ -2238,7 +2253,7 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_
         for i, (label, PSD_smoothed) in enumerate(psd_data.items()):
             freq = np.linspace(0, f_max, len(PSD_smoothed))  # Generate frequency axis
             alpha = max(0.3, 1 - (i * 0.15))  # Decrease opacity for different curves
-            
+
             # Identify indices for zoomed regions
             idx_min1, idx_max1 = np.argmin(np.abs(freq - x_min1)), np.argmin(np.abs(freq - x_max1))
             idx_min2, idx_max2 = np.argmin(np.abs(freq - x_min2)), np.argmin(np.abs(freq - x_max2))
@@ -2585,7 +2600,7 @@ def plot_condition_numbers(outdir, condition_numbers, thresholds=(1e3, 1e6)):
     """
     Plot the condition numbers of the ACF Toeplitz matrix as a function of window size for different k values,
     including shaded regions to indicate conditioning quality.
-    
+
     Parameters:
         condition_numbers (dict): Dictionary with keys as (window_size, k) and values as condition numbers.
         outdir (str): Directory to save the plot.
@@ -2667,7 +2682,7 @@ def plot_mismatch_optimal_SNR_condition_number_window_parameters(mismatch_data, 
                 plot_function(data_dict, outdir, direction, M, dL, N_FFT)
 
 def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX_list, window_SX_list, k_list, saturation_DX_list, saturation_SX_list,  outdir, direction):
-    
+
     """
     Loop through all combinations of windowing parameters and plot mismatch (real & imaginary at 50% CI) vs N_FFT.
     """

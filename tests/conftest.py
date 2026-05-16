@@ -345,6 +345,13 @@ if "pyRing" not in sys.modules:
     def _fake_compute_binary_quantities(m1, m2, chi1, chi2):
         return 1.0, 0.25, 0.1, -0.1
 
+    class _FakeRemnantModel:
+        def compute_remnant_parameters_from_inspiral_aligned_spins_quasicircular_parameters(self, m1, m2, chi1, chi2):
+            return 0.95*(m1 + m2), 0.7 + 0.1*(chi1 + chi2)
+
+        def compute_remnant_parameters_from_inspiral_aligned_spins_noncircular_parameters(self, m1, m2, chi1, chi2, nc_params, version):
+            return 0.94*(m1 + m2), 0.65 + 0.1*(chi1 + chi2)
+
     fake_modes = {
         "linear": {(2, 2): ["mode"]},
         "quadratic": {(2, 2): ["quad"]},
@@ -354,6 +361,7 @@ if "pyRing" not in sys.modules:
     fake_pyRing_utils.print_subsection = _fake_print_section
     fake_pyRing_utils.railing_check = _fake_railing_check
     fake_pyRing_utils.compute_KerrBinary_binary_quantities = _fake_compute_binary_quantities
+    fake_pyRing_utils.RemnantModel = _FakeRemnantModel
     fake_pyRing_utils.available_modes_dict_KerrBinary = {"London2018": fake_modes, "Carullo2024": fake_modes}
 
     fake_pyRing_waveform.KerrBH = lambda *args, **kwargs: {"args": args, "kwargs": kwargs}

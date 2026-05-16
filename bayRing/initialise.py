@@ -240,6 +240,7 @@ def read_config(Config):
         'times'            : 'from-SXS-NR',
         'noise'            : None,
         'tail'             : 0.0,
+        'parameters'       : '',
         },
 
         'Model':
@@ -252,6 +253,7 @@ def read_config(Config):
         'Kerr-tail'                        : 0            ,
         'Kerr-tail-modes'                  : '22'         ,
         'KerrBinary-version'               : 'London2018' ,
+        'KerrBinary-final-state-nc-version': ''           ,
         'KerrBinary-amplitudes-nc-version' : ''           ,
         'TEOB-template'                    : 'HypTan'     ,
         'TEOB-global-fit'                  : 1            ,
@@ -324,6 +326,12 @@ def read_config(Config):
         }
 
     }
+    if Config.has_option('Injection-data', 'Kerr-parameters'):
+        raise ValueError(
+            "[Injection-data] Kerr-parameters is no longer supported. "
+            "Use [Injection-data] parameters with the current parameter names."
+        )
+
     #General input read.
     for parameters_section in parameters.keys():
 
@@ -385,6 +393,11 @@ def read_config(Config):
     else                                                                                                : parameters['Model']['charge'] = 0
 
     if not(parameters['NR-data']['add-const']==None): parameters['NR-data']['add-const'] = [float(value) for value in parameters['NR-data']['add-const'].split(',')]
+    injection_parameters = parameters['Injection-data']['parameters']
+    if not(injection_parameters==''):
+        parameters['Injection-data']['parameters'] = ast.literal_eval(injection_parameters)
+    else:
+        parameters['Injection-data']['parameters'] = None
 
     if ((parameters['Model']['template']=='KerrBinary' or parameters['Model']['template']=='TEOBPM') and not(parameters['NR-data']['l-NR']==2 and parameters['NR-data']['m']==2) and parameters['NR-data']['t-peak-22']==0.0): raise ValueError("The time of the peak of the 22 mode must be provided for the KerrBinary and TEOBPM models when fitting the HMs, to correctly rescale the NR-calibrated quantities.")
 
@@ -444,7 +457,7 @@ A dot is present at the end of each description line and is not to be intended a
         
         dir                     Absolute path of NR local data.                                                                     Default: ''.
         
-        catalog                 NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'fake_NR']. Default: 'SXS'.
+        catalog                 NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'injections']. Default: 'SXS'.
         
         ID                      Simulation ID to be considered. Example for SXS: 0305. Example for Teukolsky: \
                                 `a_0.7_A_0.141_w_1.4_ingoing_ang_15`.                                                               Default: 0305.
@@ -471,7 +484,7 @@ A dot is present at the end of each description line and is not to be intended a
         error                   Method to compute the NR error. Available options for `SXS`: \
                                 ['constant-X', 'align-with-mismatch-all', 'align-with-mismatch-res-only', 'align-at-peak'], \
                                 for `Teukolsky`: ['constant-X', 'resolution'] where X is the constant value selected by the user, \
-                                for `RIT`: ['constant-X', 'late-time-const-error']. For 'fake_NR': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
+                                for `RIT`: ['constant-X', 'late-time-const-error']. For 'injections': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
                                 deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-res-only'.
         
         error-t-min             Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_min_mm = t_peak * (1-`error-t-min`). Default: 3e-1.
@@ -501,11 +514,16 @@ A dot is present at the end of each description line and is not to be intended a
                          'from-SXS-NR']. If the error is taken from the SXS simulation, the times must be taken \
                          from the SXS sim as well.                                                                           Default: 'from-SXS-NR'.
         
-        noise            Noise injection option. If None, the noise is not added to the simulated Kerr QNMs data; \
+        noise            Noise injection option. If None, the noise is not added to the injection data; \
             if '1', the noise is added to the data. Options: None, '1'.                                                      Default: None.
         
-        tail             Option to add the tail to the simulated Kerr QNMs data; if '1', the tail is added to the data. \
+        tail             Option to add the Kerr tail to the injection data; if '1', the tail is added to the data. \
             Options: None, '1'.                                                                                              Default: None.
+        parameters       Dictionary used to generate a template injection from config values when catalog='injections'. \
+                         Required keys are: `t_start`, `t_end`, `dt` and either `q` or both `m1`, `m2`. \
+                         Kerr-like templates also require `Mf`, `af`; NR-informed templates compute those from \
+                         binary parameters. Waveform keys match the selected template parameter names, e.g. \
+                         `ln_A_220`, `phi_220`, `f_0`, `tau_0`, `phi`, `phi_mrg_22`.                                       Default: ''.
 
     ***************************************************
     * Parameters to be passed to the [Model] section. *
@@ -527,9 +545,13 @@ A dot is present at the end of each description line and is not to be intended a
         Kerr-tail                        Boolean to add a tail factor to the Kerr template.                                                                               Default: 0.
         
         Kerr-tail-modes                  Modes to which a tail will be added in the fitting template. Example format: '22,32'.                                            Default: '22'.
-        
+
         KerrBinary-version               Option to select the version of the KerrBinary model to be used. Available options: ['London2018', 'Cheung2023', 'Carullo2024'].     Default: 'London2018'.
-        
+
+        KerrBinary-final-state-nc-version Option to select the version of the KerrBinary model final-state noncircular correction fit. Format: `X-Y`, \
+                                         where each entry selects a noncircular variable to be used for the noncircular fit, among ['Emrg', 'Jmrg']. \
+                                         Required only for Carullo2024 template injections.                                                                         Default: ''.
+
         KerrBinary-amplitudes-nc-version Option to select the version of the KerrBinary model amplitudes noncircular correction fit to be used. Format: `X-Y`, \ 
                                          where each entry selects a noncircular variable to be used for the noncircular fit, among ['bmrg','Emrg', 'Jmrg', 'Mf', 'af']. \
                                          Can also pass a single variable instead of two, but not less than one or more than two.                                          Default: ''.
@@ -758,4 +780,7 @@ __ascii_art__ = """\n\n \u001b[\u001b[38;5;39m
                                                  @
 \u001b[0m"""
 
-max_len_keyword = len('KerrBinary-amplitudes-nc-version')
+max_len_keyword = max(
+    len('KerrBinary-amplitudes-nc-version'),
+    len('KerrBinary-final-state-nc-version'),
+)

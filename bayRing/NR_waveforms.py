@@ -7,30 +7,31 @@ try   : from cbhdb import simulation
 except: pass
 
 import bayRing.QNM_utils      as QNM_utils
+import bayRing.injection      as injection_utils
+import bayRing.template_waveforms as template_waveforms
 import bayRing.utils          as utils
 import bayRing.waveform_utils as waveform_utils
 import pyRing.utils           as pyRing_utils
-import pyRing.waveform        as wf
 
 twopi = 2.*np.pi
 
-def read_fake_NR(NR_catalog, fake_NR_modes):
+def read_injection_modes(NR_catalog, injection_modes):
 
-    if(NR_catalog=='fake_NR'):
+    if(injection_utils.is_injection_catalog(NR_catalog)):
 
-        fake_NR_modes_string   = fake_NR_modes.replace(',', '_')
+        injection_modes_string   = injection_modes.replace(',', '_')
 
         injection_modes_list     = []
-        injection_modes_list_tmp = fake_NR_modes.split(',')
+        injection_modes_list_tmp = injection_modes.split(',')
         for i in range(len(injection_modes_list_tmp)):
-            l_fake_NR,m_fake_NR,n_fake_NR = int(injection_modes_list_tmp[i][0]),int(injection_modes_list_tmp[i][1]),int(injection_modes_list_tmp[i][2])
-            injection_modes_list.append((l_fake_NR,m_fake_NR,n_fake_NR))
+            l_injection, m_injection, n_injection = int(injection_modes_list_tmp[i][0]), int(injection_modes_list_tmp[i][1]), int(injection_modes_list_tmp[i][2])
+            injection_modes_list.append((l_injection, m_injection, n_injection))
 
     else:
-        fake_NR_modes_string = ''
+        injection_modes_string = ''
         injection_modes_list = None
 
-    return fake_NR_modes_string, injection_modes_list
+    return injection_modes_string, injection_modes_list
 
 def read_RWZ_env_simulation_parameters(sim_file):
 
@@ -369,7 +370,8 @@ def read_NR_metadata(NR_sim, NR_catalog):
         NRsim object containing the metadata of the NR simulation.
 
     NR_catalog : str
-        Catalog of the NR simulation. Available options: ['SXS', 'cbhdb', 'charged_raw', 'RIT', 'Teukolsky']
+        Catalog of the NR simulation. Available options: ['SXS', 'cbhdb',
+        'charged_raw', 'RIT', 'Teukolsky', 'injections']
 
     Returns
     -------
@@ -489,12 +491,8 @@ def read_NR_metadata(NR_sim, NR_catalog):
                     'af'        : NR_sim.af,
 	    }
 
-    elif(NR_catalog=='fake_NR'):
-        metadata = {
-                    'q'     : NR_sim.q,
-                    'Mf'    : NR_sim.Mf,
-                    'af'    : NR_sim.af,
-            }
+    elif(injection_utils.is_injection_catalog(NR_catalog)):
+        metadata = injection_utils.metadata_from_simulation(NR_sim)
 
     else: raise ValueError("Invalid option for NR catalog: {}".format(NR_catalog))
 
@@ -572,9 +570,11 @@ class NR_simulation():
                  injection_times                                , 
                  injection_noise                                , 
                  injection_tail                                 , 
+                 injection_parameters                           ,
                  l                                              , 
                  m                                              , 
                  outdir                                         , 
+                 injection_model_parameters = None              ,
                  waveform_type  = 'strain'                      ,
                  download       = False                         , 
                  NR_error       = 'align-with-mismatch-res-only', 
@@ -604,9 +604,26 @@ class NR_simulation():
         self.fits                     = utils.normalize_optional_path(fits)
         self.outdir                   = outdir
 
-        self.fake_NR_modes            = injection_modes_list
+        self.injection_modes          = injection_modes_list
         self.injection_noise          = injection_noise
         self.injection_tail           = injection_tail
+        self.injection_parameters     = injection_parameters
+        self.injection_model_parameters = dict(injection_model_parameters or {})
+        self.injection_model_parameters.setdefault('template', 'Kerr')
+        self.injection_model_parameters.setdefault('N-DS-modes', 1)
+        self.injection_model_parameters.setdefault('N-DS-tails', 0)
+        self.injection_model_parameters.setdefault('QNM-modes', '220,221,320')
+        self.injection_model_parameters.setdefault('QQNM-modes', '')
+        self.injection_model_parameters.setdefault('Kerr-tail-modes', '22')
+        self.injection_model_parameters.setdefault('KerrBinary-version', 'London2018')
+        self.injection_model_parameters.setdefault('KerrBinary-final-state-nc-version', '')
+        self.injection_model_parameters.setdefault('KerrBinary-amplitudes-nc-version', '')
+        self.injection_model_parameters.setdefault('TEOB-template', 'HypTan')
+        self.injection_model_parameters.setdefault('TEOB-global-fit', 1)
+        self.injection_model_parameters.setdefault('TEOB-merger-data', 0)
+        self.injection_model_parameters.setdefault('charge', 0)
+        self.injection_truths         = None
+        self.injection_metadata       = {}
 
         self.tM_start                 = tM_start
         self.tM_end                   = tM_end
@@ -618,77 +635,77 @@ class NR_simulation():
         # Read-in simulation #
         ######################
         
-        #IMPROVEME: work in progress for template injections.
-        if(self.NR_catalog=='fake_NR'):
-            
-            t_start, t_end, dt, self.q, self.Mf, self.af, self.A_dict, self.phi_dict, self.tail_dict = self.read_fake_NR_metadata()
+        if(injection_utils.is_injection_catalog(self.NR_catalog)):
+
+            raw_injection_parameters = self.injection_parameters
+            if raw_injection_parameters is None:
+                self.read_injection_metadata()
+                raw_injection_parameters = dict(self.injection_metadata_parameters)
+
+            injection_times_config, self.injection_metadata, waveform_parameters = injection_utils.prepare_injection_parameters(
+                raw_injection_parameters,
+                self.injection_model_parameters,
+            )
+            for key, value in self.injection_metadata.items():
+                setattr(self, key, value)
 
             if(injection_times=='from-metadata'):
 
-                self.t_start = t_start
-                self.t_NR    = np.arange(self.t_start, t_end, dt)
+                self.t_start = injection_times_config['t_start']
+                self.t_NR    = np.arange(self.t_start, injection_times_config['t_end'], injection_times_config['dt'])
                 if(self.t_NR[0] < 0):
                     self.t_NR = self.t_NR - self.t_NR[0]
 
             elif(injection_times=='from-SXS-NR'):
 
                 self.download      = download
-                self.fake_error_NR = NR_error
+                self.injection_error_source = NR_error
 
                 self.t_NR, self.NR_err_cmplx_SXS, self.t_start = self.extract_data_NR(t_min_mismatch, t_max_mismatch)
 
             else:
 
                 raise ValueError("Unknown times option.")
-                                            
-            modes_input = []
-            modes_input.append(','.join(['{}{}{}'.format(l_ring, m_ring, n) for l_ring, m_ring, n in self.fake_NR_modes]))
 
-            metadata_tmp       = {}
-            metadata_tmp['Mf'] = self.Mf
-            metadata_tmp['af'] = self.af
-           
-            _, _, _, _, self.qnm_cached = QNM_utils.read_Kerr_modes(modes_input, None, None, self.l, self.m, metadata_tmp)
+            injection_peak = injection_times_config.get('t_peak', self.t_start)
+            Kerr_modes, Kerr_quad_modes, qnm_cached = self._injection_Kerr_setup(self.injection_metadata)
+            Kerr_tail_modes = QNM_utils.read_tail_modes(self.injection_model_parameters['Kerr-tail-modes'])
+            fit_metadata = self._read_injection_fit_metadata()
+            injection_template = self.injection_model_parameters['template']
+            injection_tail = 0 if self.injection_tail is None else int(float(self.injection_tail))
 
-            amps = {}
-        
-            # Read-in linear modes.
-            for (l_ring, m_ring, n) in self.fake_NR_modes:
-                linear_string = '{}{}{}'.format(l_ring, m_ring, n)
+            injection_model = template_waveforms.WaveformModel(
+                self.t_NR,
+                self.t_start,
+                injection_peak,
+                injection_template,
+                self.injection_model_parameters['N-DS-modes'],
+                Kerr_modes,
+                self.injection_metadata,
+                fit_metadata,
+                qnm_cached,
+                self.l,
+                self.m,
+                N_ds_tails                = self.injection_model_parameters['N-DS-tails'],
+                tail                      = injection_tail,
+                tail_modes                = Kerr_tail_modes,
+                quadratic_modes           = Kerr_quad_modes,
+                const_params              = None,
+                KerrBinary_version        = self.injection_model_parameters['KerrBinary-version'],
+                KerrBinary_amp_nc_version = self.injection_model_parameters['KerrBinary-amplitudes-nc-version'],
+                TEOB_template             = self.injection_model_parameters['TEOB-template'],
+                TEOB_global_fit           = self.injection_model_parameters['TEOB-global-fit'],
+                TEOB_merger_data          = self.injection_model_parameters['TEOB-merger-data'],
+            )
 
-                if 'A_{}'.format(linear_string) in self.A_dict.keys(): 
-                    amps[(2, l_ring, m_ring, n)] = self.A_dict['A_{}'.format(linear_string)] * np.exp(1j*(self.phi_dict['phi_{}'.format(linear_string)]))
-                else:
-                    print("Mode not present in the metadata. Please update the metadata or change the input modes to be included in the template for the fake NR data.")
-                    exit()
+            try:
+                injected_waveform = injection_model.waveform(waveform_parameters, {})
+            except KeyError as exc:
+                raise ValueError("Missing injection parameter `{}` for template `{}`.".format(exc.args[0], injection_template)) from exc
 
-            ringdown_fun = wf.KerrBH(self.t_start                         ,
-                                     self.Mf                              ,
-                                     self.af                              ,
-                                     amps                                 ,
-                                     0.0                                  , # distance,    overrun by geom
-                                     0.0                                  , # inclination, overrun by geom
-                                     0.0                                  , # phi,         overrun by geom
-                                    
-                                     reference_amplitude = 0.0            ,
-                                     geom                = 1              ,
-                                     qnm_fit             = 0              ,
-                                     qnm_interpolants    = None           ,
-                                    
-                                     Spheroidal          = 0              , # Spheroidal harmonics, overrun by geom
-                                     amp_non_prec_sym    = 1              ,
-                                     tail_parameters     = {}             ,
-                                     quadratic_modes     = {}             ,
-                                     quad_lin_prop       = 0              ,
-                                     qnm_cached          = self.qnm_cached,
-
-                                     charge              = 0              ,
-                                     TGR_params          = None           ,
-                                     )
-            
-            _, _, _, self.NR_r, self.NR_i = ringdown_fun.waveform(self.t_NR)
-
-            self.NR_r = -self.NR_r
+            self.NR_r = np.real(injected_waveform)
+            self.NR_i = np.imag(injected_waveform)
+            self.injection_truths = dict(waveform_parameters)
 
         elif(self.NR_catalog=='charged_raw'):
 
@@ -1025,7 +1042,7 @@ class NR_simulation():
                 error_value                = float(NR_error.split('-')[-1])
                 self.NR_err_cmplx          = self.generate_constant_error(error_value)
        
-        elif(self.NR_catalog=='fake_NR'):
+        elif(injection_utils.is_injection_catalog(self.NR_catalog)):
             
             if('gaussian' in NR_error):
                 error_value                = float(NR_error.split('-')[-1])
@@ -1093,6 +1110,37 @@ class NR_simulation():
         # Store the peaktime to facilitate post-processing
         print("\n* The peak time is t_peak = {}".format(self.t_peak))
         np.savetxt(os.path.join(self.outdir,'Peak_quantities/Peak_time.txt'), np.array([self.t_peak]), header = "t_peak [sim units]")
+
+    def _injection_Kerr_setup(self, metadata):
+
+        injection_template = self.injection_model_parameters['template']
+        if injection_template == 'Damped-sinusoids':
+            return [], None, {}
+
+        cache_negative_m_qnms = (
+            injection_template == 'KerrBinary'
+            and self.injection_model_parameters['KerrBinary-version'] == 'Cheung2023'
+            and metadata['af'] < 0.0
+        )
+
+        return QNM_utils.read_Kerr_modes(
+            self.injection_model_parameters['QNM-modes'],
+            self.injection_model_parameters['QQNM-modes'],
+            self.injection_model_parameters['charge'],
+            self.l,
+            self.m,
+            metadata,
+            cache_negative_m_qnms=cache_negative_m_qnms,
+        )
+
+    def _read_injection_fit_metadata(self):
+
+        if not(self.fits):
+            return None
+
+        fit_data = pd.read_csv(self.fits)
+
+        return fit_data.iloc[0].to_dict()
        
     def extract_data_NR(self, t_min_mismatch, t_max_mismatch):
 
@@ -1111,7 +1159,7 @@ class NR_simulation():
         NR_amp, NR_phi               = waveform_utils.amp_phase_from_re_im(NR_r, NR_i)
 
         # Build NR error array.
-        if(self.fake_error_NR=='from-SXS-NR'):
+        if(self.injection_error_source=='from-SXS-NR'):
             t_res,  NR_r_res,  NR_i_res  = self.read_waveform_lm_from_SXS(self.extrap_order,   self.res_level-1)
             t_extr, NR_r_extr, NR_i_extr = self.read_waveform_lm_from_SXS(self.extrap_order+1, self.res_level)
 
@@ -1131,12 +1179,11 @@ class NR_simulation():
 
         return t_NR, NR_err_cmplx, t_peak
         
-    # FIXME: this function should be cleaned up
-    def read_fake_NR_metadata(self):
+    def read_injection_metadata(self):
         
         """
         
-        Read the metadata to create the fake NR data using the QNMs template.
+        Read metadata used to create injection data.
 
         Parameters
         ----------
@@ -1154,81 +1201,38 @@ class NR_simulation():
             Time step between each point.
         q
             Mass ratio.
-        Mf
-            Final mass of the remnant black hole.
-        af
-            Final dimensionless spin of the remnant black hole.
-        A_dict
-            Dictionary of the QNM modes amplitudes.
-        phi_dict
-            Dictionary of the QNM modes phases.
         """
 
         path_metadata = self.NR_dir + f'/metadata_{self.NR_ID}.txt'
+        parsed_metadata = {}
 
         with open(path_metadata, 'r') as input_file:
-
             for line in input_file:
-            
-                if line.startswith("t_start"):
-                    t_start = float(line.split(':')[1].strip().split()[0])
-                
-                elif line.startswith("t_end"):
-                    t_end   = float(line.split(':')[1].strip().split()[0])
+                if ':' not in line:
+                    continue
+                key, value = line.split(':', 1)
+                parsed_metadata[key.strip()] = float(value.strip().split()[0])
 
-                elif line.startswith("dt"):
-                    dt      = float(line.split(':')[1].strip().split()[0])
+        missing_keys = [key for key in ['t_start', 't_end', 'dt'] if key not in parsed_metadata]
+        if not('q' in parsed_metadata or ('m1' in parsed_metadata and 'm2' in parsed_metadata)):
+            missing_keys.append('q or m1,m2')
+        if len(missing_keys):
+            raise ValueError("Missing mandatory injection metadata entries: {}".format(missing_keys))
 
-                elif line.startswith("q"):
-                    q       = float(line.split(':')[1].strip().split()[0])
-
-                elif line.startswith("Mf"):
-                    Mf      = float(line.split(':')[1].strip().split()[0])
-
-                elif line.startswith("af"):
-                    af      = float(line.split(':')[1].strip().split()[0])
-                    
-                elif line.startswith("A_220"):
-                    A_220   = float(line.split(':')[1].strip().split()[0])
-                    
-                elif line.startswith("phi_220"):
-                    phi_220 = float(line.split(':')[1].strip().split()[0])
-                
-                elif line.startswith("A_220"):
-                    A_220   = float(line.split(':')[1].strip().split()[0])
-                    
-                elif line.startswith("phi_220"):
-                    phi_220 = float(line.split(':')[1].strip().split()[0])
-                
-                elif line.startswith("A_221"):
-                    A_221   = float(line.split(':')[1].strip().split()[0])
-                    
-                elif line.startswith("phi_221"):
-                    phi_221 = float(line.split(':')[1].strip().split()[0])
-
-                elif line.startswith("A_320"):
-                    A_320   = float(line.split(':')[1].strip().split()[0])
-                    
-                elif line.startswith("phi_320"):
-                    phi_320 = float(line.split(':')[1].strip().split()[0])
-              
-                elif line.startswith("A_22_tail"):
-                    A_22_tail = float(line.split(':')[1].strip().split()[0])
-    
-                elif line.startswith("p_22_tail"):
-                    p_22_tail = float(line.split(':')[1].strip().split()[0])
-                
-                elif line.startswith("phi_22_tail"):
-                    phi_22_tail = float(line.split(':')[1].strip().split()[0])
-                 
-                    break
-
-        A_dict    = {'A_220' : A_220, 'A_221' : A_221, 'A_320' : A_320}
-        phi_dict  = {'phi_220' : phi_220, 'phi_221' : phi_221, 'phi_320' : phi_320}
-        tail_dict = {'A_22_tail' : A_22_tail, 'p_22_tail' : p_22_tail, 'phi_22_tail' : phi_22_tail}
+        self.injection_metadata_parameters = dict(parsed_metadata)
        
-        return t_start, t_end, dt, q, Mf, af, A_dict, phi_dict, tail_dict
-        
+        return (
+            parsed_metadata['t_start'],
+            parsed_metadata['t_end'],
+            parsed_metadata['dt'],
+            parsed_metadata.get('q'),
+            parsed_metadata.get('Mf'),
+            parsed_metadata.get('af'),
+            {},
+            {},
+            {},
+        )
+
     def read_cbhdb_metadata(self):
         
         """
