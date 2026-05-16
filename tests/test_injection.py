@@ -22,14 +22,14 @@ def _base_parameters(**overrides):
     return parameters
 
 
-def test_split_injection_parameters_converts_legacy_kerr_amplitudes():
+def test_split_injection_parameters_uses_current_kerr_parameter_names():
     times, metadata, waveform_parameters = injection.split_injection_parameters(
         _base_parameters(
-            A_220=2.5,
+            ln_A_220=math.log(2.5),
             phi_220=0.3,
-            A_22_tail=0.2,
-            phi_22_tail=1.1,
-            p_22_tail=-2.0,
+            ln_A_tail_22=math.log(0.2),
+            phi_tail_22=1.1,
+            p_tail_22=-2.0,
         )
     )
 
@@ -78,9 +78,64 @@ def test_split_injection_parameters_rejects_missing_common_metadata():
         injection.split_injection_parameters({"t_start": 0.0})
 
 
-def test_legacy_fake_nr_catalog_name_is_accepted():
+def test_split_injection_parameters_rejects_legacy_parameter_names():
+    with pytest.raises(ValueError, match="Unsupported legacy injection parameter key"):
+        injection.split_injection_parameters(_base_parameters(A_220=2.5))
+
+
+def test_nr_informed_injection_computes_remnant_from_binary_parameters():
+    _, metadata, waveform_parameters = injection.prepare_injection_parameters(
+        {
+            "t_start": 0.0,
+            "t_end": 120.0,
+            "dt": 0.1,
+            "q": 2.0,
+            "chi1": 0.2,
+            "chi2": -0.1,
+            "phi": 0.3,
+        },
+        {"template": "KerrBinary", "KerrBinary-version": "London2018"},
+    )
+
+    assert math.isclose(metadata["m1"], 2.0/3.0)
+    assert math.isclose(metadata["m2"], 1.0/3.0)
+    assert math.isclose(metadata["Mf"], 0.95)
+    assert math.isclose(metadata["af"], 0.71)
+    assert waveform_parameters == {"phi": 0.3}
+
+
+def test_nr_informed_injection_rejects_independent_remnant_parameters():
+    with pytest.raises(ValueError, match="derives `Mf` and `af`"):
+        injection.prepare_injection_parameters(
+            _base_parameters(phi=0.3),
+            {"template": "TEOBPM"},
+        )
+
+
+def test_injection_catalog_name_is_current_only():
     assert injection.is_injection_catalog("injections")
-    assert injection.is_injection_catalog("fake_NR")
+    assert not injection.is_injection_catalog("fake_NR")
+
+
+def test_config_rejects_legacy_kerr_parameters_key():
+    fake_pyRing_initialise = types.ModuleType("pyRing.initialise")
+    fake_pyRing_initialise.store_git_info = lambda *args, **kwargs: None
+    sys.modules.setdefault("pyRing.initialise", fake_pyRing_initialise)
+
+    from bayRing import initialise
+
+    initialise.pyRing_utils.print_subsection = lambda *args, **kwargs: None
+
+    config = configparser.ConfigParser()
+    config.read_string(
+        """
+        [Injection-data]
+        Kerr-parameters = {'t_start': 0.0}
+        """
+    )
+
+    with pytest.raises(ValueError, match="Kerr-parameters is no longer supported"):
+        initialise.read_config(config)
 
 
 def test_injection_example_configs_cover_available_templates():
@@ -102,6 +157,9 @@ def test_injection_example_configs_cover_available_templates():
         parameters = initialise.read_config(config)
         assert parameters["NR-data"]["catalog"] == "injections"
         assert parameters["Injection-data"]["parameters"] is not None
+        if parameters["Model"]["template"] in injection.NR_INFORMED_TEMPLATES:
+            assert "Mf" not in parameters["Injection-data"]["parameters"]
+            assert "af" not in parameters["Injection-data"]["parameters"]
         templates.append(parameters["Model"]["template"])
 
     assert set(templates) == {

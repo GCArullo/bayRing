@@ -168,6 +168,9 @@ fixed values or minimization start values.
    * - ``KerrBinary-version``
      - ``London2018``
      - ``London2018``, ``Cheung2023`` or ``Carullo2024``.
+   * - ``KerrBinary-final-state-nc-version``
+     - empty string
+     - Carullo2024 final-state correction variables for template injections.
    * - ``KerrBinary-amplitudes-nc-version``
      - empty string
      - Carullo2024 amplitude-correction variables.

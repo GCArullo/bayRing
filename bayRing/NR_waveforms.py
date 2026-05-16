@@ -616,6 +616,7 @@ class NR_simulation():
         self.injection_model_parameters.setdefault('QQNM-modes', '')
         self.injection_model_parameters.setdefault('Kerr-tail-modes', '22')
         self.injection_model_parameters.setdefault('KerrBinary-version', 'London2018')
+        self.injection_model_parameters.setdefault('KerrBinary-final-state-nc-version', '')
         self.injection_model_parameters.setdefault('KerrBinary-amplitudes-nc-version', '')
         self.injection_model_parameters.setdefault('TEOB-template', 'HypTan')
         self.injection_model_parameters.setdefault('TEOB-global-fit', 1)
@@ -641,7 +642,10 @@ class NR_simulation():
                 self.read_injection_metadata()
                 raw_injection_parameters = dict(self.injection_metadata_parameters)
 
-            injection_times_config, self.injection_metadata, waveform_parameters = injection_utils.split_injection_parameters(raw_injection_parameters)
+            injection_times_config, self.injection_metadata, waveform_parameters = injection_utils.prepare_injection_parameters(
+                raw_injection_parameters,
+                self.injection_model_parameters,
+            )
             for key, value in self.injection_metadata.items():
                 setattr(self, key, value)
 
@@ -1197,14 +1201,6 @@ class NR_simulation():
             Time step between each point.
         q
             Mass ratio.
-        Mf
-            Final mass of the remnant black hole.
-        af
-            Final dimensionless spin of the remnant black hole.
-        A_dict
-            Dictionary of the QNM modes amplitudes.
-        phi_dict
-            Dictionary of the QNM modes phases.
         """
 
         path_metadata = self.NR_dir + f'/metadata_{self.NR_ID}.txt'
@@ -1217,25 +1213,24 @@ class NR_simulation():
                 key, value = line.split(':', 1)
                 parsed_metadata[key.strip()] = float(value.strip().split()[0])
 
-        missing_keys = [key for key in ['t_start', 't_end', 'dt', 'q', 'Mf', 'af'] if key not in parsed_metadata]
+        missing_keys = [key for key in ['t_start', 't_end', 'dt'] if key not in parsed_metadata]
+        if not('q' in parsed_metadata or ('m1' in parsed_metadata and 'm2' in parsed_metadata)):
+            missing_keys.append('q or m1,m2')
         if len(missing_keys):
             raise ValueError("Missing mandatory injection metadata entries: {}".format(missing_keys))
 
-        A_dict    = {key: value for key, value in parsed_metadata.items() if key.startswith('A_') and not key.startswith('A_peak') and not key.endswith('_tail')}
-        phi_dict  = {key: value for key, value in parsed_metadata.items() if key.startswith('phi_') and not key.endswith('_tail')}
-        tail_dict = {key: value for key, value in parsed_metadata.items() if key.endswith('_tail')}
         self.injection_metadata_parameters = dict(parsed_metadata)
        
         return (
             parsed_metadata['t_start'],
             parsed_metadata['t_end'],
             parsed_metadata['dt'],
-            parsed_metadata['q'],
-            parsed_metadata['Mf'],
-            parsed_metadata['af'],
-            A_dict,
-            phi_dict,
-            tail_dict,
+            parsed_metadata.get('q'),
+            parsed_metadata.get('Mf'),
+            parsed_metadata.get('af'),
+            {},
+            {},
+            {},
         )
 
     def read_cbhdb_metadata(self):

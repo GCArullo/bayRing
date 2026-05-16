@@ -67,8 +67,7 @@ Supported catalogue names in the current parser are:
    * - ``injections``
      - Internal synthetic data
      - Builds an injection waveform from the selected template and supplied
-       injection parameters. The legacy catalogue name ``fake_NR`` is still
-       accepted.
+       injection parameters.
 
 The default catalogue is ``SXS`` and the default simulation ID is ``0305``.
 
@@ -77,15 +76,18 @@ Synthetic Template Injections
 
 For ``catalog = injections``, the ``[Injection-data] parameters`` dictionary
 defines the synthetic waveform.  It must include ``t_start``, ``t_end``,
-``dt``, ``q``, ``Mf`` and ``af``.  The remaining entries use the same
-parameter names as the selected ``[Model] template``.  For example,
-``Damped-sinusoids`` accepts names such as ``ln_A_0``, ``phi_0``, ``f_0`` and
-``tau_0``; ``KerrBinary`` accepts ``phi``; and ``TEOBPM`` accepts
-``phi_mrg_22`` plus local fit coefficients when global fits are disabled.
+``dt`` and either ``q`` or both ``m1`` and ``m2``.  Kerr-like templates
+(``Damped-sinusoids``, ``Kerr`` and ``Kerr-Damped-sinusoids``) also require
+``Mf`` and ``af``.  NR-informed templates (``KerrBinary`` and ``TEOBPM``)
+derive ``Mf`` and ``af`` from the binary parameters through the same remnant
+fits used by pyRing injections, so those entries must not be supplied
+independently.
 
-Legacy Kerr-style amplitudes such as ``A_220`` and tail entries such as
-``A_22_tail``, ``phi_22_tail`` and ``p_22_tail`` are still accepted and are
-converted internally to the corresponding sampled parameter names.
+The remaining entries use the same parameter names as the selected
+``[Model] template``.  For example, ``Damped-sinusoids`` accepts names such as
+``ln_A_0``, ``phi_0``, ``f_0`` and ``tau_0``; ``KerrBinary`` accepts ``phi``;
+and ``TEOBPM`` accepts ``phi_mrg_22`` plus local fit coefficients when global
+fits are disabled.
 
 Local Data Paths
 ~~~~~~~~~~~~~~~~
