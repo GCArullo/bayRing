@@ -117,14 +117,14 @@ fixed values or minimization start values.
        ``[(2,2),(3,3)]`` or ``22,33,4-4``. Overrides list values passed to
        ``l-NR`` and ``m``.
    * - ``error``
-     - ``align-with-mismatch-res-only``
+     - ``align-with-mismatch-all``
      - NR error prescription.
    * - ``error-t-min``
-     - ``3e-1``
-     - Lower fractional mismatch-alignment window input.
+     - ``0.0``
+     - Lower mismatch-alignment window input.
    * - ``error-t-max``
-     - ``4e-3``
-     - Upper fractional mismatch-alignment window input.
+     - ``30.0``
+     - Upper mismatch-alignment window input.
    * - ``add-const``
      - ``0.0,0.0``
      - Complex constant offset encoded as amplitude,phase.

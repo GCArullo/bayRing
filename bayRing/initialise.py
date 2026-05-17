@@ -403,9 +403,9 @@ def read_config(Config):
         'l-NR'             : 2,
         'm'                : 2,
         'NR-modes'         : '',
-        'error'            : 'align-with-mismatch-res-only',
-        'error-t-min'      : 3e-1,
-        'error-t-max'      : 4e-3,
+        'error'            : 'align-with-mismatch-all',
+        'error-t-min'      : 0.0,
+        'error-t-max'      : 30.0,
         'add-const'        : '0.0,0.0',
         'properties-file'  : '',
         'fits-file'        : '',
@@ -731,11 +731,11 @@ A dot is present at the end of each description line and is not to be intended a
                                 ['constant-X', 'align-with-mismatch-all', 'align-with-mismatch-res-only', 'align-at-peak'], \
                                 for `Teukolsky`: ['constant-X', 'resolution'] where X is the constant value selected by the user, \
                                 for `RIT`: ['constant-X', 'late-time-const-error']. For 'injections': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
-                                deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-res-only'.
+                                deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-all'.
         
-        error-t-min             Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_min_mm = t_peak * (1-`error-t-min`). Default: 3e-1.
+        error-t-min             Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option. When both `error-t-min` and `error-t-max` are in [0, 1], the legacy fractional pre-peak convention is used: t_min_mm = t_peak * (1-`error-t-min`). Otherwise the value is interpreted as an offset from t_peak. Default: 0.0.
         
-        error-t-max             Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_max_mm = t_peak * (1-`error-t-max`). Default: 4e-3.
+        error-t-max             Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option. When both `error-t-min` and `error-t-max` are in [0, 1], the legacy fractional pre-peak convention is used: t_max_mm = t_peak * (1-`error-t-max`). Otherwise the value is interpreted as an offset from t_peak. Default: 30.0.
         
         add-const               Parameter of the complex constant to be added to the fit template. Required to account for spurious \
                                 effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.

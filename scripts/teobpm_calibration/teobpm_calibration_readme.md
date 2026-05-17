@@ -15,7 +15,7 @@ and `43`; those modes need completed parent-mode fits before they are run.
 line per job plus a campaign progress bar.
 
 The installed command is `bayRing-teobpm-calibrate`. From a source checkout the
-same CLI can also be run as `python -m scripts.teobpm.teobpm_calibration`.
+same CLI can also be run as `python -m scripts.teobpm_calibration.teobpm_calibration`.
 
 ## 0. Choose The Campaign
 
@@ -41,7 +41,7 @@ For the original TEOBPM-paper SXS subsets, use the reconstructed paper catalog
 CSV for the selected binary type. In the current scratch workflow these were:
 
 ```bash
-export CATALOG_FILE=scripts/teobpm/catalogs/arxiv_1904_09550_nonspinning.csv
+export CATALOG_FILE=scripts/teobpm_calibration/catalogs/arxiv_1904_09550_nonspinning.csv
 # export CATALOG_FILE=/private/tmp/teobpm_current_spinning_refit/catalogs/equal_mass_spinning.csv
 # export CATALOG_FILE=/private/tmp/teobpm_current_spinning_refit/catalogs/generic_spinning.csv
 ```

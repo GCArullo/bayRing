@@ -315,13 +315,21 @@ class _FakeTesting:
             assert diff <= tolerance, f"{a} !~= {b} (diff={diff}, tol={tolerance})"
 
 
-if "numpy" not in sys.modules:
+def _real_module_available(name: str) -> bool:
+    try:
+        __import__(name)
+    except Exception:
+        return False
+    return True
+
+
+if "numpy" not in sys.modules and not _real_module_available("numpy"):
     fake_numpy = _FakeNumpy("numpy")
     fake_numpy.testing = _FakeTesting()
     sys.modules["numpy"] = fake_numpy
 
 
-if "pandas" not in sys.modules:
+if "pandas" not in sys.modules and not _real_module_available("pandas"):
     fake_pandas = types.ModuleType("pandas")
     fake_pandas.DataFrame = lambda *args, **kwargs: {"args": args, "kwargs": kwargs}
     sys.modules["pandas"] = fake_pandas
@@ -405,7 +413,7 @@ if "pyRing" not in sys.modules:
     sys.modules["pyRing.initialise"] = fake_pyRing_initialise
 
 
-if "scipy" not in sys.modules:
+if "scipy" not in sys.modules and not _real_module_available("scipy"):
     fake_scipy = types.ModuleType("scipy")
     fake_optimize = types.ModuleType("scipy.optimize")
     fake_interpolate = types.ModuleType("scipy.interpolate")

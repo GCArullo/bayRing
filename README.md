@@ -17,3 +17,40 @@ Relies on [pyRing](https://git.ligo.org/lscsoft/pyring) for waveform interfacing
 # Documentation
 
 The documentation can be found at [https://gcarullo.github.io/bayRing/](https://gcarullo.github.io/bayRing/).
+
+# SXS ringdown-quality selector
+
+This repository also contains a reproducible SXS simulation selector for choosing one common set of non-deprecated, nonprecessing, non-eccentric BBH simulations with high-quality ringdown portions across a requested mode list.
+
+Run the default pipeline with:
+
+```bash
+python -m scripts.ringdown_quality.cli run --config configs/default.yml
+```
+
+Useful overrides are:
+
+```bash
+python -m scripts.ringdown_quality.cli run \
+  --config configs/default.yml \
+  --output outputs/my_run \
+  --catalog-tag 3.0.0 \
+  --modes "2,2 2,1 3,3 4,4" \
+  --top-k 100 \
+  --max-simulations 200
+```
+
+The selector loads `sxs.load("dataframe", tag=...)`, filters the catalog without automatic supersession, computes mode-by-mode resolution, extrapolation-order, pointwise floor, and nonprecessing symmetry metrics on the fixed `[0,30]M` post-merger window, converts raw mode scores to within-mode percentiles, and selects simulations using a single simulation-level common score. It does not perform QNM or remnant-parameter fitting.
+
+Outputs are written under `outputs/ringdown_quality` by default:
+
+```text
+run_config_resolved.yml
+candidate_catalog.csv
+rejected_catalog.csv
+per_mode_metrics.csv
+simulation_scores.csv
+selected_simulations.csv
+selected_per_mode_metrics.csv
+run_summary.txt
+```

@@ -28,8 +28,16 @@ import numpy as np
 DEFAULT_MODES = [(2, 2), (2, 1), (3, 3), (3, 2), (3, 1), (4, 4), (4, 3), (4, 2), (4, 1), (5, 5)]
 TEOB_MODE_MIXING_PARENTS = {(3, 2): (2, 2), (4, 3): (3, 3)}
 DEFAULT_MODE_MIXING_MODES = sorted(TEOB_MODE_MIXING_PARENTS)
-LOCAL_FIT_TARGETS_HYPTAN = ("A_peak_over_nu", "omg_peak", "c3A", "c3p", "c4p")
-LOCAL_FIT_TARGETS_RATEXP = ("A_peak_over_nu", "A_peakdotdot_over_nu", "omg_peak", "c2A", "c3A", "c2p", "c3p", "c4p")
+REFERENCE_FIT_TARGETS = (
+    "A_ref_over_nu",
+    "A_refdot_over_nu",
+    "A_refdotdot_over_nu",
+    "omg_ref",
+    "phi_mrg",
+    "DeltaT",
+)
+LOCAL_FIT_TARGETS_HYPTAN = ("A_peak_over_nu", "omg_peak", "c3A", "c3p", "c4p") + REFERENCE_FIT_TARGETS
+LOCAL_FIT_TARGETS_RATEXP = ("A_peak_over_nu", "A_peakdotdot_over_nu", "omg_peak", "c2A", "c3A", "c2p", "c3p", "c4p") + REFERENCE_FIT_TARGETS
 PHASE_TARGET_PREFIX = "delta_phi_"
 FIT_SCHEMA = "bayRing.teobpm.global-fit.v1"
 APPENDIX_A_SCHEMA = "bayRing.teobpm.appendix-a.v1"
@@ -718,7 +726,9 @@ res-level = {config.resolution_level}
 l-NR = {mode[0]}
 m = {mode[1]}
 t-peak-22 = 0.0
-error = align-with-mismatch-res-only
+error = align-with-mismatch-all
+error-t-min = 0.0
+error-t-max = 30.0
 
 [Model]
 template = TEOBPM
@@ -1262,7 +1272,7 @@ def _target_from_parameter(parameter: str, mode: str) -> str | None:
     if not parameter.endswith(suffix):
         return None
     target = parameter[: -len(suffix)]
-    if target in {"c2A", "c3A", "c2p", "c3p", "c4p", "phi_mrg"}:
+    if target in {"c2A", "c3A", "c2p", "c3p", "c4p", *REFERENCE_FIT_TARGETS}:
         return target
     return None
 
@@ -1302,6 +1312,25 @@ def _record_metadata_targets(record: SimulationRecord | None, job: LocalFitJob, 
             value = value / job.nu
         if math.isfinite(value):
             rows.append(_local_fit_row(job, target, value, math.nan, source="metadata"))
+    return rows
+
+
+def _fixed_prior_targets_from_config(job: LocalFitJob, template: str) -> list[dict[str, Any]]:
+    config_path = Path(job.config_file)
+    if not config_path.exists():
+        return []
+    parser = _load_generated_ini(config_path)
+    if not parser.has_section("Priors"):
+        return []
+
+    rows: list[dict[str, Any]] = []
+    allowed_targets = set(_local_fit_targets_for_template(template))
+    for target in REFERENCE_FIT_TARGETS:
+        if target not in allowed_targets:
+            continue
+        value = _as_float(parser.get("Priors", f"fix-{target}_{job.mode}", fallback=None), default=math.nan)
+        if math.isfinite(value):
+            rows.append(_local_fit_row(job, target, value, math.nan, source="fixed_prior"))
     return rows
 
 
@@ -1445,12 +1474,15 @@ def collect_local_fit_outputs(campaign_dir: str | Path, output_table: str | Path
         mismatch_rows.extend(job_mismatch_rows)
         mismatch = representative_mismatch(job_mismatch_rows)
         estimates, estimate_source = read_local_fit_estimates(job.outdir)
+        fixed_prior_rows = _fixed_prior_targets_from_config(job, template)
 
         if not estimates:
             failures.append({"sxs_id": job.sxs_id, "mode": job.mode, "outdir": job.outdir, "reason": "missing point_estimates.dat or posterior.dat"})
+            rows.extend(fixed_prior_rows)
             rows.extend(_record_metadata_targets(records_by_id.get(job.sxs_id), job, template))
             continue
 
+        estimated_targets: set[str] = set()
         for parameter, estimate in estimates.items():
             target = _target_from_parameter(parameter, job.mode)
             if target is None:
@@ -1458,6 +1490,7 @@ def collect_local_fit_outputs(campaign_dir: str | Path, output_table: str | Path
             if target == "phi_mrg":
                 phases[(job.sxs_id, job.mode)] = {"job": job, **estimate, "construction_mismatch": mismatch}
             else:
+                estimated_targets.add(target)
                 rows.append(
                     _local_fit_row(
                         job,
@@ -1468,6 +1501,7 @@ def collect_local_fit_outputs(campaign_dir: str | Path, output_table: str | Path
                         construction_mismatch=mismatch,
                     )
                 )
+        rows.extend(row for row in fixed_prior_rows if row["target"] not in estimated_targets)
         rows.extend(_record_metadata_targets(records_by_id.get(job.sxs_id), job, template))
 
     for (sxs_id, mode), phase_data in sorted(phases.items()):

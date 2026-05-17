@@ -62,7 +62,8 @@ def test_kerr_waveform_collects_mode_parameters(monkeypatch):
 
     def fake_kerrbh(*args, **kwargs):
         captured.update(kwargs)
-        captured["amps"] = args[3]
+        captured["t_ref"] = args[1]
+        captured["amps"] = args[4]
         return "ringdown"
 
     monkeypatch.setattr(template_waveforms.wf, "KerrBH", fake_kerrbh)
@@ -73,6 +74,7 @@ def test_kerr_waveform_collects_mode_parameters(monkeypatch):
     assert captured["amps"][(2, 2, 2, 0)] == expected_amp
     assert captured["tail_parameters"] == {}
     assert captured["quadratic_modes"] == {}
+    assert captured["t_ref"] == model.t_peak
     assert captured["TGR_params"] is None
     assert model.charge == 0
     assert result == "ringdown"

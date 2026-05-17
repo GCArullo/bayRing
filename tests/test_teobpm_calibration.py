@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.teobpm import teobpm_calibration as calib
+from scripts.teobpm_calibration import teobpm_calibration as calib
 
 
 def _catalog_rows():
@@ -108,6 +108,9 @@ def test_prepare_campaign_writes_manifests_and_configs(tmp_path, monkeypatch):
     expected_33_text = expected_33.read_text(encoding="utf-8")
     assert "screen-output = 0" in expected_22_text
     assert "screen-output = 0" in expected_33_text
+    assert "error = align-with-mismatch-all" in expected_22_text
+    assert "error-t-min = 0.0" in expected_22_text
+    assert "error-t-max = 30.0" in expected_22_text
     assert "t-start = 0.0" in expected_22_text
     assert "TEOB-counter-rotating = 0" in expected_22_text
     assert "t-peak-22 = 0.0" in expected_33_text
@@ -420,6 +423,76 @@ def test_collect_local_fit_outputs_reads_estimates_mismatches_and_relative_phase
     assert abs(float(metadata_peak["value"]) - 0.2) < 1.0e-12
     assert (campaign_dir / "mismatch_summary.csv").exists()
     assert (campaign_dir / "local_fit_collection_summary.json").exists()
+
+
+def test_collect_local_fit_outputs_reads_fixed_reference_targets_for_global_fits(tmp_path):
+    campaign_dir = tmp_path / "campaign"
+    campaign_dir.mkdir()
+    (campaign_dir / "campaign_config.json").write_text(json.dumps({"template": "HypTan"}), encoding="utf-8")
+    jobs = []
+    reference_targets = {
+        "A_ref_over_nu": [0.20, 0.24],
+        "A_refdot_over_nu": [-0.010, -0.012],
+        "A_refdotdot_over_nu": [0.0010, 0.0012],
+        "omg_ref": [0.42, 0.44],
+        "phi_mrg": [0.50, 0.70],
+        "DeltaT": [7.5, 8.0],
+    }
+    for index, nu in enumerate([0.25, 2.0 / 9.0]):
+        sxs_id = f"SXS:BBH:000{index + 1}"
+        sxs_fs = sxs_id.replace(":", "_")
+        config_path = campaign_dir / "local_fit_configs" / f"{sxs_fs}_mode_22.ini"
+        outdir = campaign_dir / "local_fits" / sxs_fs / "mode_22"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        (outdir / "Algorithm").mkdir(parents=True, exist_ok=True)
+        config_path.write_text(
+            "[Priors]\n"
+            + "\n".join(f"fix-{target}_22 = {values[index]}" for target, values in reference_targets.items())
+            + "\n",
+            encoding="utf-8",
+        )
+        (outdir / "Algorithm" / "point_estimates.dat").write_text(
+            "# parameter\tvalue\tsigma\n"
+            f"c3A_22\t{-0.3 - 0.1 * index}\t0.01\n",
+            encoding="utf-8",
+        )
+        jobs.append(
+            calib.LocalFitJob(
+                sxs_id=sxs_id,
+                mode="22",
+                split="training",
+                config_file=str(config_path),
+                outdir=str(outdir),
+                q=1.0 + index,
+                nu=nu,
+                chi1z=0.0,
+                chi2z=0.0,
+                chi_eff=0.0,
+                chi_a=0.0,
+                eccentricity=0.0,
+                quality_score=1.0,
+            )
+        )
+    calib.write_local_fit_index(jobs, campaign_dir / "local_fit_index.csv")
+
+    calib.collect_local_fit_outputs(campaign_dir)
+    rows = list(csv.DictReader((campaign_dir / "local_fit_summary.csv").open(encoding="utf-8")))
+
+    for target, values in reference_targets.items():
+        target_rows = [row for row in rows if row["target"] == target]
+        assert len(target_rows) == 2
+        assert {row["source"] for row in target_rows} == {"fixed_prior"}
+        assert sorted(float(row["value"]) for row in target_rows) == sorted(values)
+
+    payload = calib.construct_global_fit(
+        campaign_dir / "local_fit_summary.csv",
+        campaign_dir / "teobpm_global_fit.json",
+        "nonspinning",
+        template="HypTan",
+        max_polynomial_degree=1,
+    )
+    for target in reference_targets:
+        assert target in payload["fits"]["22"]
 
 
 def test_collect_local_fit_outputs_reads_sampler_posterior_when_point_estimate_missing(tmp_path):

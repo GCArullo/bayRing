@@ -309,13 +309,23 @@ Mismatch-alignment options use:
 .. code-block:: ini
 
    [NR-data]
-   error-t-min = 0.3
-   error-t-max = 0.004
+   error-t-min = 0.0
+   error-t-max = 30.0
 
-The implementation converts these fractional inputs using the peak time:
+The default values align over ``[0,30]M`` after the peak. When both values are
+in ``[0,1]``, the implementation keeps the legacy fractional pre-peak
+convention:
 
 .. math::
 
    t_{\min}^{\mathrm{mm}} = t_{\mathrm{peak}}(1 - \mathrm{error\mbox{-}t\mbox{-}min}),
    \qquad
    t_{\max}^{\mathrm{mm}} = t_{\mathrm{peak}}(1 - \mathrm{error\mbox{-}t\mbox{-}max}).
+
+Otherwise the values are interpreted as offsets from the peak time:
+
+.. math::
+
+   t_{\min}^{\mathrm{mm}} = t_{\mathrm{peak}} + \mathrm{error\mbox{-}t\mbox{-}min},
+   \qquad
+   t_{\max}^{\mathrm{mm}} = t_{\mathrm{peak}} + \mathrm{error\mbox{-}t\mbox{-}max}.

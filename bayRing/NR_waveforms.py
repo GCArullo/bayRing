@@ -721,7 +721,13 @@ class NR_simulation():
         If True, the NR simulation is downloaded from the NR catalog. Default: False.
 
     NR_error : str, optional
-        Error of the NR simulation. Available options: 'align-with-mismatch-res-only', 'align-with-mismatch-res-and-extrap', 'align-with-mismatch-res-and-extrap-and-pert', 'constant-X' (with X=error value), 'late-time-const-error'. Default: 'align-with-mismatch-res-only'.
+        Error of the NR simulation. Available options are catalogue-dependent.
+        For SXS: 'constant-X', 'align-with-mismatch-all',
+        'align-with-mismatch-res-only', 'align-at-peak', and
+        'late-time-const-error'. For Teukolsky: 'constant-X' and
+        'resolution'. For RIT: 'constant-X' and 'late-time-const-error'.
+        For injections: 'gaussian-X' and 'from-SXS-NR'. Default:
+        'align-with-mismatch-all'.
 
     tM_start : float, optional
         Initial time of the fit. Default: 30.0.
@@ -733,10 +739,14 @@ class NR_simulation():
         Time delay between the NR simulation and the SCD simulation. Default: 0.0.
 
     t_min_mismatch : float, optional
-        Initial time of the mismatch used to compute the error. Default: 2692.7480095302817 (for SXS:0305).
+        Lower mismatch-window input. When both mismatch-window inputs are in
+        [0, 1], they use the legacy fractional pre-peak convention; otherwise
+        values are offsets from the peak time. Default: 0.0.
 
     t_max_mismatch : float, optional
-        Final time of the mismatch used to compute the error. Default: 3792.7480095302817 (for SXS:0305).
+        Upper mismatch-window input. When both mismatch-window inputs are in
+        [0, 1], they use the legacy fractional pre-peak convention; otherwise
+        values are offsets from the peak time. Default: 30.0.
         
     """
 
@@ -760,13 +770,13 @@ class NR_simulation():
                  injection_model_parameters = None              ,
                  waveform_type  = 'strain'                      ,
                  download       = False                         , 
-                 NR_error       = 'align-with-mismatch-res-only', 
+                 NR_error       = 'align-with-mismatch-all'     , 
                  tM_start       = 30.0                          , 
                  tM_end         = 150.0                         , 
                  t_delay_scd    = 0.0                           , 
                  t_peak_22      = 0.0                           ,
-                 t_min_mismatch = 3e-1                          ,
-                 t_max_mismatch = 4e-3                          ):
+                 t_min_mismatch = 0.0                           ,
+                 t_max_mismatch = 30.0                          ):
 
         ####################
         # Input parameters #
@@ -1003,17 +1013,20 @@ class NR_simulation():
                 # If a valid resolution level is already set, load the waveform with that resolution level
                 self.t_NR, self.NR_r, self.NR_i = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level)
 
-            t_res, NR_r_res, NR_i_res = self.t_NR, self.NR_r, self.NR_i
-            for lower_res_level in range(self.res_level - 1, 0, -1):
-                try:
-                    t_res, NR_r_res, NR_i_res = self.read_waveform_lm_from_SXS(self.extrap_order, lower_res_level)
-                    print('* Resolution error constructed with resolution level {}'.format(lower_res_level))
-                    break
-                except ValueError:
-                    pass
-            else:
-                print('* No lower SXS resolution available; setting the resolution error to zero.')
-            t_extr, NR_r_extr, NR_i_extr = self.read_waveform_lm_from_SXS(self.extrap_order+1, self.res_level)
+            t_res, NR_r_res, NR_i_res       = self.t_NR, self.NR_r, self.NR_i
+            t_extr, NR_r_extr, NR_i_extr    = None, None, None
+            sxs_comparison_error_options    = ['align-with-mismatch-res-only', 'align-with-mismatch-all', 'align-at-peak']
+            if(NR_error in sxs_comparison_error_options):
+                for lower_res_level in range(self.res_level - 1, 0, -1):
+                    try:
+                        t_res, NR_r_res, NR_i_res = self.read_waveform_lm_from_SXS(self.extrap_order, lower_res_level)
+                        print('* Resolution error constructed with resolution level {}'.format(lower_res_level))
+                        break
+                    except ValueError:
+                        pass
+                else:
+                    print('* No lower SXS resolution available; setting the resolution error to zero.')
+                t_extr, NR_r_extr, NR_i_extr = self.read_waveform_lm_from_SXS(self.extrap_order+1, self.res_level)
 
         elif(self.NR_catalog=='RIT'):
         
@@ -1103,7 +1116,7 @@ class NR_simulation():
             else:
 
                 # Align the waveforms minimizing the mismatch over a [t_min, t_max] interval.
-                if('align-with-mismatch' in NR_error):
+                if(NR_error in ['align-with-mismatch-res-only', 'align-with-mismatch-all']):
                     
                     # Resolution error. 
                     NR_r_res    , NR_i_res       = waveform_utils.align_waveforms_with_mismatch(self.t_NR, self.NR_amp, self.NR_phi,  t_res,  NR_r_res,  NR_i_res, t_min_mismatch, t_max_mismatch)
