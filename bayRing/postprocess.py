@@ -206,8 +206,25 @@ def waveform_parameter_samples(results, method=None):
 def model_component_lists(results, inference_model, method=None):
 
     parameter_samples = waveform_parameter_samples(results, method)
-    models_re_list    = [np.real(np.array(inference_model.model(p))) for p in parameter_samples]
-    models_im_list    = [np.imag(np.array(inference_model.model(p))) for p in parameter_samples]
+    models_re_list    = []
+    models_im_list    = []
+    skipped_samples   = 0
+    for p in parameter_samples:
+        try:
+            model = np.array(inference_model.model(p))
+        except (FloatingPointError, OverflowError, TypeError, ValueError):
+            skipped_samples += 1
+            continue
+        if not np.all(np.isfinite(model)):
+            skipped_samples += 1
+            continue
+        models_re_list.append(np.real(model))
+        models_im_list.append(np.imag(model))
+
+    if not models_re_list:
+        raise RuntimeError("No finite waveform samples could be constructed for postprocessing.")
+    if skipped_samples:
+        print("* Warning: skipped {} invalid point-estimate waveform sample(s) during postprocessing.".format(skipped_samples))
 
     return models_re_list, models_im_list
 

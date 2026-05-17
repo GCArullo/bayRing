@@ -203,9 +203,13 @@ def read_default_bounds(wf_model, TEOB_template=''):
     default_bounds_TEOBPM    = {'phi_mrg': [0.0  , twopi]       ,
                                 'c3A'    : [-10.0, 10.0 ]       ,
                                 'c3p'    : [-10.0, 10.0 ]       ,
-                                'c4p'    : [-10.0, 10.0 ]       ,
                                 }
-    if not(TEOB_template=='HypTan'):
+    if not(TEOB_template=='SEOBNRv5'):
+        default_bounds_TEOBPM['c4p'] = [-10.0, 10.0]
+    if(TEOB_template=='SEOBNRv5'):
+        default_bounds_TEOBPM['c2A'] = [1.0e-4, 5.0]
+        default_bounds_TEOBPM['c2p'] = [1.0e-4, 5.0]
+    elif not(TEOB_template=='HypTan'):
         default_bounds_TEOBPM['c2A']          = [-10.0, 10.0]
         default_bounds_TEOBPM['c2p']          = [-10.0, 10.0]
 
@@ -217,6 +221,29 @@ def read_default_bounds(wf_model, TEOB_template=''):
     elif(wf_model=='TEOBPM'               ): default_bounds = default_bounds_TEOBPM
 
     return default_bounds
+
+def teobpm_optional_reference_bounds():
+
+    return {
+        'DeltaT'              : [0.0, 50.0],
+        'A_peak_over_nu'      : [1.0e-8, 1.0],
+        'omg_peak'           : [1.0e-4, 1.0],
+        'A_peakdot_over_nu'   : [-1.0, 1.0],
+        'A_ref_over_nu'       : [1.0e-8, 1.0],
+        'A_refdot_over_nu'    : [-1.0, 1.0],
+        'A_refdotdot_over_nu' : [-1.0, 1.0],
+        'omg_ref'            : [1.0e-4, 1.0],
+        'c2A'                : [1.0e-4, 20.0],
+        'c2p'                : [1.0e-4, 20.0],
+    }
+
+def has_teobpm_optional_prior(Config, fullname):
+
+    return (
+        Config.has_option('Priors', 'fix-'+fullname) or
+        Config.has_option('Priors', fullname+'-min') or
+        Config.has_option('Priors', fullname+'-max')
+    )
 
 def railing_check(results_object, inference_model, outdir, nlive, seed, tolerance=2.0):
 
@@ -401,6 +428,8 @@ def Dynamic_InferenceModel(base):
             self.TEOB_merger_data = self.wf_model.TEOB_merger_data 
             self.TEOB_mode_mixing = getattr(self.wf_model, 'TEOB_mode_mixing', 0)
             self.TEOB_counter_rotating = getattr(self.wf_model, 'TEOB_counter_rotating', 0)
+            self.TEOB_quadratic_44 = getattr(self.wf_model, 'TEOB_quadratic_44', 0)
+            self.TEOB_tapered_overtone_44 = getattr(self.wf_model, 'TEOB_tapered_overtone_44', 0)
             self.min_method    = min_method
             self.Config        = Config
 
@@ -560,6 +589,20 @@ def Dynamic_InferenceModel(base):
                         self.names.append(fullname)
                         self.bounds.append(single_bounds)
 
+                if not(self.TEOB_global_fit):
+                    optional_bounds_TEOBPM = teobpm_optional_reference_bounds()
+                    for name in optional_bounds_TEOBPM.keys():
+                        if name in default_bounds_TEOBPM:
+                            continue
+                        fullname = '{}_{}{}'.format(name, self.wf_model.l_NR, self.wf_model.m_NR)
+                        if has_teobpm_optional_prior(self.Config, fullname):
+                            try:
+                                self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                            except(configparser.NoOptionError):
+                                single_bounds = read_parameter_bounds(Config, configparser, name, fullname, optional_bounds_TEOBPM)
+                                self.names.append(fullname)
+                                self.bounds.append(single_bounds)
+
                 if self.TEOB_mode_mixing:
                     parent_modes = {(3, 2): (2, 2), (4, 3): (3, 3)}
                     requested_mode = (self.wf_model.l_NR, self.wf_model.m_NR)
@@ -573,6 +616,16 @@ def Dynamic_InferenceModel(base):
                                 self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
                             except(configparser.NoOptionError):
                                 pass
+                        if not(self.TEOB_global_fit):
+                            optional_bounds_TEOBPM = teobpm_optional_reference_bounds()
+                            for name in optional_bounds_TEOBPM.keys():
+                                if name in default_bounds_TEOBPM:
+                                    continue
+                                fullname = '{}_{}{}'.format(name, parent_mode[0], parent_mode[1])
+                                try:
+                                    self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                                except(configparser.NoOptionError):
+                                    pass
 
                 if self.TEOB_counter_rotating:
                     default_bounds_counter = {
@@ -580,8 +633,9 @@ def Dynamic_InferenceModel(base):
                         'phi_mrg_counter'   : [0.0, twopi],
                         'c3A_counter'       : default_bounds_TEOBPM['c3A'],
                         'c3p_counter'       : default_bounds_TEOBPM['c3p'],
-                        'c4p_counter'       : default_bounds_TEOBPM['c4p'],
                     }
+                    if 'c4p' in default_bounds_TEOBPM:
+                        default_bounds_counter['c4p_counter'] = default_bounds_TEOBPM['c4p']
                     if not(self.TEOB_template=='HypTan'):
                         default_bounds_counter['c2A_counter'] = default_bounds_TEOBPM['c2A']
                         default_bounds_counter['c2p_counter'] = default_bounds_TEOBPM['c2p']
@@ -593,6 +647,46 @@ def Dynamic_InferenceModel(base):
                         except(configparser.NoOptionError):
                             single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_counter)
                             self.names.append(fullname)
+                            self.bounds.append(single_bounds)
+                    if(self.TEOB_template=='HypTan'):
+                        optional_bounds_counter = {
+                            'c2A_counter': teobpm_optional_reference_bounds()['c2A'],
+                            'c2p_counter': teobpm_optional_reference_bounds()['c2p'],
+                        }
+                        for name in optional_bounds_counter.keys():
+                            fullname = '{}_{}'.format(name, counter_mode_label)
+                            if has_teobpm_optional_prior(self.Config, fullname):
+                                try:
+                                    self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                                except(configparser.NoOptionError):
+                                    single_bounds = read_parameter_bounds(Config, configparser, name, fullname, optional_bounds_counter)
+                                    self.names.append(fullname)
+                                    self.bounds.append(single_bounds)
+
+                if self.TEOB_quadratic_44:
+                    default_bounds_quadratic_44 = {
+                        'ln_A_sum_440_220_220': [-20.0, 5.0],
+                        'phi_sum_440_220_220' : [0.0, twopi],
+                    }
+                    for name in default_bounds_quadratic_44.keys():
+                        try:
+                            self.fixed_params[name] = self.Config.getfloat("Priors",'fix-'+name)
+                        except(configparser.NoOptionError):
+                            single_bounds = read_parameter_bounds(Config, configparser, name, name, default_bounds_quadratic_44)
+                            self.names.append(name)
+                            self.bounds.append(single_bounds)
+
+                if self.TEOB_tapered_overtone_44:
+                    default_bounds_tapered_overtone_44 = {
+                        'ln_A_tapered_441': [-20.0, 5.0],
+                        'phi_tapered_441' : [0.0, twopi],
+                    }
+                    for name in default_bounds_tapered_overtone_44.keys():
+                        try:
+                            self.fixed_params[name] = self.Config.getfloat("Priors",'fix-'+name)
+                        except(configparser.NoOptionError):
+                            single_bounds = read_parameter_bounds(Config, configparser, name, name, default_bounds_tapered_overtone_44)
+                            self.names.append(name)
                             self.bounds.append(single_bounds)
 
             else:
@@ -701,7 +795,12 @@ def Dynamic_InferenceModel(base):
         def log_likelihood_ToMin(self,x):
         
             x_dict  = dict(zip(self.names, x))
-            model   = self.model(x_dict)
+            try:
+                model = self.model(x_dict)
+            except (FloatingPointError, OverflowError, TypeError, ValueError):
+                return np.full(2*len(self.data), 1.0e30)
+            if not np.all(np.isfinite(model)):
+                return np.full(2*len(self.data), 1.0e30)
             err     = 1e-16
             res_r   = (np.real(self.data)-np.real(model))/(np.real(self.error)+err)
             res_i   = (np.imag(self.data)-np.imag(model))/(np.imag(self.error)+err)

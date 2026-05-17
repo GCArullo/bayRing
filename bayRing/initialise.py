@@ -440,6 +440,12 @@ def read_config(Config):
         'TEOB-merger-data'                 : 0            ,
         'TEOB-mode-mixing'                 : 0            ,
         'TEOB-counter-rotating'            : 0            ,
+        'TEOB-quadratic-44'                : 0            ,
+        'TEOB-quadratic-44-window-start'   : 10.0         ,
+        'TEOB-quadratic-44-window-width'   : 15.0         ,
+        'TEOB-tapered-overtone-44'         : 0            ,
+        'TEOB-tapered-overtone-44-window-start': 0.0      ,
+        'TEOB-tapered-overtone-44-window-width': 10.0     ,
         },
 
         'Inference':
@@ -652,6 +658,10 @@ def read_config(Config):
     elif(parameters['Model']['template']=='TEOBPM'      ):
         parameters['Model']['QNM-modes']     = '220,221,210,211,330,331,320,321,310,311,440,441,430,431,420,421,410,411,550,551'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4  or parameters['NR-data']['l-NR']==5): raise ValueError("The TEOBPM template is only available for l=2,3,4,5")
+        if parameters['Model']['TEOB-quadratic-44'] and not((parameters['NR-data']['l-NR']==4) and (parameters['NR-data']['m']==4)):
+            raise ValueError("TEOB-quadratic-44 can be enabled only when fitting the NR (4,4) mode.")
+        if parameters['Model']['TEOB-tapered-overtone-44'] and not((parameters['NR-data']['l-NR']==4) and (parameters['NR-data']['m']==4)):
+            raise ValueError("TEOB-tapered-overtone-44 can be enabled only when fitting the NR (4,4) mode.")
         
     print('\n\n\nFIXME: print updated vars\n\n\n')
 
@@ -814,6 +824,22 @@ A dot is present at the end of each description line and is not to be intended a
         TEOB-counter-rotating             Boolean to add a time-dependent counter-rotating TEOBPM contribution to the selected
                                           spherical mode. For a 21 fit, the extra 2-1 parameters are ln_A_counter_scale_2-1,
                                           phi_mrg_counter_2-1, c3A_counter_2-1, c3p_counter_2-1 and c4p_counter_2-1.                  Default: 0.
+
+        TEOB-quadratic-44                 Boolean to add a tapered 220x220 quadratic QNM contribution to TEOBPM (4,4).
+                                          The sampled parameters are ln_A_sum_440_220_220 and phi_sum_440_220_220.                    Default: 0.
+
+        TEOB-quadratic-44-window-start    Time after the 22 peak where the early-time taper starts, in M.                             Default: 10.0.
+
+        TEOB-quadratic-44-window-width    Half-cosine taper width for TEOB-quadratic-44, in M. A non-positive value gives a step.     Default: 15.0.
+
+        TEOB-tapered-overtone-44          Boolean to add a tapered 441 QNM contribution to TEOBPM (4,4).
+                                          The sampled parameters are ln_A_tapered_441 and phi_tapered_441.                            Default: 0.
+
+        TEOB-tapered-overtone-44-window-start
+                                          Time after the 22 peak where the early-time taper starts, in M.                             Default: 0.0.
+
+        TEOB-tapered-overtone-44-window-width
+                                          Half-cosine taper width for TEOB-tapered-overtone-44, in M. A non-positive value gives a step. Default: 10.0.
 
         TEOB-merger-data                 Boolean flag to switch between using the values of the amplitude and frequency at the peak of the modes as given \ 
                                          by the NR merger data (TEOB-merger-data = 1, to be provided in [NR-data][properties-file]) or by the quasi-circular fits \

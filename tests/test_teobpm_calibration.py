@@ -106,6 +106,8 @@ def test_prepare_campaign_writes_manifests_and_configs(tmp_path, monkeypatch):
     assert jobs[0].outdir == str(output_dir / "local_fits" / "SXS_BBH_0001" / "mode_22")
     expected_22_text = expected_22.read_text(encoding="utf-8")
     expected_33_text = expected_33.read_text(encoding="utf-8")
+    assert "screen-output = 0" in expected_22_text
+    assert "screen-output = 0" in expected_33_text
     assert "t-start = 0.0" in expected_22_text
     assert "TEOB-counter-rotating = 0" in expected_22_text
     assert "t-peak-22 = 0.0" in expected_33_text

@@ -16,6 +16,18 @@ TEOB_FIT_METADATA_KEYS = {
     'bmrg': 'bmrg',
     'jmrg': 'Jmrg',
 }
+TEOB_LOCAL_REFERENCE_PARAMETERS = (
+    'DeltaT',
+    'A_peak_over_nu',
+    'omg_peak',
+    'A_peakdot_over_nu',
+    'A_ref_over_nu',
+    'A_refdot_over_nu',
+    'A_refdotdot_over_nu',
+    'omg_ref',
+    'c2A',
+    'c2p',
+)
 
 
 def _teob_mode_label(l, m):
@@ -23,9 +35,33 @@ def _teob_mode_label(l, m):
     return '{}{}'.format(l, m)
 
 
+def _TEOBPM_parameter_is_available(container, name):
+
+    if container is None:
+        return False
+    if isinstance(container, dict):
+        return name in container
+
+    try:
+        container[name]
+    except (AttributeError, IndexError, KeyError, TypeError, ValueError):
+        return False
+
+    return True
+
+
+def _TEOBPM_apply_optional_reference_parameters(NR_fit_coeffs, mode, params, fixed_params):
+    mode_label = _teob_mode_label(mode[0], mode[1])
+    for name in TEOB_LOCAL_REFERENCE_PARAMETERS:
+        fullname = '{}_{}'.format(name, mode_label)
+        if (_TEOBPM_parameter_is_available(fixed_params, fullname) or
+                _TEOBPM_parameter_is_available(params, fullname)):
+            NR_fit_coeffs[mode][name] = utils.get_param_override(fixed_params, params, fullname)
+
+
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, N_ds_tails=0, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_template = 'RatExp', TEOB_calibration = 'qc', TEOB_merger_data = 1, TEOB_global_fit = 0, TEOB_mode_mixing = 0, TEOB_counter_rotating = 0):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, N_ds_tails=0, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_template = 'RatExp', TEOB_calibration = 'qc', TEOB_merger_data = 1, TEOB_global_fit = 0, TEOB_mode_mixing = 0, TEOB_counter_rotating = 0, TEOB_quadratic_44 = 0, TEOB_quadratic_44_window_start = 10.0, TEOB_quadratic_44_window_width = 15.0, TEOB_tapered_overtone_44 = 0, TEOB_tapered_overtone_44_window_start = 0.0, TEOB_tapered_overtone_44_window_width = 10.0):
 
         self.t_NR                      = t_NR
         self.t_start                   = tM_start
@@ -51,6 +87,13 @@ class WaveformModel(cpnest.model.Model):
         self.TEOB_global_fit           = TEOB_global_fit
         self.TEOB_mode_mixing          = TEOB_mode_mixing
         self.TEOB_counter_rotating     = TEOB_counter_rotating
+        self.TEOB_quadratic_44         = TEOB_quadratic_44
+        self.TEOB_quadratic_44_window_start = TEOB_quadratic_44_window_start
+        self.TEOB_quadratic_44_window_width = TEOB_quadratic_44_window_width
+        self.TEOB_tapered_overtone_44  = TEOB_tapered_overtone_44
+        self.TEOB_tapered_overtone_44_window_start = TEOB_tapered_overtone_44_window_start
+        self.TEOB_tapered_overtone_44_window_width = TEOB_tapered_overtone_44_window_width
+        self._TEOB_delta_t_cache       = {}
 
         if not(const_params==None):
             self.const_r = [const_params[0]*np.cos(const_params[1])]
@@ -311,9 +354,47 @@ class WaveformModel(cpnest.model.Model):
                 raise RuntimeError("The imported pyRing TEOBPM build does not support the calibration argument.") from exc
             raise
 
+    def _TEOBPM_default_delta_t(self, mode):
+
+        mode = tuple(mode)
+        if mode not in self._TEOB_delta_t_cache:
+            ringdown_model = wf.TEOBPM(self.t_peak                  ,
+                                       self.metadata['m1']          ,
+                                       self.metadata['m2']          ,
+                                       self.metadata['chi1']        ,
+                                       self.metadata['chi2']        ,
+                                       {}                           ,
+                                       1.0                          ,
+                                       0.0                          ,
+                                       0.0                          ,
+                                       [mode]                       ,
+                                       {}                           ,
+                                       geom     = 1                 ,
+                                       template = 'HypTan'          )
+            self._TEOB_delta_t_cache[mode] = float(ringdown_model.DeltaT(mode[0], mode[1]))
+        return self._TEOB_delta_t_cache[mode]
+
+    def _TEOBPM_apply_mode_mixing_delta_t_floor(self, NR_fit_coeffs):
+
+        if not(self.TEOB_mode_mixing):
+            return
+
+        for child_mode, parent_mode in TEOB_MODE_MIXING_PARENTS.items():
+            if (child_mode not in NR_fit_coeffs) or (parent_mode not in NR_fit_coeffs):
+                continue
+            if 'DeltaT' not in NR_fit_coeffs[child_mode]:
+                continue
+            if 'DeltaT' in NR_fit_coeffs[parent_mode]:
+                parent_delta_t = NR_fit_coeffs[parent_mode]['DeltaT']
+            else:
+                parent_delta_t = self._TEOBPM_default_delta_t(parent_mode)
+            child_delta_t = NR_fit_coeffs[child_mode]['DeltaT']
+            if child_delta_t < parent_delta_t:
+                NR_fit_coeffs[child_mode]['DeltaT'] = parent_delta_t
+
     def TEOBPM_waveform(self, params, fixed_params):
 
-        if self.TEOB_template not in ['HypTan', 'RatExp']:
+        if self.TEOB_template not in ['HypTan', 'RatExp', 'SEOBNRv5']:
             raise ValueError("Unknown TEOB template: {}".format(self.TEOB_template))
         if self.TEOB_calibration not in ['qc', 'noncirc']:
             raise ValueError("Unknown TEOB calibration family: {}".format(self.TEOB_calibration))
@@ -361,11 +442,15 @@ class WaveformModel(cpnest.model.Model):
             for mode in internal_modes:
                 mode_label = '{}{}'.format(mode[0], mode[1])
                 try:
+                    _TEOBPM_apply_optional_reference_parameters(NR_fit_coeffs, mode, params, fixed_params)
                     NR_fit_coeffs[mode]['c3A'] = utils.get_param_override(fixed_params, params, 'c3A_{}'.format(mode_label))
                     NR_fit_coeffs[mode]['c3p'] = utils.get_param_override(fixed_params, params, 'c3p_{}'.format(mode_label))
-                    NR_fit_coeffs[mode]['c4p'] = utils.get_param_override(fixed_params, params, 'c4p_{}'.format(mode_label))
+                    if(self.TEOB_template=='SEOBNRv5'):
+                        NR_fit_coeffs[mode]['c4p'] = 0.0
+                    else:
+                        NR_fit_coeffs[mode]['c4p'] = utils.get_param_override(fixed_params, params, 'c4p_{}'.format(mode_label))
 
-                    if(self.TEOB_template=='RatExp'):
+                    if(self.TEOB_template in ['RatExp', 'SEOBNRv5']):
                         NR_fit_coeffs[mode]['c2A'] = utils.get_param_override(fixed_params, params, 'c2A_{}'.format(mode_label))
                         NR_fit_coeffs[mode]['c2p'] = utils.get_param_override(fixed_params, params, 'c2p_{}'.format(mode_label))
                 except KeyError as exc:
@@ -408,6 +493,8 @@ class WaveformModel(cpnest.model.Model):
                 if(self.TEOB_template=='RatExp'):
                     raise ValueError("TEOB global fit is enabled but no fit metadata provided.")
 
+        self._TEOBPM_apply_mode_mixing_delta_t_floor(NR_fit_coeffs)
+
         NR_fit_coeffs['Mf'] = self.Mf
         NR_fit_coeffs['af'] = self.af
 
@@ -428,7 +515,7 @@ class WaveformModel(cpnest.model.Model):
 
     def TEOBPM_counter_rotating_waveform(self, params, fixed_params):
 
-        if self.TEOB_template not in ['HypTan', 'RatExp']:
+        if self.TEOB_template not in ['HypTan', 'RatExp', 'SEOBNRv5']:
             raise ValueError("Unknown TEOB template: {}".format(self.TEOB_template))
         if self.TEOB_calibration not in ['qc', 'noncirc']:
             raise ValueError("Unknown TEOB calibration family: {}".format(self.TEOB_calibration))
@@ -469,13 +556,26 @@ class WaveformModel(cpnest.model.Model):
         else:
             NR_fit_coeffs = {teob_mode: {}}
 
+        _TEOBPM_apply_optional_reference_parameters(NR_fit_coeffs, teob_mode, params, fixed_params)
         NR_fit_coeffs[teob_mode]['c3A'] = get_counter_param('c3A_counter')
         NR_fit_coeffs[teob_mode]['c3p'] = get_counter_param('c3p_counter')
-        NR_fit_coeffs[teob_mode]['c4p'] = get_counter_param('c4p_counter')
+        if(self.TEOB_template=='SEOBNRv5'):
+            NR_fit_coeffs[teob_mode]['c4p'] = 0.0
+        else:
+            NR_fit_coeffs[teob_mode]['c4p'] = get_counter_param('c4p_counter')
 
-        if(self.TEOB_template=='RatExp'):
+        if(self.TEOB_template in ['RatExp', 'SEOBNRv5']):
             NR_fit_coeffs[teob_mode]['c2A'] = get_counter_param('c2A_counter')
             NR_fit_coeffs[teob_mode]['c2p'] = get_counter_param('c2p_counter')
+        else:
+            try:
+                NR_fit_coeffs[teob_mode]['c2A'] = get_counter_param('c2A_counter')
+            except KeyError:
+                pass
+            try:
+                NR_fit_coeffs[teob_mode]['c2p'] = get_counter_param('c2p_counter')
+            except KeyError:
+                pass
 
         NR_fit_coeffs['Mf'] = self.Mf
         NR_fit_coeffs['af'] = self.af
@@ -496,6 +596,82 @@ class WaveformModel(cpnest.model.Model):
         wf_r_counter, wf_i_counter = self._apply_waveform_conventions(wf_r_counter, wf_i_counter, include_const=False)
 
         return np.exp(ln_A_scale) * np.conjugate(wf_r_counter + 1j*wf_i_counter)
+
+    def _TEOBPM_window(self, start, width):
+
+        t_rel = np.asarray(self.t_NR) - self.t_peak
+
+        values = []
+        for time_value in t_rel:
+            if width <= 0.0:
+                values.append(1.0 if time_value >= start else 0.0)
+                continue
+            x = (time_value - start)/width
+            if x <= 0.0:
+                values.append(0.0)
+            elif x >= 1.0:
+                values.append(1.0)
+            else:
+                values.append(0.5*(1.0 - np.cos(np.pi*x)))
+
+        return np.array(values)
+
+    def _TEOBPM_quadratic_44_window(self):
+
+        return self._TEOBPM_window(
+            self.TEOB_quadratic_44_window_start,
+            self.TEOB_quadratic_44_window_width,
+        )
+
+    def _TEOBPM_tapered_overtone_44_window(self):
+
+        return self._TEOBPM_window(
+            self.TEOB_tapered_overtone_44_window_start,
+            self.TEOB_tapered_overtone_44_window_width,
+        )
+
+    def TEOBPM_quadratic_44_waveform(self, params, fixed_params):
+
+        if not((self.l_NR == 4) and (self.m_NR == 4)):
+            raise ValueError("TEOBPM quadratic 44 is available only for the selected NR mode (4,4).")
+
+        qnm_key = (2, 2, 2, 0)
+        if qnm_key not in self.qnm_cached:
+            raise ValueError("TEOBPM quadratic 44 requires the cached 220 QNM frequency.")
+
+        ln_A = utils.get_param_override(fixed_params, params, 'ln_A_sum_440_220_220')
+        phi  = utils.get_param_override(fixed_params, params, 'phi_sum_440_220_220')
+
+        f_220   = self.qnm_cached[qnm_key]['f']
+        tau_220 = self.qnm_cached[qnm_key]['tau']
+        t_rel   = np.asarray(self.t_NR) - self.t_peak
+        window  = self._TEOBPM_quadratic_44_window()
+
+        f_quad   = 2.0*f_220
+        tau_quad = 0.5*tau_220
+        basis    = np.exp(-t_rel/tau_quad) * np.exp(-1j*2.0*np.pi*f_quad*t_rel)
+
+        return np.exp(ln_A) * np.exp(1j*phi) * window * basis
+
+    def TEOBPM_tapered_overtone_44_waveform(self, params, fixed_params):
+
+        if not((self.l_NR == 4) and (self.m_NR == 4)):
+            raise ValueError("TEOBPM tapered overtone 44 is available only for the selected NR mode (4,4).")
+
+        qnm_key = (2, 4, 4, 1)
+        if qnm_key not in self.qnm_cached:
+            raise ValueError("TEOBPM tapered overtone 44 requires the cached 441 QNM frequency.")
+
+        ln_A = utils.get_param_override(fixed_params, params, 'ln_A_tapered_441')
+        phi  = utils.get_param_override(fixed_params, params, 'phi_tapered_441')
+
+        f_441   = self.qnm_cached[qnm_key]['f']
+        tau_441 = self.qnm_cached[qnm_key]['tau']
+        t_rel   = np.asarray(self.t_NR) - self.t_peak
+        window  = self._TEOBPM_tapered_overtone_44_window()
+        basis   = np.exp(-t_rel/tau_441) * np.exp(-1j*2.0*np.pi*f_441*t_rel)
+
+        return np.exp(ln_A) * np.exp(1j*phi) * window * basis
 
     def waveform(self, params, fixed_params):
 
@@ -541,5 +717,15 @@ class WaveformModel(cpnest.model.Model):
             counter_rotating = self.TEOBPM_counter_rotating_waveform(params, fixed_params)
             self.wf_r = self.wf_r + np.real(counter_rotating)
             self.wf_i = self.wf_i + np.imag(counter_rotating)
+
+        if self.wf_model=='TEOBPM' and self.TEOB_quadratic_44:
+            quadratic_44 = self.TEOBPM_quadratic_44_waveform(params, fixed_params)
+            self.wf_r = self.wf_r + np.real(quadratic_44)
+            self.wf_i = self.wf_i + np.imag(quadratic_44)
+
+        if self.wf_model=='TEOBPM' and self.TEOB_tapered_overtone_44:
+            overtone_44 = self.TEOBPM_tapered_overtone_44_waveform(params, fixed_params)
+            self.wf_r = self.wf_r + np.real(overtone_44)
+            self.wf_i = self.wf_i + np.imag(overtone_44)
 
         return self.wf_r + 1j * self.wf_i

@@ -379,6 +379,40 @@ global fits or are sampled locally:
        peak metadata, because the ansatz uses the second derivative of the
        peak amplitude. This flag is not the qc/noncirc calibration selector.
 
+``TEOB-quadratic-44`` adds a narrow opt-in nonlinear term to TEOBPM ``(4,4)``
+fits. The term is a ``220x220`` sum-frequency QNM with a half-cosine early-time
+taper:
+
+.. code-block:: ini
+
+   TEOB-quadratic-44 = 1
+   TEOB-quadratic-44-window-start = 10.0
+   TEOB-quadratic-44-window-width = 15.0
+
+The sampled complex amplitude uses the same naming convention as Kerr
+quadratic terms:
+
+.. code-block:: text
+
+   ln_A_sum_440_220_220
+   phi_sum_440_220_220
+
+``TEOB-tapered-overtone-44`` adds an opt-in ``441`` QNM contribution with its
+own half-cosine early-time taper:
+
+.. code-block:: ini
+
+   TEOB-tapered-overtone-44 = 1
+   TEOB-tapered-overtone-44-window-start = 0.0
+   TEOB-tapered-overtone-44-window-width = 10.0
+
+The sampled amplitude parameters are:
+
+.. code-block:: text
+
+   ln_A_tapered_441
+   phi_tapered_441
+
 For all TEOBPM runs, the merger phase for the fitted multipole is sampled:
 
 .. code-block:: text

@@ -704,7 +704,7 @@ def local_config_text(record: SimulationRecord, mode: tuple[int, int], config: C
         prior_text = f"{prior_text}\n{counter_prior_text}"
     return f"""[I/O]
 outdir = {outdir}
-screen-output = 1
+screen-output = 0
 run-type = full
 
 [NR-data]
@@ -1247,7 +1247,17 @@ def fill_higher_mode_inputs(
     return summary
 
 
+TEOB_44_ADDITIVE_TARGETS = {
+    "ln_A_sum_440_220_220",
+    "phi_sum_440_220_220",
+    "ln_A_tapered_441",
+    "phi_tapered_441",
+}
+
+
 def _target_from_parameter(parameter: str, mode: str) -> str | None:
+    if mode == "44" and parameter in TEOB_44_ADDITIVE_TARGETS:
+        return parameter
     suffix = f"_{mode}"
     if not parameter.endswith(suffix):
         return None

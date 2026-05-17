@@ -198,6 +198,12 @@ def _run_single_start(Config, parameters, config_file):
                                                 TEOB_merger_data          = parameters['Model']['TEOB-merger-data']                ,
                                                 TEOB_mode_mixing          = parameters['Model']['TEOB-mode-mixing']                ,
                                                 TEOB_counter_rotating     = parameters['Model']['TEOB-counter-rotating']            ,
+                                                TEOB_quadratic_44         = parameters['Model']['TEOB-quadratic-44']                ,
+                                                TEOB_quadratic_44_window_start = parameters['Model']['TEOB-quadratic-44-window-start'],
+                                                TEOB_quadratic_44_window_width = parameters['Model']['TEOB-quadratic-44-window-width'],
+                                                TEOB_tapered_overtone_44  = parameters['Model']['TEOB-tapered-overtone-44']        ,
+                                                TEOB_tapered_overtone_44_window_start = parameters['Model']['TEOB-tapered-overtone-44-window-start'],
+                                                TEOB_tapered_overtone_44_window_width = parameters['Model']['TEOB-tapered-overtone-44-window-width'],
                                                 )
 
     # ===============#
@@ -241,7 +247,22 @@ def _run_single_start(Config, parameters, config_file):
 
     if parameters['I/O']['run-type']=='full':
         import pickle
-        model_samples = [np.array(inference_model.model(p)) for p in postprocess.waveform_parameter_samples(results_object, parameters['Inference']['method'])]
+        model_samples = []
+        skipped_samples = 0
+        for p in postprocess.waveform_parameter_samples(results_object, parameters['Inference']['method']):
+            try:
+                model_sample = np.array(inference_model.model(p))
+            except (FloatingPointError, OverflowError, TypeError, ValueError):
+                skipped_samples += 1
+                continue
+            if not np.all(np.isfinite(model_sample)):
+                skipped_samples += 1
+                continue
+            model_samples.append(model_sample)
+        if not model_samples:
+            raise RuntimeError("No finite waveform samples could be constructed for serialization.")
+        if skipped_samples:
+            print("* Warning: skipped {} invalid point-estimate waveform sample(s) during serialization.".format(skipped_samples))
         with open(os.path.join(parameters['I/O']['outdir'], 'NR_sim.pkl'), 'wb') as f:
             pickle.dump([NR_sim, model_samples, wf_model], f)
 

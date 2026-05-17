@@ -429,6 +429,17 @@ def test_dynamic_inference_model_instances_are_pickleable_after_global_lookup_re
                 "c2p": [-10.0, 10.0],
             },
         ),
+        (
+            "TEOBPM",
+            "SEOBNRv5",
+            {
+                "phi_mrg": [0.0, inference.twopi],
+                "c3A": [-10.0, 10.0],
+                "c3p": [-10.0, 10.0],
+                "c2A": [1.0e-4, 5.0],
+                "c2p": [1.0e-4, 5.0],
+            },
+        ),
     ],
 )
 def test_read_default_bounds_selects_expected_ranges(wf_model, template, expected):
