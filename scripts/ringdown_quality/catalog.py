@@ -8,7 +8,13 @@ import numpy as np
 import pandas as pd
 
 from .config import Config
-from .waveform_io import configure_sxs, discover_available_levs
+from .waveform_io import (
+    configure_sxs,
+    discover_available_extrapolation_orders,
+    discover_available_levs,
+    extrapolation_order_available,
+    extrapolation_order_label,
+)
 
 
 def load_catalog(config: Config) -> pd.DataFrame:
@@ -188,6 +194,14 @@ def _choose_levs(levs: list[int]) -> tuple[int | None, int | None]:
     return int(levs[-2]), int(levs[-1])
 
 
+def _unique_extrapolation_orders(config: Config) -> list[str]:
+    raw_orders = [
+        extrapolation_order_label(config.waveform.reference_extrapolation_order),
+        *[extrapolation_order_label(order) for order in config.waveform.comparison_extrapolation_orders],
+    ]
+    return list(dict.fromkeys(raw_orders))
+
+
 def filter_catalog(df: pd.DataFrame, config: Config) -> tuple[pd.DataFrame, pd.DataFrame]:
     catalog = _normalise_catalog_index(df)
     reasons_by_id: dict[str, list[str]] = {sxs_id: [] for sxs_id in catalog.index}
@@ -273,19 +287,60 @@ def filter_catalog(df: pd.DataFrame, config: Config) -> tuple[pd.DataFrame, pd.D
     if config.filters.require_two_resolutions:
         passing = {}
         available_levs = {}
+        available_extrapolation_orders = {}
+        required_orders = _unique_extrapolation_orders(config)
         for sxs_id in catalog.index:
             if sxs_id not in current_ids:
                 available_levs[sxs_id] = []
+                available_extrapolation_orders[sxs_id] = []
                 passing[sxs_id] = False
                 continue
             levs = discover_available_levs(str(sxs_id), config=config)
             available_levs[sxs_id] = levs
             ok = len(levs) >= 2
             passing[sxs_id] = ok
+            available_extrapolation_orders[sxs_id] = []
             if not ok:
                 reasons_by_id[sxs_id].append("insufficient_levs")
+            else:
+                _, lev_high = _choose_levs(levs)
+                if lev_high is not None:
+                    discovered_orders = discover_available_extrapolation_orders(str(sxs_id), lev_high, config=config)
+                    if discovered_orders is not None:
+                        available_extrapolation_orders[sxs_id] = discovered_orders
+                        available_set = {extrapolation_order_label(order) for order in discovered_orders}
+                        if len(available_set) < 2:
+                            ok = False
+                            reasons_by_id[sxs_id].append("insufficient_extrapolation_orders")
+                        elif any(order not in available_set for order in required_orders):
+                            ok = False
+                            reasons_by_id[sxs_id].append("missing_required_extrapolation_order")
+                    else:
+                        availability = {
+                            order: extrapolation_order_available(sxs_id, lev_high, order, config=config)
+                            for order in required_orders
+                        }
+                        if any(value is False for value in availability.values()):
+                            ok = False
+                            reasons_by_id[sxs_id].append("missing_required_extrapolation_order")
+                        elif all(value is not None for value in availability.values()) and len(
+                            [value for value in availability.values() if value is True]
+                        ) < 2:
+                            ok = False
+                            reasons_by_id[sxs_id].append("insufficient_extrapolation_orders")
+                        else:
+                            available_extrapolation_orders[sxs_id] = [
+                                order for order, value in availability.items() if value is True
+                            ]
+                else:
+                    ok = False
+                    reasons_by_id[sxs_id].append("insufficient_levs")
+            passing[sxs_id] = ok
         record_filter("two_resolutions", passing)
         catalog["available_levs"] = [" ".join(str(lev) for lev in available_levs[sxs_id]) for sxs_id in catalog.index]
+        catalog["available_extrapolation_orders"] = [
+            " ".join(order for order in available_extrapolation_orders[sxs_id]) for sxs_id in catalog.index
+        ]
         lev_pairs = [_choose_levs(available_levs[sxs_id]) for sxs_id in catalog.index]
         catalog["lev_low"] = [pair[0] for pair in lev_pairs]
         catalog["lev_high"] = [pair[1] for pair in lev_pairs]

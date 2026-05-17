@@ -149,6 +149,7 @@ def test_teobpm_waveform_passes_string_template(monkeypatch):
             "omg_peak_22": 0.3,
             "A_peak_22": 0.4,
             "A_peak22dotdot": -0.01,
+            "DeltaT_22": 0.0,
         },
     )
 
@@ -176,6 +177,10 @@ def test_teobpm_waveform_passes_string_template(monkeypatch):
     assert not isinstance(captured["template"], int)
     assert captured["merger_data"] == 1
     assert captured["global_fit"] == 0
+    assert captured["NR_fit_coeffs"][(2, 2)]["omg_peak"] == 0.3
+    assert captured["NR_fit_coeffs"][(2, 2)]["A_peak_over_nu"] == 0.4 / (30.0 * 20.0 / 50.0**2)
+    assert captured["NR_fit_coeffs"][(2, 2)]["A_peakdotdot_over_nu"] == -0.01 / (30.0 * 20.0 / 50.0**2)
+    assert captured["NR_fit_coeffs"][(2, 2)]["DeltaT"] == 0.0
 
 
 def test_teobpm_waveform_passes_seobnrv5_template_without_c4p(monkeypatch):

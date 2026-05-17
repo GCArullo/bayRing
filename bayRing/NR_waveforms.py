@@ -1,5 +1,5 @@
 # General python imports
-import h5py, numpy as np, os, pandas as pd, subprocess, tempfile
+import h5py, json, numpy as np, os, pandas as pd, subprocess, tempfile
 from scipy import interpolate
 
 os.environ.setdefault("NUMBA_CACHE_DIR", os.path.join(tempfile.gettempdir(), "bayring_numba_cache"))
@@ -41,6 +41,70 @@ def _parse_sxs_reference_eccentricity(ecc):
     if np.isnan(ecc):
         return 0.0
     return ecc
+
+
+def _symmetric_mass_ratio_from_q(q):
+
+    try:
+        q = float(q)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(q) or q <= 0.0:
+        return None
+    return q/(1.0 + q)**2
+
+
+def _nearest_time_index(times, target_time):
+
+    times = np.asarray(times, dtype=float)
+    if len(times) == 0:
+        raise ValueError("Cannot locate a merger sample on an empty time array.")
+    return int(np.argmin(np.abs(times - float(target_time))))
+
+
+def _gradient_on_grid(values, times):
+
+    values = np.asarray(values, dtype=float)
+    times = np.asarray(times, dtype=float)
+    if len(values) < 2:
+        return np.zeros_like(values)
+    edge_order = 2 if len(values) > 2 else 1
+    return np.gradient(values, times, edge_order=edge_order)
+
+
+def _compute_mode_merger_metadata(t_NR, NR_amp, NR_phi, ecc, mode, reference_peak_time=None, nu=None):
+
+    mode_label = '{}{}'.format(int(mode[0]), int(mode[1]))
+    t_NR       = np.asarray(t_NR, dtype=float)
+    NR_amp     = np.asarray(NR_amp, dtype=float)
+    NR_phi     = np.asarray(NR_phi, dtype=float)
+
+    mode_peak_time = waveform_utils.find_peak_time(t_NR, NR_amp, ecc)
+    peak_index     = _nearest_time_index(t_NR, mode_peak_time)
+    omega          = _gradient_on_grid(NR_phi, t_NR)
+    amp_dot        = _gradient_on_grid(NR_amp, t_NR)
+    amp_dotdot     = _gradient_on_grid(amp_dot, t_NR)
+
+    if reference_peak_time is None:
+        reference_peak_time = mode_peak_time
+
+    metadata = {
+        'mode'                         : mode_label,
+        't_peak_{}'.format(mode_label) : float(mode_peak_time),
+        'A_peak_{}'.format(mode_label) : float(NR_amp[peak_index]),
+        'omg_peak_{}'.format(mode_label): float(omega[peak_index]),
+        'omega_peak_{}'.format(mode_label): float(omega[peak_index]),
+        'A_peak{}dot'.format(mode_label): float(amp_dot[peak_index]),
+        'A_peak{}dotdot'.format(mode_label): float(amp_dotdot[peak_index]),
+        'DeltaT_{}'.format(mode_label) : float(mode_peak_time - reference_peak_time),
+    }
+
+    if nu is not None and np.isfinite(nu) and nu != 0.0:
+        metadata['A_peak_over_nu_{}'.format(mode_label)] = metadata['A_peak_{}'.format(mode_label)]/nu
+        metadata['A_peakdot_over_nu_{}'.format(mode_label)] = metadata['A_peak{}dot'.format(mode_label)]/nu
+        metadata['A_peakdotdot_over_nu_{}'.format(mode_label)] = metadata['A_peak{}dotdot'.format(mode_label)]/nu
+
+    return metadata
 
 
 def _sxs_bitwise_axis(axis, ndim):
@@ -679,6 +743,8 @@ def read_NR_metadata(NR_sim, NR_catalog):
 
     else: raise ValueError("Invalid option for NR catalog: {}".format(NR_catalog))
 
+    metadata.update(getattr(NR_sim, 'additional_metadata', {}) or {})
+
     return metadata
     
 class NR_simulation():
@@ -1293,10 +1359,14 @@ class NR_simulation():
                         self.NR_i[i] += np.imag(self.NR_err_cmplx.data[i])
 
         # Start from zero.
-        if(self.t_NR[0] < 0 and self.waveform_type=='strain'): self.t_NR = self.t_NR - self.t_NR[0]
+        self.time_shift = 0.0
+        if(self.t_NR[0] < 0 and self.waveform_type=='strain'):
+            self.time_shift = float(self.t_NR[0])
+            self.t_NR = self.t_NR - self.time_shift
         
         # Locate the merger time (which does not coincide with the peak in the eccentric case).
-        self.t_peak = waveform_utils.find_peak_time(self.t_NR, self.NR_amp, self.ecc)
+        self.mode_peak_time = waveform_utils.find_peak_time(self.t_NR, self.NR_amp, self.ecc)
+        self.t_peak = self.mode_peak_time
 
         # For convenience, for second order perturbations, allow the option to build the time axis from the secondary peak.
         if(self.NR_catalog=='Teukolsky' and self.pert_order=='lin'): 
@@ -1308,6 +1378,7 @@ class NR_simulation():
             self.t_peak = self.t_peak_22
 
         self.NR_freq  = np.gradient(self.NR_phi, self.t_NR)/(twopi)
+        self._store_computed_merger_metadata()
         
         # Restrict computations to [t_min, t_max]
         self.t_min, self.t_max = self.t_peak + tM_start, self.t_peak + tM_end
@@ -1325,6 +1396,120 @@ class NR_simulation():
         # Store the peaktime to facilitate post-processing
         print("\n* The peak time is t_peak = {}".format(self.t_peak))
         np.savetxt(os.path.join(self.outdir,'Peak_quantities/Peak_time.txt'), np.array([self.t_peak]), header = "t_peak [sim units]")
+
+    def _read_waveform_lm_for_mode(self, mode):
+
+        original_l, original_m = self.l, self.m
+        try:
+            self.l, self.m = int(mode[0]), int(mode[1])
+            if(self.NR_catalog=='SXS'):
+                t_NR, NR_r, NR_i = self.read_waveform_lm_from_SXS(self.extrap_order, self.res_level)
+            elif(self.NR_catalog=='RIT'):
+                t_NR, NR_r, NR_i = self.read_waveform_lm_from_RIT()
+            else:
+                raise ValueError("Merger metadata for related modes is implemented for SXS and RIT waveforms.")
+        finally:
+            self.l, self.m = original_l, original_m
+
+        t_NR = np.asarray(t_NR, dtype=float)
+        if(getattr(self, 'time_shift', 0.0) != 0.0 and self.waveform_type=='strain'):
+            t_NR = t_NR - self.time_shift
+        return t_NR, np.asarray(NR_r, dtype=float), np.asarray(NR_i, dtype=float)
+
+    def _related_merger_modes(self):
+
+        mode = (int(self.l), int(self.m))
+        related_modes = []
+        if mode in template_waveforms.TEOB_MODE_MIXING_PARENTS:
+            related_modes.append(template_waveforms.TEOB_MODE_MIXING_PARENTS[mode])
+        return related_modes
+
+    def _set_mode_merger_metadata(self, merger_metadata):
+
+        if not hasattr(self, 'additional_metadata') or self.additional_metadata is None:
+            self.additional_metadata = {}
+        self.additional_metadata.update(merger_metadata)
+
+        mode_label = merger_metadata['mode']
+        for key in [
+            't_peak_{}',
+            'A_peak_{}',
+            'omg_peak_{}',
+            'omega_peak_{}',
+            'A_peak{}dot',
+            'A_peak{}dotdot',
+            'DeltaT_{}',
+        ]:
+            metadata_key = key.format(mode_label)
+            if metadata_key in merger_metadata:
+                setattr(self, metadata_key, merger_metadata[metadata_key])
+
+        if mode_label == '22':
+            self.A_peak_22      = merger_metadata['A_peak_22']
+            self.omg_peak_22    = merger_metadata['omg_peak_22']
+            self.A_peak22dotdot = merger_metadata['A_peak22dotdot']
+
+    def _write_computed_merger_metadata(self):
+
+        if not hasattr(self, 'additional_metadata') or self.additional_metadata is None:
+            return
+        mode_entries = {
+            key: value
+            for key, value in self.additional_metadata.items()
+            if (
+                key.startswith(('t_peak_', 'A_peak_', 'omg_peak_', 'omega_peak_', 'DeltaT_'))
+                or (key.startswith('A_peak') and (key.endswith('dot') or key.endswith('dotdot')))
+                or key.startswith(('A_peak_over_nu_', 'A_peakdot_over_nu_', 'A_peakdotdot_over_nu_'))
+            )
+        }
+        if not mode_entries:
+            return
+        serialisable_entries = {}
+        for key, value in mode_entries.items():
+            if isinstance(value, (np.floating, np.integer)):
+                serialisable_entries[key] = float(value)
+            else:
+                serialisable_entries[key] = value
+        outdir = os.path.join(self.outdir, 'Peak_quantities')
+        os.makedirs(outdir, exist_ok=True)
+        with open(os.path.join(outdir, 'Merger_metadata.json'), 'w', encoding='utf-8') as handle:
+            json.dump(serialisable_entries, handle, indent=2, sort_keys=True)
+
+    def _store_computed_merger_metadata(self):
+
+        nu = _symmetric_mass_ratio_from_q(getattr(self, 'q', None))
+        selected_mode = (int(self.l), int(self.m))
+        selected_metadata = _compute_mode_merger_metadata(
+            self.t_NR,
+            self.NR_amp,
+            self.NR_phi,
+            self.ecc,
+            selected_mode,
+            reference_peak_time=self.t_peak,
+            nu=nu,
+        )
+        self._set_mode_merger_metadata(selected_metadata)
+
+        for mode in self._related_merger_modes():
+            if mode == selected_mode:
+                continue
+            try:
+                t_NR, NR_r, NR_i = self._read_waveform_lm_for_mode(mode)
+                NR_amp, NR_phi = waveform_utils.amp_phase_from_re_im(NR_r, NR_i)
+                merger_metadata = _compute_mode_merger_metadata(
+                    t_NR,
+                    NR_amp,
+                    NR_phi,
+                    self.ecc,
+                    mode,
+                    reference_peak_time=self.t_peak,
+                    nu=nu,
+                )
+                self._set_mode_merger_metadata(merger_metadata)
+            except Exception as exc:
+                print("* Could not compute TEOBPM merger metadata for related mode {}{}: {}".format(mode[0], mode[1], exc))
+
+        self._write_computed_merger_metadata()
 
     def _injection_Kerr_setup(self, metadata):
 

@@ -317,7 +317,7 @@ TEOBPM
    TEOB-template = HypTan
    TEOB-calibration = qc
    TEOB-global-fit = 1
-   TEOB-merger-data = 0
+   TEOB-merger-data = 1
 
 ``TEOB-template`` selects the amplitude ansatz:
 
@@ -331,6 +331,8 @@ TEOBPM
      - Hyperbolic-tangent amplitude template.
    * - ``RatExp``
      - Rational-exponential amplitude template.
+   * - ``SEOBNRv5``
+     - SEOBNRv5-inspired amplitude template.
 
 ``TEOB-calibration`` selects the calibration family independently of the
 amplitude ansatz:
@@ -372,12 +374,14 @@ global fits or are sampled locally:
    * - Value
      - Meaning
    * - ``0``
-     - Use quasi-circular peak fits.
+     - Use pyRing's built-in quasi-circular peak fits.
    * - ``1``
-     - Use NR merger peak quantities from ``[NR-data] properties-file``.
-       ``RatExp`` runs require this option and the corresponding NR merger
-       peak metadata, because the ansatz uses the second derivative of the
-       peak amplitude. This flag is not the qc/noncirc calibration selector.
+     - Use merger peak quantities computed from the loaded NR multipole:
+       ``A_peak_lm``, ``omg_peak_lm``, ``DeltaT_lm`` and, where needed,
+       ``A_peaklmdotdot``. The values are written to
+       ``Peak_quantities/Merger_metadata.json`` and can be collected for later
+       global fits as functions of binary parameters. This flag is not the
+       qc/noncirc calibration selector.
 
 ``TEOB-quadratic-44`` adds a narrow opt-in nonlinear term to TEOBPM ``(4,4)``
 fits. The term is a ``220x220`` sum-frequency QNM with a half-cosine early-time

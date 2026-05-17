@@ -154,6 +154,18 @@ def _load_required_waveforms(
     config: Config,
 ) -> tuple[waveform_io.WaveformData, waveform_io.WaveformData, dict[str, waveform_io.WaveformData]]:
     ref_order = config.waveform.reference_extrapolation_order
+    if waveform_io.extrapolation_order_available(sxs_id, lev_high, ref_order, config) is False:
+        raise FileNotFoundError(f"{sxs_id} Lev{lev_high} has no reference strain file for {ref_order}.")
+    if waveform_io.extrapolation_order_available(sxs_id, lev_low, ref_order, config) is False:
+        raise FileNotFoundError(f"{sxs_id} Lev{lev_low} has no reference strain file for {ref_order}.")
+    missing_orders = [
+        str(order)
+        for order in config.waveform.comparison_extrapolation_orders
+        if waveform_io.extrapolation_order_available(sxs_id, lev_high, str(order), config) is False
+    ]
+    if missing_orders and config.filters.require_extrapolation_comparison:
+        raise FileNotFoundError(f"missing high-resolution strain files for extrapolation orders {missing_orders}")
+
     high_ref = waveform_io.load_waveform(sxs_id, lev_high, ref_order, config)
     low_ref = waveform_io.load_waveform(sxs_id, lev_low, ref_order, config)
     comparison_waveforms = {}

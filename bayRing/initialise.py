@@ -437,7 +437,7 @@ def read_config(Config):
         'TEOB-template'                    : 'HypTan'     ,
         'TEOB-calibration'                 : 'qc'         ,
         'TEOB-global-fit'                  : 1            ,
-        'TEOB-merger-data'                 : 0            ,
+        'TEOB-merger-data'                 : 1            ,
         'TEOB-mode-mixing'                 : 0            ,
         'TEOB-counter-rotating'            : 0            ,
         'TEOB-quadratic-44'                : 0            ,
@@ -805,8 +805,7 @@ A dot is present at the end of each description line and is not to be intended a
         TEOB-template                    TEOB amplitude ansatz to be used. Available options: ['HypTan', 'RatExp']. The 'HypTan' version is defined in  \
                                          arXiv:1904.09550, arXiv:2001.09082, while the 'RatExp' in II.C of arXiv:2305.19336. 
                                          
-                                         Additionally, if 'RatExp' template is selected, the TEOB-merger-data flag has to be set to 1, and NR merger data has \
-                                         to be provided in [NR-data][properties-file].                                                                                    Default: 'HypTan'.
+                                         TEOB-merger-data should normally be 1 so merger peak quantities are computed from the loaded NR simulation.                      Default: 'HypTan'.
 
         TEOB-calibration                 TEOB calibration family. Available options: ['qc', 'noncirc']. The 'qc' family allows noneccentric/quasi-circular \
                                          fit variables. The 'noncirc' family allows noncircular/eccentric fit variables such as 'ecc', 'bmrg', 'Emrg' and \
@@ -841,9 +840,9 @@ A dot is present at the end of each description line and is not to be intended a
         TEOB-tapered-overtone-44-window-width
                                           Half-cosine taper width for TEOB-tapered-overtone-44, in M. A non-positive value gives a step. Default: 10.0.
 
-        TEOB-merger-data                 Boolean flag to switch between using the values of the amplitude and frequency at the peak of the modes as given \ 
-                                         by the NR merger data (TEOB-merger-data = 1, to be provided in [NR-data][properties-file]) or by the quasi-circular fits \
-                                         (TEOB-merger-data = 0).                                                                                                          Default: 0.
+        TEOB-merger-data                 Boolean flag to switch between using the values of the amplitude and frequency at the peak of the modes as computed \
+                                         from the loaded NR simulation (TEOB-merger-data = 1) or by pyRing's built-in quasi-circular fits \
+                                         (TEOB-merger-data = 0). The computed values are written to Peak_quantities/Merger_metadata.json for later global fits.            Default: 1.
 
     *******************************************************
     * Parameters to be passed to the [Inference] section. *

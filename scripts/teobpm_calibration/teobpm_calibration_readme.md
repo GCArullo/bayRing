@@ -9,8 +9,10 @@ when `Algorithm/posterior.dat` already exists for nested-sampler runs. Pass
 and mode.
 
 The default higher-mode set is
-`22,21,33,32,31,44,43,42,41,55`. Mode mixing is enabled by default for `32`
-and `43`; those modes need completed parent-mode fits before they are run.
+`22,21,33,32,31,44,43,42,41,55`. Mode mixing is enabled by default for `32`, `42`, and `43`; those modes need completed
+parent-mode fits before they are run.
+
+The `55` mode is generated with the quadratic term `Px220x330` by default.
 `run-local-fits` uses all available CPU cores by default and prints one status
 line per job plus a campaign progress bar.
 
@@ -19,7 +21,7 @@ same CLI can also be run as `python -m scripts.teobpm_calibration.teobpm_calibra
 
 ## 0. Choose The Campaign
 
-Set these variables once. Use `HypTan` or `RatExp` for the template, and use
+Set these variables once. Use `HypTan`, `RatExp`, or `SEOBNRv5` for the template, and use
 `Minimization` or `Nested-sampler` for the local-fit algorithm.
 
 ```bash
@@ -29,7 +31,7 @@ export BINARY_TYPE=nonspinning        # nonspinning, equal-mass-spinning, spinni
 export LOCAL_ALGORITHM=Minimization
 export MAX_POLYNOMIAL_DEGREE=3
 export MODES=22,21,33,32,31,44,43,42,41,55
-export MIXED_MODES=32,43
+export MIXED_MODES=32,42,43
 export RANDOM_FRACTION=1.0
 export CAMPAIGN_DIR="${ROOT}/${TEMPLATE}/${BINARY_TYPE}"
 export GLOBAL_FIT="${CAMPAIGN_DIR}/teobpm_global_fit.json"
@@ -90,17 +92,17 @@ Run the hierarchy in order:
 3. `spinning`
 
 Do not start a higher level until the lower-level JSON checked above exists.
-Generated calibration configs follow pyRing's current TEOBPM time convention:
-the `22` peak is the reference, and mode `lm` starts at
-`t_peak_22 + DeltaT_lm(q, chi1, chi2)`. Therefore the generated `t-start` is
-`DeltaT_lm` for higher modes and `0` for `22`; `--t-start` adds an extra offset
-on top of that convention.
+Generated calibration configs use the `22` peak as the reference. bayRing
+computes the selected mode's `DeltaT_lm` and merger peak quantities directly
+from the loaded NR waveform, then passes them to TEOBPM with
+`TEOB-merger-data = 1`. The generated `t-start` is the user supplied
+`--t-start` for every mode; the prepare step does not call pyRing's built-in
+`DeltaT_lm(q, chi1, chi2)` fits.
 
-That per-mode start is only for constructing local fit coefficients. Once local
-fits have been constructed, waveform mismatch comparisons used by local-fit
-plots and global-fit checks must start at the `22` peak with `t-start = 0` and
-`tref = peak22`. Higher modes may be empty over the initial `0 <= t < DeltaT_lm`
-stretch of the comparison.
+Once local fits have been constructed, waveform mismatch comparisons used by
+local-fit plots and global-fit checks must start at the `22` peak with
+`t-start = 0` and `tref = peak22`. Higher modes may be empty over the initial
+`0 <= t < DeltaT_lm` stretch of the comparison.
 
 ## 1. Local Fits
 
@@ -137,8 +139,8 @@ bayRing-teobpm-calibrate fill-hm-inputs \
   --mode-mixing-modes "$MIXED_MODES"
 ```
 
-Run the higher modes whose dependencies are available. This includes `32`
-because its parent is `22`; hold back `43` until `33` has completed:
+Run the higher modes whose dependencies are available. This includes `32` and `42`
+because their parents are `22` and `32` respectively; hold back `43` until `33` has completed:
 
 ```bash
 OMP_NUM_THREADS=1 bayRing-teobpm-calibrate run-local-fits \

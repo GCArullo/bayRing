@@ -35,13 +35,12 @@ The command writes:
 * ``local_fit_configs/*.ini`` with one normal bayRing config per fit;
 * ``run_local_fits.sh`` with the corresponding ``bayRing`` commands.
 
-Calibration configs follow pyRing's current TEOBPM time convention. The
-``(2,2)`` peak is the reference, and mode ``lm`` starts at
-``t_peak_22 + DeltaT_lm(q, chi1, chi2)``. The generated ``t-start`` is therefore
-``0`` for ``22`` and pyRing's ``DeltaT_lm`` for higher modes; ``--t-start`` adds
-an extra offset on top of that convention.
+Calibration configs use the ``(2,2)`` peak as the reference. bayRing computes
+the selected mode's ``DeltaT_lm`` and merger peak quantities directly from the
+loaded NR waveform, then passes them to TEOBPM with ``TEOB-merger-data = 1``.
+The generated ``t-start`` is the user supplied ``--t-start`` for every mode; the
+prepare step does not call pyRing's built-in ``DeltaT_lm(q, chi1, chi2)`` fits.
 
-This per-mode start is only used while constructing local fit coefficients.
 Once coefficients exist, waveform mismatch evaluation for local-fit plots and
 global-fit checks must compare from the ``(2,2)`` peak with ``t-start = 0`` and
 ``tref = peak22``. Higher modes can therefore be empty over the initial
@@ -61,8 +60,10 @@ Run the indexed ``22`` local fits first with:
      --workers 4
 
 Then fill the higher-mode metadata and run every higher mode whose dependencies
-are available. This can include ``32`` because its mixed-mode parent is ``22``;
+are available. This can include ``32`` and ``42`` because their mixed-mode parents are ``22`` and ``32`` respectively;
 hold back ``43`` until ``33`` has completed:
+
+The ``55`` mode uses a default quadratic term, ``Px220x330``.
 
 .. code-block:: bash
 

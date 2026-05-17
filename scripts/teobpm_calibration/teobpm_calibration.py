@@ -26,8 +26,9 @@ import numpy as np
 
 
 DEFAULT_MODES = [(2, 2), (2, 1), (3, 3), (3, 2), (3, 1), (4, 4), (4, 3), (4, 2), (4, 1), (5, 5)]
-TEOB_MODE_MIXING_PARENTS = {(3, 2): (2, 2), (4, 3): (3, 3)}
+TEOB_MODE_MIXING_PARENTS = {(3, 2): (2, 2), (4, 3): (3, 3), (4, 2): (3, 2)}
 DEFAULT_MODE_MIXING_MODES = sorted(TEOB_MODE_MIXING_PARENTS)
+QQNM_TERMS_BY_MODE = {(5, 5): 'Px220x330'}
 REFERENCE_FIT_TARGETS = (
     "A_ref_over_nu",
     "A_refdot_over_nu",
@@ -38,6 +39,7 @@ REFERENCE_FIT_TARGETS = (
 )
 LOCAL_FIT_TARGETS_HYPTAN = ("A_peak_over_nu", "omg_peak", "c3A", "c3p", "c4p") + REFERENCE_FIT_TARGETS
 LOCAL_FIT_TARGETS_RATEXP = ("A_peak_over_nu", "A_peakdotdot_over_nu", "omg_peak", "c2A", "c3A", "c2p", "c3p", "c4p") + REFERENCE_FIT_TARGETS
+LOCAL_FIT_TARGETS_SEOBNRV5 = ("A_peak_over_nu", "omg_peak", "c2A", "c2p", "c3A", "c3p") + REFERENCE_FIT_TARGETS
 PHASE_TARGET_PREFIX = "delta_phi_"
 FIT_SCHEMA = "bayRing.teobpm.global-fit.v1"
 APPENDIX_A_SCHEMA = "bayRing.teobpm.appendix-a.v1"
@@ -144,9 +146,11 @@ class LocalFitJob:
 
 
 def _teobpm_requires_merger_peak_data(template: str) -> bool:
-    """RatExp uses the peak-amplitude second derivative; this is independent of qc/noncirc calibration."""
+    """TEOBPM calibration jobs use NR-computed merger data instead of pyRing's built-in peak fits."""
 
-    return template == "RatExp"
+    if template in {"HypTan", "RatExp", "SEOBNRv5"}:
+        return True
+    raise ValueError(f"Unknown TEOBPM template `{template}`.")
 
 
 def _as_float(value: Any, default: float = 0.0) -> float:
@@ -615,6 +619,13 @@ def _local_prior_text(mode: tuple[int, int], template: str) -> str:
             "c3p": (0.1, 10.0),
             "c4p": (0.1, 10.0),
         }
+    elif template == "SEOBNRv5":
+        bounds = {
+            "c2A": (1.0e-4, 5.0),
+            "c3A": (-5.0, 1.0),
+            "c2p": (1.0e-4, 5.0),
+            "c3p": (0.1, 10.0),
+        }
     else:
         raise ValueError(f"Unknown TEOBPM template `{template}`.")
 
@@ -648,6 +659,15 @@ def _local_counter_rotating_prior_text(mode: tuple[int, int], template: str) -> 
             "c3p_counter": (0.1, 10.0),
             "c4p_counter": (0.1, 10.0),
         }
+    elif template == "SEOBNRv5":
+        bounds = {
+            "ln_A_counter_scale": (-8.0, 0.0),
+            "phi_mrg_counter": (0.0, 2.0*math.pi),
+            "c2A_counter": (1.0e-4, 5.0),
+            "c3A_counter": (-5.0, 1.0),
+            "c2p_counter": (1.0e-4, 5.0),
+            "c3p_counter": (0.1, 10.0),
+        }
     else:
         raise ValueError(f"Unknown TEOBPM template `{template}`.")
 
@@ -658,44 +678,8 @@ def _local_counter_rotating_prior_text(mode: tuple[int, int], template: str) -> 
     return "\n".join(lines)
 
 
-def _pyRing_teobpm_delta_t(record: SimulationRecord, mode: tuple[int, int]) -> float:
-    """Return pyRing's TEOBPM mode start offset relative to the 22 peak."""
-    if mode == (2, 2):
-        return 0.0
-    try:
-        import pyRing.waveform as wf
-    except Exception as exc:
-        raise RuntimeError("Preparing TEOBPM calibration configs requires importable pyRing.waveform.") from exc
-
-    q = record.q
-    if not math.isfinite(q) or q <= 0.0:
-        raise ValueError(f"Cannot compute TEOBPM DeltaT for {record.sxs_id}: invalid q={record.q}.")
-    m1 = q / (1.0 + q)
-    m2 = 1.0 / (1.0 + q)
-    try:
-        teobpm = wf.TEOBPM(
-            0.0,
-            m1,
-            m2,
-            record.chi1z,
-            record.chi2z,
-            {},
-            1.0,
-            0.0,
-            0.0,
-            [mode],
-            {},
-            geom=1,
-        )
-        return float(teobpm.DeltaT(mode[0], mode[1]))
-    except Exception as exc:
-        raise RuntimeError(
-            f"Could not compute pyRing TEOBPM DeltaT for {record.sxs_id} mode {_mode_label(mode)}."
-        ) from exc
-
-
 def _local_fit_t_start(record: SimulationRecord, mode: tuple[int, int], config: CalibrationConfig) -> float:
-    return float(config.t_start) + _pyRing_teobpm_delta_t(record, mode)
+    return float(config.t_start)
 
 
 def local_config_text(record: SimulationRecord, mode: tuple[int, int], config: CalibrationConfig) -> str:
@@ -707,6 +691,7 @@ def local_config_text(record: SimulationRecord, mode: tuple[int, int], config: C
     counter_rotating = 1 if mode == (2, 1) else 0
     t_start = _local_fit_t_start(record, mode, config)
     prior_text = _local_prior_text(mode, config.template)
+    quadratic_modes = QQNM_TERMS_BY_MODE.get(mode, '')
     counter_prior_text = _local_counter_rotating_prior_text(mode, config.template)
     if counter_prior_text:
         prior_text = f"{prior_text}\n{counter_prior_text}"
@@ -738,6 +723,7 @@ TEOB-global-fit = {global_fit}
 TEOB-merger-data = {merger_data}
 TEOB-mode-mixing = {mode_mixing}
 TEOB-counter-rotating = {counter_rotating}
+{ 'QQNM-modes = ' + quadratic_modes if quadratic_modes else '' }
 
 [Priors]
 {prior_text}
@@ -1168,10 +1154,10 @@ def fill_higher_mode_inputs(
 ) -> dict[str, Any]:
     """Fill generated HM configs with t-peak-22 and parent local-fit values.
 
-    Higher-mode TEOBPM fits need the 22 peak time. Mixed 32/43 fits also need a
+    Higher-mode TEOBPM fits need the 22 peak time. Mixed 32/42/43 fits also need
     fixed parent-mode phase and local coefficients, because pyRing internally
-    constructs the 22 or 33 parent multipole before projecting the requested
-    spherical mode.
+    constructs the parent multipole before projecting the requested spherical
+    mode.
     """
 
     campaign_dir = Path(campaign_dir)
@@ -1286,6 +1272,8 @@ def _local_fit_targets_for_template(template: str) -> tuple[str, ...]:
         return LOCAL_FIT_TARGETS_HYPTAN
     if template == "RatExp":
         return LOCAL_FIT_TARGETS_RATEXP
+    if template == "SEOBNRv5":
+        return LOCAL_FIT_TARGETS_SEOBNRV5
     raise ValueError(f"Unknown TEOBPM template `{template}`.")
 
 
@@ -1299,6 +1287,7 @@ def _record_metadata_targets(record: SimulationRecord | None, job: LocalFitJob, 
         "omg_peak": [f"omg_peak_{mode}", f"omega_peak_{mode}", f"peak-omega-l{mode[0]}-m{mode[1:]}"],
         "A_peak_over_nu": [f"A_peak_{mode}", f"A_peak{mode}", f"peak-ampl-l{mode[0]}-m{mode[1:]}"],
         "A_peakdotdot_over_nu": [f"A_peak{mode}dotdot"],
+        "DeltaT": [f"DeltaT_{mode}", f"DeltaT{mode}"],
     }
     allowed_targets = set(_local_fit_targets_for_template(template))
     for target, keys in target_keys.items():
@@ -1312,6 +1301,39 @@ def _record_metadata_targets(record: SimulationRecord | None, job: LocalFitJob, 
             value = value / job.nu
         if math.isfinite(value):
             rows.append(_local_fit_row(job, target, value, math.nan, source="metadata"))
+    return rows
+
+
+def _computed_merger_targets_from_job(job: LocalFitJob, template: str) -> list[dict[str, Any]]:
+    path = Path(job.outdir) / "Peak_quantities" / "Merger_metadata.json"
+    if not path.exists():
+        return []
+    try:
+        metadata = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+
+    mode = job.mode
+    target_keys = {
+        "omg_peak": [f"omg_peak_{mode}", f"omega_peak_{mode}"],
+        "A_peak_over_nu": [f"A_peak_over_nu_{mode}", f"A_peak_{mode}", f"A_peak{mode}"],
+        "A_peakdot_over_nu": [f"A_peakdot_over_nu_{mode}", f"A_peak{mode}dot"],
+        "A_peakdotdot_over_nu": [f"A_peakdotdot_over_nu_{mode}", f"A_peak{mode}dotdot"],
+        "DeltaT": [f"DeltaT_{mode}", f"DeltaT{mode}"],
+    }
+    allowed_targets = set(_local_fit_targets_for_template(template))
+    rows: list[dict[str, Any]] = []
+    for target, keys in target_keys.items():
+        if target not in allowed_targets:
+            continue
+        raw_value = _first_present(metadata, keys, None)
+        if raw_value is None:
+            continue
+        value = _as_float(raw_value, default=math.nan)
+        if target.endswith("_over_nu") and keys[0] not in metadata and job.nu != 0.0:
+            value = value / job.nu
+        if math.isfinite(value):
+            rows.append(_local_fit_row(job, target, value, math.nan, source="NR_sim"))
     return rows
 
 
@@ -1475,11 +1497,14 @@ def collect_local_fit_outputs(campaign_dir: str | Path, output_table: str | Path
         mismatch = representative_mismatch(job_mismatch_rows)
         estimates, estimate_source = read_local_fit_estimates(job.outdir)
         fixed_prior_rows = _fixed_prior_targets_from_config(job, template)
+        computed_merger_rows = _computed_merger_targets_from_job(job, template)
+        computed_merger_targets = {row["target"] for row in computed_merger_rows}
 
         if not estimates:
             failures.append({"sxs_id": job.sxs_id, "mode": job.mode, "outdir": job.outdir, "reason": "missing point_estimates.dat or posterior.dat"})
-            rows.extend(fixed_prior_rows)
-            rows.extend(_record_metadata_targets(records_by_id.get(job.sxs_id), job, template))
+            rows.extend(row for row in fixed_prior_rows if row["target"] not in computed_merger_targets)
+            rows.extend(computed_merger_rows)
+            rows.extend(row for row in _record_metadata_targets(records_by_id.get(job.sxs_id), job, template) if row["target"] not in computed_merger_targets)
             continue
 
         estimated_targets: set[str] = set()
@@ -1501,8 +1526,9 @@ def collect_local_fit_outputs(campaign_dir: str | Path, output_table: str | Path
                         construction_mismatch=mismatch,
                     )
                 )
-        rows.extend(row for row in fixed_prior_rows if row["target"] not in estimated_targets)
-        rows.extend(_record_metadata_targets(records_by_id.get(job.sxs_id), job, template))
+        rows.extend(row for row in fixed_prior_rows if row["target"] not in estimated_targets and row["target"] not in computed_merger_targets)
+        rows.extend(computed_merger_rows)
+        rows.extend(row for row in _record_metadata_targets(records_by_id.get(job.sxs_id), job, template) if row["target"] not in estimated_targets and row["target"] not in computed_merger_targets)
 
     for (sxs_id, mode), phase_data in sorted(phases.items()):
         if mode == "22":
@@ -4120,8 +4146,8 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--output-dir", required=True)
     prepare.add_argument("--catalog-file", default=None)
     prepare.add_argument("--modes", default=",".join(_mode_label(mode) for mode in DEFAULT_MODES))
-    prepare.add_argument("--mode-mixing-modes", default=",".join(_mode_label(mode) for mode in DEFAULT_MODE_MIXING_MODES), help="Comma-separated TEOBPM modes that should enable TEOB mode-mixing, e.g. 32,43.")
-    prepare.add_argument("--template", choices=["HypTan", "RatExp"], default="RatExp")
+    prepare.add_argument("--mode-mixing-modes", default=",".join(_mode_label(mode) for mode in DEFAULT_MODE_MIXING_MODES), help="Comma-separated TEOBPM modes that should enable TEOB mode-mixing, e.g. 32,42,43.")
+    prepare.add_argument("--template", choices=["HypTan", "RatExp", "SEOBNRv5"], default="RatExp")
     prepare.add_argument("--teob-calibration", choices=["qc", "noncirc"], default="qc")
     prepare.add_argument("--validation-fraction", type=float, default=0.33)
     prepare.add_argument("--seed", type=int, default=1234)
@@ -4135,7 +4161,7 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--min-quality-score", type=float, default=None)
     prepare.add_argument("--bayring-executable", default="bayRing")
     prepare.add_argument("--nr-data-dir", default="")
-    prepare.add_argument("--properties-file", default="", help="Optional CSV with SXS merger peak quantities to pass to generated bayRing configs.")
+    prepare.add_argument("--properties-file", default="", help="Optional CSV with supplemental SXS metadata; TEOBPM merger peak quantities are computed from the loaded NR waveform.")
     prepare.add_argument("--extrap-order", type=int, default=2)
     prepare.add_argument("--resolution-level", type=int, default=-1)
     prepare.add_argument("--t-start", type=float, default=0.0)
@@ -4151,7 +4177,7 @@ def build_parser() -> argparse.ArgumentParser:
     fit.add_argument("--local-fit-table", required=True)
     fit.add_argument("--output-file", required=True)
     fit.add_argument("--family", choices=["nonspinning", "equal-mass-spinning", "spinning", "aligned-spin"], required=True)
-    fit.add_argument("--template", choices=["HypTan", "RatExp"], default="RatExp")
+    fit.add_argument("--template", choices=["HypTan", "RatExp", "SEOBNRv5"], default="RatExp")
     fit.add_argument("--teob-calibration", choices=["qc", "noncirc"], default="qc")
     fit.add_argument("--base-nonspinning-file", default=None)
     fit.add_argument("--max-polynomial-degree", type=int, default=3)
@@ -4175,7 +4201,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fill higher-mode local-fit configs with t-peak-22 and mixed-mode parent local-fit values.",
     )
     fill_hm.add_argument("--campaign-dir", required=True)
-    fill_hm.add_argument("--mode-mixing-modes", default="32,43")
+    fill_hm.add_argument("--mode-mixing-modes", default=",".join(_mode_label(mode) for mode in DEFAULT_MODE_MIXING_MODES))
 
     appendix_prepare = subparsers.add_parser("appendix-a-prepare", help="Prepare the Appendix A quasi-circular SXS reproduction campaigns.")
     appendix_prepare.add_argument("--output-dir", required=True)

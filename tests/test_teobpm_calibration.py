@@ -66,11 +66,10 @@ def test_aligned_spin_requires_nonspinning_base_fit(tmp_path):
         calib.filter_records(records, config)
 
 
-def test_prepare_campaign_writes_manifests_and_configs(tmp_path, monkeypatch):
+def test_prepare_campaign_writes_manifests_and_configs(tmp_path):
     catalog_path = tmp_path / "catalog.json"
     catalog_path.write_text(json.dumps(_catalog_rows()), encoding="utf-8")
     output_dir = tmp_path / "campaign"
-    monkeypatch.setattr(calib, "_pyRing_teobpm_delta_t", lambda record, mode: 0.0 if mode == (2, 2) else 4.25)
     config = calib.CalibrationConfig(
         family="nonspinning",
         output_dir=str(output_dir),
@@ -112,18 +111,19 @@ def test_prepare_campaign_writes_manifests_and_configs(tmp_path, monkeypatch):
     assert "error-t-min = 0.0" in expected_22_text
     assert "error-t-max = 30.0" in expected_22_text
     assert "t-start = 0.0" in expected_22_text
+    assert "TEOB-merger-data = 1" in expected_22_text
     assert "TEOB-counter-rotating = 0" in expected_22_text
     assert "t-peak-22 = 0.0" in expected_33_text
-    assert "t-start = 4.25" in expected_33_text
+    assert "t-start = 0.0" in expected_33_text
+    assert "TEOB-merger-data = 1" in expected_33_text
     assert "TEOB-counter-rotating = 0" in expected_33_text
     assert "[Priors]" in expected_33_text
     assert "c3p_33-min = 0.1" in expected_33_text
 
 
-def test_local_fit_configs_enable_independent_counter_rotating_21_by_default(tmp_path, monkeypatch):
+def test_local_fit_configs_enable_independent_counter_rotating_21_by_default(tmp_path):
     record = calib.normalise_catalog_entry(_catalog_rows()[0])
     output_dir = tmp_path / "campaign"
-    monkeypatch.setattr(calib, "_pyRing_teobpm_delta_t", lambda record, mode: 8.0)
     config = calib.CalibrationConfig(
         family="nonspinning",
         output_dir=str(output_dir),
@@ -177,6 +177,35 @@ def test_prepare_parser_defaults_to_mixed_higher_modes_and_sxs_id_subset(tmp_pat
     assert config.sxs_ids == ["SXS:BBH:0001", "SXS:BBH:0003"]
     assert config.random_fraction == 1.0
     assert config.t_start == 0.0
+
+
+def test_prepare_parser_allows_seobnrv5_template(tmp_path):
+    args = calib.build_parser().parse_args([
+        "prepare",
+        "--family",
+        "nonspinning",
+        "--output-dir",
+        str(tmp_path / "campaign"),
+        "--template",
+        "SEOBNRv5",
+    ])
+    config = calib._config_from_args(args)
+    assert config.template == "SEOBNRv5"
+
+
+def test_seobnrv5_template_prior_text_is_available_for_primary_and_counter_modes():
+    primary = calib._local_prior_text((2, 2), "SEOBNRv5")
+    assert "c2A_22-min = 0.0001" in primary
+    assert "c2p_22-min = 0.0001" in primary
+    assert "c3A_22-min = -5" in primary
+    assert "c3p_22-min = 0.1" in primary
+    assert "c4p_22-min" not in primary
+
+    counter = calib._local_counter_rotating_prior_text((2, 1), "SEOBNRv5")
+    assert "c2A_counter_2-1-min = 0.0001" in counter
+    assert "c2p_counter_2-1-min = 0.0001" in counter
+    assert "c3p_counter_2-1-min = 0.1" in counter
+    assert "c4p_counter_2-1-min" not in counter
 
 
 def test_run_local_fit_job_invokes_bayring_and_writes_logs(tmp_path, monkeypatch):
@@ -378,7 +407,17 @@ def test_collect_local_fit_outputs_reads_estimates_mismatches_and_relative_phase
             )
         )
         (outdir / "Algorithm").mkdir(parents=True)
+        (outdir / "Peak_quantities").mkdir(parents=True)
     calib.write_local_fit_index(jobs, campaign_dir / "local_fit_index.csv")
+    (Path(jobs[0].outdir) / "Peak_quantities" / "Merger_metadata.json").write_text(
+        json.dumps({
+            "A_peak_over_nu_22": 0.32,
+            "A_peak_22": 0.08,
+            "omg_peak_22": 0.36,
+            "DeltaT_22": 0.0,
+        }),
+        encoding="utf-8",
+    )
     (Path(jobs[0].outdir) / "Algorithm" / "point_estimates.dat").write_text(
         "# parameter\tvalue\tsigma\n"
         "c3A_22\t1.0\t0.1\n"
@@ -415,12 +454,15 @@ def test_collect_local_fit_outputs_reads_estimates_mismatches_and_relative_phase
     c3a_22 = [row for row in rows if row["mode"] == "22" and row["target"] == "c3A"][0]
     delta_33 = [row for row in rows if row["mode"] == "33" and row["target"] == "delta_phi_33"][0]
     metadata_peak = [row for row in rows if row["mode"] == "22" and row["target"] == "A_peak_over_nu"][0]
+    metadata_delta_t = [row for row in rows if row["mode"] == "22" and row["target"] == "DeltaT"][0]
     assert c3a_22["source"] == "point_estimate"
     assert abs(float(delta_33["value"]) - 0.5) < 1.0e-12
     assert "mismatch" not in delta_33
     assert abs(float(delta_33["construction_mismatch"]) - (0.02**2 + 0.04**2) ** 0.5) < 1.0e-12
-    assert metadata_peak["source"] == "metadata"
-    assert abs(float(metadata_peak["value"]) - 0.2) < 1.0e-12
+    assert metadata_peak["source"] == "NR_sim"
+    assert abs(float(metadata_peak["value"]) - 0.32) < 1.0e-12
+    assert metadata_delta_t["source"] == "NR_sim"
+    assert abs(float(metadata_delta_t["value"])) < 1.0e-12
     assert (campaign_dir / "mismatch_summary.csv").exists()
     assert (campaign_dir / "local_fit_collection_summary.json").exists()
 

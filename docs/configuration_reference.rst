@@ -183,7 +183,7 @@ fixed values or minimization start values.
      - Carullo2024 amplitude-correction variables.
    * - ``TEOB-template``
      - ``HypTan``
-     - TEOB post-merger amplitude ansatz, either ``HypTan`` or ``RatExp``.
+     - TEOB post-merger amplitude ansatz, either ``HypTan``, ``RatExp`` or ``SEOBNRv5``.
    * - ``TEOB-calibration``
      - ``qc``
      - TEOB calibration family, either ``qc`` for noneccentric/quasi-circular
@@ -194,9 +194,9 @@ fixed values or minimization start values.
      - Use calibrated TEOB global fits. If ``0``, sample local TEOB
        calibration coefficients.
    * - ``TEOB-merger-data``
-     - ``0``
-     - If ``1``, use NR merger peak quantities from ``properties-file``
-       instead of the quasi-circular peak fits.
+     - ``1``
+     - If ``1``, use merger peak quantities computed from the loaded NR
+       multipole instead of pyRing's built-in quasi-circular peak fits.
    * - ``TEOB-quadratic-44``
      - ``0``
      - Add an opt-in tapered ``220x220`` quadratic QNM contribution to the

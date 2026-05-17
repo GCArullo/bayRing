@@ -115,10 +115,12 @@ Optional metadata tables use:
    properties-file = /path/to/properties.csv
    fits-file = /path/to/fits.csv
 
-``properties-file`` supplies extra NR quantities such as peak amplitudes or
-Carullo2024 metadata variables. ``fits-file`` supplies fit coefficients for calibrated
-templates such as some ``TEOBPM`` workflows. Empty strings are treated as no
-file supplied.
+``properties-file`` supplies supplemental NR quantities such as Carullo2024
+metadata variables. TEOBPM merger peak quantities are computed from the loaded
+NR waveform when ``TEOB-merger-data = 1``; a properties table can still provide
+precomputed values for legacy runs. ``fits-file`` supplies fit coefficients for
+calibrated templates such as some ``TEOBPM`` workflows. Empty strings are
+treated as no file supplied.
 
 Multipole Selection
 ~~~~~~~~~~~~~~~~~~~
@@ -186,13 +188,14 @@ the complex NR multipole. It then finds a peak time:
   secondary reference time;
 * a nonzero ``t-peak-22`` overrides those choices.
 
-The TEOBPM calibration workflow follows pyRing's current convention: the
-``(2,2)`` peak is the reference time, and higher-mode local fits start at
-``t_peak_22 + DeltaT_lm`` by writing pyRing's ``DeltaT_lm`` as ``t-start``.
-After local coefficients are constructed, TEOBPM evaluation mismatch
-comparisons for local-fit plots and global-fit checks should instead start from
-the ``(2,2)`` peak with ``t-start = 0`` and ``tref = peak22``; higher modes can
-be zero until their internal ``DeltaT_lm`` start.
+The TEOBPM calibration workflow uses the ``(2,2)`` peak as the reference time.
+For each loaded NR multipole, bayRing computes the merger amplitude, merger
+frequency, peak-time offset ``DeltaT_lm`` and peak-amplitude second derivative
+directly from the NR waveform. Generated local-fit configs therefore start from
+the configured ``t-start`` without evaluating pyRing's built-in ``DeltaT_lm``
+fits. Evaluation mismatch comparisons for local-fit plots and global-fit checks
+should start from the ``(2,2)`` peak with ``t-start = 0`` and ``tref = peak22``;
+higher modes can be zero until their computed ``DeltaT_lm`` start.
 
 The fit interval is:
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
+import re
 from typing import Any
 
 import numpy as np
@@ -27,6 +29,13 @@ def extrapolation_order_to_int(order: str | int) -> int | str:
     return int(text)
 
 
+def extrapolation_order_label(order: str | int) -> str:
+    if isinstance(order, str) and order.strip().upper().startswith("N"):
+        return order.strip().upper()
+    value = extrapolation_order_to_int(order)
+    return f"N{value}" if isinstance(value, int) else str(value)
+
+
 def _call_sxs_write_config(*, download: bool, cache: bool) -> None:
     import sxs
 
@@ -45,10 +54,41 @@ def configure_sxs(config: Any) -> None:
     _call_sxs_write_config(download=bool(config.catalog.auto_download), cache=bool(config.catalog.cache))
 
 
+@lru_cache(maxsize=8)
+def _load_simulations_metadata(tag: str | None) -> Any:
+    import sxs
+
+    if tag:
+        return sxs.load("simulations", tag=tag)
+    return sxs.load("simulations")
+
+
+@lru_cache(maxsize=8)
+def _ensure_dataframe_loaded(tag: str | None) -> None:
+    import sxs
+
+    if tag:
+        sxs.load("dataframe", tag=tag)
+    else:
+        sxs.load("dataframe")
+
+
 def discover_available_levs(sxs_id: str, config: Any | None = None) -> list[int]:
     import sxs
 
     levs: set[int] = set()
+    tag = getattr(getattr(config, "catalog", None), "tag", None)
+    for metadata_tag in (str(tag) if tag else None, None):
+        try:
+            simulations = _load_simulations_metadata(metadata_tag)
+            metadata = simulations.get(sxs_id)
+            if metadata is not None:
+                levs.update(_parse_lev_values(metadata.get("lev_numbers", [])))
+                if levs:
+                    return sorted(levs)
+        except Exception:
+            pass
+
     try:
         sim = sxs.load(sxs_id, auto_supersede=False, download=False)
         for attr in ("levs", "Lev", "resolutions", "available_levs", "available_resolutions"):
@@ -87,6 +127,65 @@ def _parse_lev_values(value: Any) -> list[int]:
         except ValueError:
             continue
     return parsed
+
+
+def _parse_extrapolation_orders_from_files(value: Any, lev: int) -> list[str]:
+    files = value.values() if isinstance(value, dict) else value
+    if files is None:
+        return []
+    if isinstance(files, (str, bytes)):
+        files = [files]
+    lev_marker = f"Lev{int(lev)}"
+    order_pattern = re.compile(r"Strain_([Nn]?\d+)")
+    orders: list[str] = []
+    for item in files:
+        text = str(item)
+        if lev_marker not in text:
+            continue
+        match = order_pattern.search(text)
+        if not match:
+            continue
+        orders.append(match.group(1).upper() if match.group(1).upper().startswith("N") else f"N{match.group(1)}")
+    return list(dict.fromkeys(orders))
+
+
+def discover_available_extrapolation_orders(sxs_id: str, lev: int, config: Any | None = None) -> list[str] | None:
+    tag = getattr(getattr(config, "catalog", None), "tag", None)
+    for metadata_tag in (str(tag) if tag else None, None):
+        try:
+            metadata = _load_simulations_metadata(metadata_tag).get(sxs_id)
+        except Exception:
+            metadata = None
+        if metadata is None:
+            continue
+        files = metadata.get("files")
+        orders = _parse_extrapolation_orders_from_files(files, lev)
+        if orders:
+            return orders
+    return None
+
+
+def extrapolation_order_available(sxs_id: str, lev: int, extrapolation_order: str | int, config: Any) -> bool | None:
+    tag = getattr(getattr(config, "catalog", None), "tag", None)
+    metadata = None
+    for metadata_tag in (str(tag) if tag else None, None):
+        try:
+            metadata = _load_simulations_metadata(metadata_tag).get(sxs_id)
+        except Exception:
+            metadata = None
+        if metadata is not None:
+            break
+    if metadata is None:
+        return None
+
+    files = metadata.get("files", None)
+    if not files:
+        return None
+    names = list(files.keys()) if isinstance(files, dict) else list(files)
+    order_label = extrapolation_order_label(extrapolation_order)
+    lev_prefix = f"Lev{int(lev)}:"
+    strain_token = f"Strain_{order_label}"
+    return any(str(name).startswith(lev_prefix) and strain_token in str(name) for name in names)
 
 
 def _load_simulation(location: str, extrapolation_order: str, config: Any) -> Any:
@@ -234,11 +333,14 @@ def load_waveform(
     import sxs
 
     try:
-        sxs.load("dataframe", tag=config.catalog.tag)
+        _ensure_dataframe_loaded(str(config.catalog.tag) if config.catalog.tag else None)
     except Exception:
         pass
 
     location = f"{sxs_id}/Lev{int(lev)}"
+    available = extrapolation_order_available(sxs_id, lev, extrapolation_order, config)
+    if available is False:
+        raise FileNotFoundError(f"{sxs_id} Lev{lev} has no strain file for {extrapolation_order}.")
     sim = _load_simulation(location, extrapolation_order, config)
     h = _waveform_from_simulation(sim, location, extrapolation_order, config)
     if config.waveform.remove_memory:

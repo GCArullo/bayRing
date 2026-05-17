@@ -3,7 +3,7 @@ import math
 
 import numpy as np
 
-from bayRing import waveform_utils
+from bayRing import NR_waveforms, waveform_utils
 
 
 def _array(values):
@@ -78,3 +78,25 @@ def test_find_peak_time_defaults_to_maximum_for_low_eccentricity():
     peak_time = waveform_utils.find_peak_time(time, amplitude, ecc=1e-4)
 
     assert peak_time == 1.0
+
+
+def test_compute_mode_merger_metadata_uses_nr_peak_sample():
+    time = _array([-1.0, 0.0, 1.0])
+    amplitude = _array([1.0, 2.0, 1.0])
+    phase = 0.3 * time + 1.0
+
+    metadata = NR_waveforms._compute_mode_merger_metadata(
+        time,
+        amplitude,
+        phase,
+        ecc=0.0,
+        mode=(3, 3),
+        reference_peak_time=-4.0,
+        nu=0.25,
+    )
+
+    assert metadata["A_peak_33"] == 2.0
+    assert math.isclose(metadata["A_peak_over_nu_33"], 8.0)
+    assert math.isclose(metadata["omg_peak_33"], 0.3)
+    assert math.isclose(metadata["A_peak33dotdot"], -2.0)
+    assert math.isclose(metadata["DeltaT_33"], 4.0)
