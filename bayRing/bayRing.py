@@ -236,6 +236,9 @@ def _run_single_start(Config, parameters, config_file):
     elif(parameters['I/O']['run-type']=='post-processing'): results_object = postprocess.read_results_object_from_previous_inference(parameters)
     else                                                  : raise Exception("Unknown run type selected: {}. Exiting.".format(parameters['I/O']['run-type']))
 
+    if(parameters['I/O']['run-type']=='post-processing' and parameters['Inference']['method']=='Minimization'):
+        inference.minimization_railing_check(results_object, inference_model, parameters['I/O']['outdir'], tolerance=2.0)
+
     if parameters['I/O']['run-type']=='full':
         import pickle
         model_samples = [np.array(inference_model.model(p)) for p in postprocess.waveform_parameter_samples(results_object, parameters['Inference']['method'])]

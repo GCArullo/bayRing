@@ -46,6 +46,9 @@ window_key_index = {
     'saturation_SX': 4,
 }
 
+class PointEstimateResults(dict):
+    pass
+
 def read_posterior_samples(outdir):
 
     posterior_path = os.path.join(outdir, 'Algorithm/posterior.dat')
@@ -59,6 +62,23 @@ def read_posterior_samples(outdir):
                 break
 
     return np.genfromtxt(posterior_path, names=True, deletechars="", delimiter=delimiter)
+
+def read_point_estimates(outdir):
+
+    point_estimates_path = os.path.join(outdir, 'Algorithm', 'point_estimates.dat')
+    data = np.genfromtxt(point_estimates_path, names=True, dtype=None, encoding=None)
+    rows = np.atleast_1d(data)
+
+    results = PointEstimateResults()
+    results.errors = {}
+    for row in rows:
+        parameter = row['parameter']
+        if(isinstance(parameter, bytes)):
+            parameter = parameter.decode()
+        results[str(parameter)] = float(row['value'])
+        results.errors[str(parameter)] = float(row['sigma'])
+
+    return results
 
 def waveform_parameter_samples(results, method=None):
 
@@ -235,7 +255,10 @@ def read_results_object_from_previous_inference(parameters):
 
     if(parameters['Inference']['method'] in point_estimate_methods):
 
-        results_object = read_posterior_samples(parameters['I/O']['outdir'])
+        try:
+            results_object = read_posterior_samples(parameters['I/O']['outdir'])
+        except OSError:
+            results_object = read_point_estimates(parameters['I/O']['outdir'])
 
     elif(parameters['Inference']['method'] == 'Nested-sampler'):
 

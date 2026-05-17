@@ -76,6 +76,11 @@ Point-estimate methods also write:
    * - ``Algorithm/posterior.dat``
      - Synthetic Gaussian posterior approximation centred on the point
        estimate. This is generated so plotting code can run.
+   * - ``Algorithm/Parameters_prior_railing.txt``
+     - For ``method = Minimization``, flags prior-bound railing. When
+       ``posterior.dat`` exists, the check uses the posterior samples. If only
+       ``point_estimates.dat`` is available, the check flags point estimates
+       within the prior-edge tolerance.
 
 The synthetic point-estimate posterior is not a replacement for nested
 sampling. It is a convenience product for diagnostic plots.
