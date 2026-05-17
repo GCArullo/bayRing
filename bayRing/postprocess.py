@@ -2195,67 +2195,6 @@ def _plot_series_with_band(ax, x, median, lower=None, upper=None, color='firebri
     else:
         ax.fill_between(x, band_low, band_high, color=color, alpha=alpha, lw=0)
 
-def _finite_abs_max(values):
-
-    values = np.abs(_as_1d_float_array(values))
-    values = values[np.isfinite(values)]
-    if(len(values)==0):
-        return 0.0
-    return float(np.max(values))
-
-def _nr_error_scale_ylim(error_values, fallback_values):
-
-    scale = _finite_abs_max(error_values)
-    if(scale<=0.0):
-        scale = _finite_abs_max(fallback_values)
-    if(scale<=0.0):
-        scale = 1.0
-    return [-1.6*scale, 1.6*scale]
-
-def _save_residual_nr_error_scale_zoom(
-        outdir, x_cut, residual_real, residual_imag, nr_error_real, nr_error_imag,
-        label_data, title, leg_name_tail=''):
-
-    x_cut         = _as_1d_float_array(x_cut)
-    residual_real = _as_1d_float_array(residual_real)
-    residual_imag = _as_1d_float_array(residual_imag)
-    nr_error_real = np.abs(_as_1d_float_array(nr_error_real))
-    nr_error_imag = np.abs(_as_1d_float_array(nr_error_imag))
-
-    color_model = '#cc0033'
-    color_error = '#6f91b5'
-
-    fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(12.0, 7.0), sharex=True)
-    ax_re, ax_im = axes
-    _style_fancy_axes(axes)
-
-    for ax in axes:
-        ax.axhline(0.0, c='0.2', lw=0.8, alpha=0.65)
-        ax.set_xlim([float(np.min(x_cut)), float(np.max(x_cut))])
-
-    ax_re.fill_between(x_cut, -nr_error_real, nr_error_real,
-                       color=color_error, alpha=0.42, lw=0, label=r'$\pm\ \mathrm{NR\ error}$')
-    ax_im.fill_between(x_cut, -nr_error_imag, nr_error_imag,
-                       color=color_error, alpha=0.42, lw=0)
-    ax_re.plot(x_cut, residual_real, c=color_model, lw=1.5, label=r'$\mathrm{residual}$')
-    ax_im.plot(x_cut, residual_imag, c=color_model, lw=1.5)
-
-    ax_re.set_ylim(_nr_error_scale_ylim(nr_error_real, residual_real))
-    ax_im.set_ylim(_nr_error_scale_ylim(nr_error_imag, residual_imag))
-    ax_re.set_ylabel(r'$\Delta \mathrm{Re[%s]}$'%(label_data))
-    ax_im.set_ylabel(r'$\Delta \mathrm{Im[%s]}$'%(label_data))
-    ax_im.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$')
-    ax_re.legend(loc='best')
-
-    fig.suptitle('{} residuals zoomed to the NR-error scale'.format(title), size=24)
-    fig.tight_layout(rect=[0,0,1,0.94])
-    fig.subplots_adjust(hspace=0.08)
-
-    path_base = os.path.join(outdir, f'Plots/Comparisons/Residuals_NR_error_scale_zoom{leg_name_tail}')
-    fig.savefig(f'{path_base}.pdf', bbox_inches='tight')
-    fig.savefig(f'{path_base}.png', bbox_inches='tight', dpi=200)
-    plt.close(fig)
-
 def _copy_parameter_sample(sample):
 
     if(isinstance(sample, dict)):
@@ -2395,18 +2334,6 @@ def plot_fancy_residual(NR_sim, template, metadata, results, inference_model, ou
     leg_name_tail = '_tail' if tail_flag else ''
     fig.savefig(os.path.join(outdir, f'Plots/Comparisons/Residuals_reconstruction{leg_name_tail}.pdf'), bbox_inches='tight')
     plt.close(fig)
-
-    _save_residual_nr_error_scale_zoom(
-        outdir,
-        x_cut,
-        quantiles[50]['real'] - NR_r_cut,
-        quantiles[50]['imag'] - NR_i_cut,
-        NR_r_err_cut,
-        NR_i_err_cut,
-        label_data,
-        '{}-{}'.format(NR_sim.NR_catalog, NR_sim.NR_ID),
-        leg_name_tail
-    )
 
     if(tail_flag):
         positive_NR  = (t_NR  - t_peak) > 0

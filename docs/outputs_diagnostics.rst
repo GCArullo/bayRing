@@ -113,8 +113,6 @@ Common files include:
      - NR waveform and model reconstruction.
    * - ``Residuals_reconstruction.pdf``
      - NR-model residuals.
-   * - ``Residuals_NR_error_scale_zoom.pdf``, ``Residuals_NR_error_scale_zoom.png``
-     - Real and imaginary residuals with the vertical range set by the NR-error band.
    * - ``Decay_rate.pdf``
      - Decay-rate diagnostic where available.
    * - ``Waveform_reconstruction_no_tail_format.pdf``
