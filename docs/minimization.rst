@@ -103,6 +103,9 @@ post-processing path:
 * **Point estimates:** best-fit parameter values and local uncertainties.
 * **Synthetic posterior samples:** optional Gaussian approximations written
   only when ``point-estimate-posterior-samples > 0``.
+* **Prior-bound railing flags:** ``Algorithm/Parameters_prior_railing.txt``
+  uses the synthetic posterior samples when present. For point-estimate-only
+  outputs, it flags best-fit values close to the configured prior bounds.
 * **Waveform reconstructions:** fitted waveform and residual plots when
   plotting is enabled.
 * **Mismatch/SNR diagnostics:** available through the same diagnostic switches
