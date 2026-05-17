@@ -107,10 +107,34 @@ def test_prepare_campaign_writes_manifests_and_configs(tmp_path, monkeypatch):
     expected_22_text = expected_22.read_text(encoding="utf-8")
     expected_33_text = expected_33.read_text(encoding="utf-8")
     assert "t-start = 0.0" in expected_22_text
+    assert "TEOB-counter-rotating = 0" in expected_22_text
     assert "t-peak-22 = 0.0" in expected_33_text
     assert "t-start = 4.25" in expected_33_text
+    assert "TEOB-counter-rotating = 0" in expected_33_text
     assert "[Priors]" in expected_33_text
     assert "c3p_33-min = 0.1" in expected_33_text
+
+
+def test_local_fit_configs_enable_independent_counter_rotating_21_by_default(tmp_path, monkeypatch):
+    record = calib.normalise_catalog_entry(_catalog_rows()[0])
+    output_dir = tmp_path / "campaign"
+    monkeypatch.setattr(calib, "_pyRing_teobpm_delta_t", lambda record, mode: 8.0)
+    config = calib.CalibrationConfig(
+        family="nonspinning",
+        output_dir=str(output_dir),
+        modes=[(2, 1)],
+        template="HypTan",
+    )
+
+    [config_path] = calib.generate_local_fit_configs([record], config)
+
+    config_text = config_path.read_text(encoding="utf-8")
+    assert "TEOB-counter-rotating = 1" in config_text
+    assert "c3A_21-min = -5" in config_text
+    assert "ln_A_counter_scale_2-1-min = -8" in config_text
+    assert "phi_mrg_counter_2-1-max = 6.283185307179586" in config_text
+    assert "c3A_counter_2-1-min = -5" in config_text
+    assert "c3p_counter_2-1-max = 10" in config_text
 
 
 def test_prepare_campaign_allows_zero_validation_fraction(tmp_path):

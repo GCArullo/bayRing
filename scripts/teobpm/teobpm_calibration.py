@@ -617,6 +617,39 @@ def _local_prior_text(mode: tuple[int, int], template: str) -> str:
     return "\n".join(lines)
 
 
+def _local_counter_rotating_prior_text(mode: tuple[int, int], template: str) -> str:
+    if mode != (2, 1):
+        return ""
+
+    counter_mode_label = _mode_label((mode[0], -mode[1]))
+    if template == "HypTan":
+        bounds = {
+            "ln_A_counter_scale": (-8.0, 0.0),
+            "phi_mrg_counter": (0.0, 2.0*math.pi),
+            "c3A_counter": (-5.0, 1.0),
+            "c3p_counter": (0.1, 10.0),
+            "c4p_counter": (0.1, 10.0),
+        }
+    elif template == "RatExp":
+        bounds = {
+            "ln_A_counter_scale": (-8.0, 0.0),
+            "phi_mrg_counter": (0.0, 2.0*math.pi),
+            "c2A_counter": (0.1, 10.0),
+            "c3A_counter": (-5.0, 1.0),
+            "c2p_counter": (0.1, 10.0),
+            "c3p_counter": (0.1, 10.0),
+            "c4p_counter": (0.1, 10.0),
+        }
+    else:
+        raise ValueError(f"Unknown TEOBPM template `{template}`.")
+
+    lines = []
+    for name, (lower, upper) in bounds.items():
+        lines.append(f"{name}_{counter_mode_label}-min = {lower:.16g}")
+        lines.append(f"{name}_{counter_mode_label}-max = {upper:.16g}")
+    return "\n".join(lines)
+
+
 def _pyRing_teobpm_delta_t(record: SimulationRecord, mode: tuple[int, int]) -> float:
     """Return pyRing's TEOBPM mode start offset relative to the 22 peak."""
     if mode == (2, 2):
@@ -663,7 +696,12 @@ def local_config_text(record: SimulationRecord, mode: tuple[int, int], config: C
     merger_data = 1 if _teobpm_requires_merger_peak_data(config.template) else 0
     global_fit = 0
     mode_mixing = 1 if mode in config.mode_mixing_modes else 0
+    counter_rotating = 1 if mode == (2, 1) else 0
     t_start = _local_fit_t_start(record, mode, config)
+    prior_text = _local_prior_text(mode, config.template)
+    counter_prior_text = _local_counter_rotating_prior_text(mode, config.template)
+    if counter_prior_text:
+        prior_text = f"{prior_text}\n{counter_prior_text}"
     return f"""[I/O]
 outdir = {outdir}
 screen-output = 1
@@ -689,9 +727,10 @@ TEOB-calibration = {config.teob_calibration}
 TEOB-global-fit = {global_fit}
 TEOB-merger-data = {merger_data}
 TEOB-mode-mixing = {mode_mixing}
+TEOB-counter-rotating = {counter_rotating}
 
 [Priors]
-{_local_prior_text(mode, config.template)}
+{prior_text}
 
 [Inference]
 method = {config.method}
