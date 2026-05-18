@@ -1,6 +1,7 @@
 # Standard python packages
 import corner, csv, hashlib, h5py, matplotlib.pyplot as plt, numpy as np, os, pickle, qnm, scipy.linalg as sl, seaborn as sns, shutil, numba
 from scipy.interpolate           import interp1d
+from scipy.optimize              import fmin
 from itertools import product
 import math
 
@@ -1640,6 +1641,71 @@ def _interpolate_nr_waveform_component(waveform, component, analysis_time):
 
     return interp1d(time, waveform[component], bounds_error=False, fill_value=0.0)(analysis_time)
 
+def _align_nr_comparison_waveform(reference_waveform, comparison_waveform, analysis_time):
+
+    analysis_time = np.asarray(analysis_time)
+    if(len(analysis_time) < 2):
+        raise ValueError("comparison waveform alignment requires at least two analysis samples")
+
+    reference_time = _normalise_nr_time_to_analysis_grid(reference_waveform['time'], analysis_time)
+    comparison_time = _normalise_nr_time_to_analysis_grid(comparison_waveform['time'], analysis_time)
+    if(len(reference_time) == 0 or len(comparison_time) == 0):
+        raise ValueError("comparison waveform alignment requires non-empty time arrays")
+
+    reference_amp, reference_phi = waveform_utils.amp_phase_from_re_im(
+        reference_waveform['real'], reference_waveform['imag']
+    )
+    comparison_amp, comparison_phi = waveform_utils.amp_phase_from_re_im(
+        comparison_waveform['real'], comparison_waveform['imag']
+    )
+
+    reference_amp_interp = interp1d(reference_time, reference_amp, fill_value=0.0, bounds_error=False)
+    reference_phi_interp = interp1d(reference_time, reference_phi, fill_value=0.0, bounds_error=False)
+    comparison_amp_interp = interp1d(comparison_time, comparison_amp, fill_value=0.0, bounds_error=False)
+    comparison_phi_interp = interp1d(comparison_time, comparison_phi, fill_value=0.0, bounds_error=False)
+
+    t_min_mismatch = analysis_time[0]
+    t_max_mismatch = analysis_time[-1]
+    mask = np.logical_and(reference_time >= t_min_mismatch, reference_time <= t_max_mismatch)
+    alignment_time = reference_time[mask]
+    if(len(alignment_time) < 2):
+        raise ValueError("comparison waveform alignment window has fewer than two samples")
+
+    def alignment_mismatch(deltaT_deltaPhi):
+        deltaT, deltaPhi = deltaT_deltaPhi[0], deltaT_deltaPhi[1]
+        ref_amp = reference_amp_interp(alignment_time)
+        comp_amp = comparison_amp_interp(alignment_time - deltaT)
+        ref_phi = reference_phi_interp(alignment_time)
+        comp_phi = comparison_phi_interp(alignment_time - deltaT)
+
+        norm_ref = np.sum(np.abs(ref_amp)**2)
+        norm_comp = np.sum(np.abs(comp_amp)**2)
+        if(norm_ref == 0.0 or norm_comp == 0.0):
+            return np.inf
+
+        numerator = np.real(
+            np.sum(ref_amp * comp_amp * np.exp(-1j * (ref_phi - comp_phi - deltaPhi)))
+        )
+
+        return 1.0 - numerator / np.sqrt(norm_ref * norm_comp)
+
+    rough_deltaPhi = reference_phi_interp(t_min_mismatch) - comparison_phi_interp(t_min_mismatch)
+    deltaT, deltaPhi = fmin(
+        alignment_mismatch, np.array([0.0, rough_deltaPhi]),
+        ftol=1e-15, disp=False
+    )
+    aligned_complex = comparison_amp_interp(reference_time - deltaT) * np.exp(
+        1j * (comparison_phi_interp(reference_time - deltaT) + deltaPhi)
+    )
+    aligned_real, aligned_imag = np.real(aligned_complex), -np.imag(aligned_complex)
+
+    aligned_waveform = dict(comparison_waveform)
+    aligned_waveform['time'] = reference_time
+    aligned_waveform['real'] = aligned_real
+    aligned_waveform['imag'] = aligned_imag
+
+    return aligned_waveform
+
 def compute_nr_comparison_mismatches(NR_sim, outdir, acf, N_FFT, M, dL, t_start_g,
                                      window_size_DX, window_size_SX, k,
                                      saturation_DX, saturation_SX, direction=None):
@@ -1653,10 +1719,17 @@ def compute_nr_comparison_mismatches(NR_sim, outdir, acf, N_FFT, M, dL, t_start_
 
     for diagnostic_type, print_label, reference_waveform, comparison_waveform in pairs:
         pair_label = '{} vs {}'.format(reference_waveform['label'], comparison_waveform['label'])
+        try:
+            aligned_comparison_waveform = _align_nr_comparison_waveform(
+                reference_waveform, comparison_waveform, analysis_time
+            )
+        except Exception as exc:
+            print("* Skipping {} mismatch ({}): alignment failed: {}".format(print_label, pair_label, exc))
+            continue
         for component in strain_components:
             try:
                 reference = _interpolate_nr_waveform_component(reference_waveform, component, analysis_time) * scale
-                comparison = _interpolate_nr_waveform_component(comparison_waveform, component, analysis_time) * scale
+                comparison = _interpolate_nr_waveform_component(aligned_comparison_waveform, component, analysis_time) * scale
                 mismatch = _time_domain_mismatch(acf, reference, comparison)
             except Exception as exc:
                 print("* Skipping {} mismatch ({}, h {}): {}".format(print_label, pair_label, component, exc))
