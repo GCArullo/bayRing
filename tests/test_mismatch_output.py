@@ -48,35 +48,36 @@ def test_record_mismatch_diagnostic_merges_mismatch_and_snr(tmp_path):
 
 
 def test_compute_nr_comparison_mismatches_records_available_sxs_pairs(tmp_path):
+    time = np.linspace(0.0, 12.0, 121)
+    amp = 0.2 + np.exp(-0.04 * (time - 5.0) ** 2)
+    phase = 0.35 * time + 0.01 * time ** 2
+    reference_real = amp * np.cos(phase)
+    reference_imag = -amp * np.sin(phase)
+    shifted_time = time + 0.7
+    shifted_phase = phase + 0.4
+    shifted_real = amp * np.cos(shifted_phase)
+    shifted_imag = -amp * np.sin(shifted_phase)
+
     class FakeNRSimulation:
         NR_catalog = "SXS"
         extrap_order = 2
         res_level = 6
-        t_NR_cut = np.array([0.0, 1.0])
+        t_NR_cut = time[(time >= 2.0) & (time <= 10.0)]
 
         def read_waveform_lm_from_SXS(self, extrap_order, res_level):
-            real_waveforms = {
-                (2, 6): np.array([1.0, 0.0]),
-                (2, 5): np.array([0.0, 1.0]),
-                (3, 6): np.array([1.0, 1.0]),
-            }
-            imag_waveforms = {
-                (2, 6): np.array([0.0, 1.0]),
-                (2, 5): np.array([1.0, 0.0]),
-                (3, 6): np.array([1.0, 1.0]),
-            }
-            try:
-                real = real_waveforms[(extrap_order, res_level)]
-                imag = imag_waveforms[(extrap_order, res_level)]
-            except KeyError:
-                raise ValueError("waveform unavailable")
-            return np.array([0.0, 1.0]), real, imag
+            if (extrap_order, res_level) == (2, 6):
+                return time, reference_real, reference_imag
+            if (extrap_order, res_level) == (2, 5):
+                return shifted_time, shifted_real, shifted_imag
+            if (extrap_order, res_level) == (3, 6):
+                return shifted_time, shifted_real, shifted_imag
+            raise ValueError("waveform unavailable")
 
     postprocess.compute_nr_comparison_mismatches(
         FakeNRSimulation(),
         str(tmp_path),
-        acf=np.array([1.0, 0.0]),
-        N_FFT=2,
+        acf=np.concatenate(([1.0], np.zeros(len(FakeNRSimulation.t_NR_cut) - 1))),
+        N_FFT=len(FakeNRSimulation.t_NR_cut),
         M=1.0,
         dL=1.0,
         t_start_g=0.0,
@@ -96,6 +97,7 @@ def test_compute_nr_comparison_mismatches_records_available_sxs_pairs(tmp_path):
         for row in rows
     }
 
-    assert row_by_type_and_component[("nr_resolution_Lev6_vs_Lev5", "real")]["mismatch"] == "1"
-    assert row_by_type_and_component[("nr_resolution_Lev6_vs_Lev5", "imag")]["mismatch"] == "1"
-    assert float(row_by_type_and_component[("nr_extrapolation_N2_vs_N3", "real")]["mismatch"]) == pytest.approx(1.0 - 1.0 / np.sqrt(2.0))
+    assert float(row_by_type_and_component[("nr_resolution_Lev6_vs_Lev5", "real")]["mismatch"]) == pytest.approx(0.0, abs=1.0e-8)
+    assert float(row_by_type_and_component[("nr_resolution_Lev6_vs_Lev5", "imag")]["mismatch"]) == pytest.approx(0.0, abs=1.0e-8)
+    assert float(row_by_type_and_component[("nr_extrapolation_N2_vs_N3", "real")]["mismatch"]) == pytest.approx(0.0, abs=1.0e-8)
+    assert float(row_by_type_and_component[("nr_extrapolation_N2_vs_N3", "imag")]["mismatch"]) == pytest.approx(0.0, abs=1.0e-8)
