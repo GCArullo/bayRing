@@ -55,6 +55,7 @@ class WaveformModel(cpnest.model.Model):
         TGR_parameters = self._Kerr_TGR_parameters()
 
         ringdown_model = wf.KerrBH(self.t_start                               ,
+                                   self.t_peak                                ,
                                    self.Mf                                    ,
                                    self.af                                    ,
                                    amps                                       ,
@@ -73,7 +74,6 @@ class WaveformModel(cpnest.model.Model):
                                    quadratic_modes     = quadratic_modes      ,
                                    quad_lin_prop       = 0                    ,
                                    qnm_cached          = self.qnm_cached      ,
-                                   t_ref               = self.t_peak          ,
 
                                    charge              = self.charge          ,
                                    TGR_params          = TGR_parameters       ,

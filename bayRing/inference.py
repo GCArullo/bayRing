@@ -1,4 +1,4 @@
-import importlib, itertools as it, numpy as np, os, pandas as pd, traceback
+import importlib, itertools as it, math, numpy as np, os, pandas as pd, traceback
 from scipy.optimize  import least_squares as l_s
 
 try:                import configparser
@@ -218,7 +218,117 @@ def read_default_bounds(wf_model, TEOB_template=''):
 
     return default_bounds
 
-def railing_check(results_object, inference_model, outdir, nlive, seed, tolerance=2.0):
+def _railing_header_and_bounds(inference_model):
+
+    header = ''
+    bounds = []
+    for (i,param) in enumerate(inference_model.names):
+        bounds.append(inference_model.bounds[i])
+        header +='{par}_low\t{par}_up\t'.format(par=param)
+
+    return header, bounds
+
+def _save_railing_parameters(outdir, railing_parameters, header, suffix=''):
+
+    filename = 'Parameters_prior_railing{}.txt'.format(suffix)
+    np.savetxt(os.path.join(outdir, 'Algorithm', filename), np.column_stack(railing_parameters), fmt= "%d", header=header)
+
+    return
+
+def _has_posterior_samples(results_object, names):
+
+    for param in names:
+        try:
+            values = results_object[param]
+        except (KeyError, ValueError, TypeError, IndexError):
+            continue
+        if(np.isscalar(values)):
+            continue
+        try:
+            if(len(values) > 1):
+                return True
+        except TypeError:
+            try:
+                if(values.size > 1):
+                    return True
+            except AttributeError:
+                pass
+
+    return False
+
+def _scalar_result_value(value):
+
+    if(np.isscalar(value)):
+        return float(value)
+
+    try:
+        return float(value.item())
+    except (AttributeError, TypeError, ValueError):
+        pass
+
+    values = list(value)
+    if(len(values) != 1):
+        raise ValueError("Expected a scalar point estimate, got {} values.".format(len(values)))
+
+    return float(values[0])
+
+def _is_finite(value):
+
+    try:
+        return math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
+
+def _point_estimate_railing_flags(value, bounds, tolerance):
+
+    low_bound, high_bound = bounds
+    prior_width = high_bound - low_bound
+    if not(_is_finite(value)) or prior_width < 0.0:
+        return False, False
+
+    tolerance_width = abs(prior_width)*tolerance/100.0
+    low_rail  = value <= low_bound  + tolerance_width
+    high_rail = value >= high_bound - tolerance_width
+
+    return low_rail, high_rail
+
+def point_estimate_railing_check(results_object, inference_model, outdir, tolerance=2.0):
+
+    """
+
+    Check whether point-estimate parameters sit close to prior boundaries.
+
+    For each parameter, the lower or upper flag is set when the point estimate
+    falls within ``tolerance`` percent of the corresponding prior edge.
+
+    """
+
+    try:
+        print('\n* Checking point-estimate parameters for railing...')
+        railing_parameters = []
+        header, bounds = _railing_header_and_bounds(inference_model)
+
+        for (i,param) in enumerate(inference_model.names):
+            value = _scalar_result_value(results_object[param])
+            low_rail, high_rail = _point_estimate_railing_flags(value, bounds[i], tolerance)
+            if(low_rail):
+                railing_parameters.append(1)
+                print('{}'.format(param.ljust(15)), 'is within {:.1f}% of the lower prior bound.'.format(tolerance))
+            else:
+                railing_parameters.append(0)
+            if(high_rail):
+                railing_parameters.append(1)
+                print('{}'.format(param.ljust(15)), 'is within {:.1f}% of the upper prior bound.'.format(tolerance))
+            else:
+                railing_parameters.append(0)
+
+        _save_railing_parameters(outdir, railing_parameters, header)
+    except:
+        print("\n* Warning: Point-estimate prior railing file generation failed with error: {}.".format(traceback.print_exc()))
+
+    return
+
+def railing_check(results_object, inference_model, outdir, nlive=None, seed=None, tolerance=2.0, check_chains=True):
 
     """
     
@@ -252,11 +362,10 @@ def railing_check(results_object, inference_model, outdir, nlive, seed, toleranc
     try:
         print('\n* Checking for railing...')
         railing_parameters  = []
-        header = ''
+        header, bounds = _railing_header_and_bounds(inference_model)
         for (i,param) in enumerate(inference_model.names):
-            Prior_bins = np.linspace(inference_model.bounds[i][0], inference_model.bounds[i][-1], 100)
+            Prior_bins = np.linspace(bounds[i][0], bounds[i][-1], 100)
             low_rail, high_rail = pyRing_utils.railing_check(samples=results_object[param], prior_bins=Prior_bins, tolerance=tolerance)
-            header +='{par}_low\t{par}_up\t'.format(par=param)
             if(low_rail):
                 railing_parameters.append(1)
                 print('{}'.format(param.ljust(15)), 'is railing against the lower prior bound.')
@@ -267,9 +376,9 @@ def railing_check(results_object, inference_model, outdir, nlive, seed, toleranc
                 print('{}'.format(param.ljust(15)), 'is railing against the upper prior bound.')
             else:
                 railing_parameters.append(0)
-        np.savetxt(os.path.join(outdir, 'Algorithm/Parameters_prior_railing.txt'), np.column_stack(railing_parameters), fmt= "%d", header=header)
+        _save_railing_parameters(outdir, railing_parameters, header)
         
-        if np.sum(railing_parameters) > 0:
+        if check_chains and nlive is not None and seed is not None and np.sum(railing_parameters) > 0:
             print('\n* Identifying chain with railing...')
             try   : chains = [np.genfromtxt(os.path.join(outdir, f'Algorithm/chain_{nlive}_{seed_x}.txt'), names = True, deletechars="") for seed_x in [0,1,2,3]]
             except: chains = [np.genfromtxt(os.path.join(outdir, f'Algorithm/chain_{nlive}_{seed}.txt'), names = True, deletechars="")]
@@ -280,7 +389,7 @@ def railing_check(results_object, inference_model, outdir, nlive, seed, toleranc
                 header_chain = ''
                 for (i,param) in enumerate(inference_model.names):
                     if railing_parameters[2*i] == 1 or railing_parameters[2*i+1] == 1: 
-                        Prior_bins = np.linspace(inference_model.bounds[i][0], inference_model.bounds[i][-1], 100)
+                        Prior_bins = np.linspace(bounds[i][0], bounds[i][-1], 100)
                         low_rail, high_rail = pyRing_utils.railing_check(samples=weighted_post[param], prior_bins=Prior_bins, tolerance=2.0)
                         header_chain +='{par}_low\t{par}_up\t'.format(par=param)
                         if(low_rail):
@@ -295,9 +404,18 @@ def railing_check(results_object, inference_model, outdir, nlive, seed, toleranc
                             railing_parameters_chain.append(0)
                     else:
                         continue
-                np.savetxt(os.path.join(outdir, f'Algorithm/Parameters_prior_railing_{chain_number}.txt'), np.column_stack(railing_parameters_chain), fmt= "%d", header=header_chain)
+                _save_railing_parameters(outdir, railing_parameters_chain, header_chain, suffix='_{}'.format(chain_number))
     except:
         print("\n* Warning: Prior railing file generation failed with error: {}.".format(traceback.print_exc()))
+
+    return
+
+def minimization_railing_check(results_object, inference_model, outdir, tolerance=2.0):
+
+    if(_has_posterior_samples(results_object, inference_model.names)):
+        railing_check(results_object, inference_model, outdir, tolerance=tolerance, check_chains=False)
+    else:
+        point_estimate_railing_check(results_object, inference_model, outdir, tolerance=tolerance)
 
     return
 
@@ -664,7 +782,12 @@ def Dynamic_InferenceModel(base):
         def log_likelihood_ToMin(self,x):
         
             x_dict  = dict(zip(self.names, x))
-            model   = self.model(x_dict)
+            try:
+                model = self.model(x_dict)
+            except (FloatingPointError, OverflowError, TypeError, ValueError):
+                return np.full(2*len(self.data), 1.0e30)
+            if not np.all(np.isfinite(model)):
+                return np.full(2*len(self.data), 1.0e30)
             err     = 1e-16
             res_r   = (np.real(self.data)-np.real(model))/(np.real(self.error)+err)
             res_i   = (np.imag(self.data)-np.imag(model))/(np.imag(self.error)+err)
@@ -1140,8 +1263,24 @@ def run_inference(parameters, inference_model):
         
         point_estimate = dict(zip(inference_model.names, minimization_results))
         postprocess.save_point_estimates(point_estimate, parameters['I/O']['outdir'], errors=minimization.errors)
-        postprocess.save_point_estimate_posterior(point_estimate, parameters['I/O']['outdir'], covariance=minimization.covariance, errors=minimization.errors, seed=parameters['Inference']['seed'])
-        results_object = postprocess.read_posterior_samples(parameters['I/O']['outdir'])
+        results_object = postprocess.PointEstimateResults(point_estimate, errors=minimization.errors, covariance=minimization.covariance)
+
+        point_estimate_posterior_samples = int(parameters['Inference'].get('point-estimate-posterior-samples', postprocess.point_estimate_posterior_samples))
+        if(point_estimate_posterior_samples < 0):
+            raise ValueError("Invalid point-estimate posterior option: `point-estimate-posterior-samples` must be non-negative.")
+        if(point_estimate_posterior_samples > 0):
+            postprocess.save_point_estimate_posterior(
+                point_estimate,
+                parameters['I/O']['outdir'],
+                covariance=minimization.covariance,
+                errors=minimization.errors,
+                seed=parameters['Inference']['seed'],
+                n_samples=point_estimate_posterior_samples,
+            )
+            results_object = postprocess.read_posterior_samples(parameters['I/O']['outdir'])
+        else:
+            postprocess.remove_point_estimate_posterior(parameters['I/O']['outdir'])
+        minimization_railing_check(results_object, inference_model, parameters['I/O']['outdir'], tolerance=2.0)
 
     elif(is_linear_inversion_method(parameters['Inference']['method'])):
 
@@ -1152,8 +1291,23 @@ def run_inference(parameters, inference_model):
         
         point_estimate = dict(zip(inference_model.names, linear_inversion_results))
         postprocess.save_point_estimates(point_estimate, parameters['I/O']['outdir'], errors=linear_inversion.errors)
-        postprocess.save_point_estimate_posterior(point_estimate, parameters['I/O']['outdir'], covariance=linear_inversion.covariance, errors=linear_inversion.errors, seed=parameters['Inference']['seed'])
-        results_object = postprocess.read_posterior_samples(parameters['I/O']['outdir'])
+        results_object = postprocess.PointEstimateResults(point_estimate, errors=linear_inversion.errors, covariance=linear_inversion.covariance)
+
+        point_estimate_posterior_samples = int(parameters['Inference'].get('point-estimate-posterior-samples', postprocess.point_estimate_posterior_samples))
+        if(point_estimate_posterior_samples < 0):
+            raise ValueError("Invalid point-estimate posterior option: `point-estimate-posterior-samples` must be non-negative.")
+        if(point_estimate_posterior_samples > 0):
+            postprocess.save_point_estimate_posterior(
+                point_estimate,
+                parameters['I/O']['outdir'],
+                covariance=linear_inversion.covariance,
+                errors=linear_inversion.errors,
+                seed=parameters['Inference']['seed'],
+                n_samples=point_estimate_posterior_samples,
+            )
+            results_object = postprocess.read_posterior_samples(parameters['I/O']['outdir'])
+        else:
+            postprocess.remove_point_estimate_posterior(parameters['I/O']['outdir'])
 
     elif(parameters['Inference']['method'] == 'Nested-sampler'):
         
