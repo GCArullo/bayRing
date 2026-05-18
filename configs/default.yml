@@ -1,0 +1,65 @@
+catalog:
+  tag: "3.0.0"
+  auto_download: true
+  cache: true
+
+filters:
+  require_bbh: true
+  require_non_deprecated: true
+  require_nonprecessing: true
+  require_noneccentric: true
+  max_chi1_perp: 1.0e-3
+  max_chi2_perp: 1.0e-3
+  max_reference_eccentricity: 1.0e-3
+  keyword_sanity_filter: true
+  require_two_resolutions: true
+  require_extrapolation_comparison: true
+
+waveform:
+  data_type: "h"
+  reference_extrapolation_order: "N2"
+  comparison_extrapolation_orders: ["N3", "N4"]
+  ringdown_window_M: [0.0, 30.0]
+  merger_time_definition: "ell2_norm_peak"
+  remove_memory: false
+  interpolation: "cubic"
+  interpolation_fallback: "linear"
+  min_samples_in_window: 64
+
+modes:
+  target_modes:
+    - [2, 2]
+    - [2, 1]
+    - [3, 3]
+    - [3, 2]
+    - [4, 4]
+
+metrics:
+  norm_floor: 1.0e-14
+  pointwise_error_floor: 1.0e-15
+  signal_to_error_quantile: 0.10
+  weights:
+    resolution: 0.7
+    extrapolation: 0.1
+    floor: 0.1
+    symmetry: 0.1
+
+selection:
+  aggregate_method: "min_percentile"
+  top_k: 50
+  top_fraction: null
+  min_common_score: null
+  require_all_modes_valid: true
+
+output:
+  directory: "outputs/ringdown_quality"
+  write_per_mode_metrics: true
+  write_simulation_scores: true
+  write_selected_metrics: true
+  file_format: "csv"
+
+runtime:
+  checkpoint_every: 25
+  max_simulations: null
+  random_seed: 1234
+  verbose: true
