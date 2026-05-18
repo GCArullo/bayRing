@@ -105,19 +105,26 @@ fixed values or minimization start values.
      - Teukolsky perturbation order.
    * - ``l-NR``
      - ``2``
-     - Spherical NR multipole ``l`` to fit.
+     - Spherical NR multipole ``l`` to fit. Accepts a scalar or a list paired
+       with ``m``.
    * - ``m``
      - ``2``
-     - Spherical NR multipole ``m`` to fit.
+     - Spherical NR multipole ``m`` to fit. Accepts a scalar or a list paired
+       with ``l-NR``.
+   * - ``NR-modes``
+     - empty string
+     - Optional explicit list of NR ``(l,m)`` modes, for example
+       ``[(2,2),(3,3)]`` or ``22,33,4-4``. Overrides list values passed to
+       ``l-NR`` and ``m``.
    * - ``error``
-     - ``align-with-mismatch-res-only``
+     - ``align-with-mismatch-all``
      - NR error prescription.
    * - ``error-t-min``
-     - ``3e-1``
-     - Lower fractional mismatch-alignment window input.
+     - ``0.0``
+     - Lower mismatch-alignment window input.
    * - ``error-t-max``
-     - ``4e-3``
-     - Upper fractional mismatch-alignment window input.
+     - ``30.0``
+     - Upper mismatch-alignment window input.
    * - ``add-const``
      - ``0.0,0.0``
      - Complex constant offset encoded as amplitude,phase.
@@ -168,6 +175,9 @@ fixed values or minimization start values.
    * - ``KerrBinary-version``
      - ``London2018``
      - ``London2018``, ``Cheung2023`` or ``Carullo2024``.
+   * - ``KerrBinary-final-state-nc-version``
+     - empty string
+     - Carullo2024 final-state correction variables for template injections.
    * - ``KerrBinary-amplitudes-nc-version``
      - empty string
      - Carullo2024 amplitude-correction variables.
@@ -177,11 +187,14 @@ fixed values or minimization start values.
    * - ``TEOB-global-fit``
      - ``1``
      - Use calibrated TEOB global fits. If ``0``, sample local TEOB
-       calibration coefficients.
+       calibration coefficients. Local sampling is intended for calibration
+       campaigns, not final real-data ``TEOBPM`` parameter estimation.
    * - ``TEOB-merger-data``
      - ``0``
-     - Use NR merger peak quantities from ``properties-file`` instead of the
-       quasi-circular peak fits.
+     - If ``1``, use NR merger peak quantities from ``properties-file``
+       instead of the quasi-circular peak fits. Any such NR-derived input must
+       be replaced by a pyRing global fit before ``TEOBPM`` is treated as a
+       stand-alone real-data model.
 
 Some templates override ``QNM-modes`` internally. For example ``KerrBinary``
 and ``TEOBPM`` set their calibrated mode lists based on the selected template
@@ -223,9 +236,21 @@ version.
    * - ``nensemble``
      - ``1``
      - Number of raynest ensemble processes.
+   * - ``n-start-time-workers``
+     - ``1``
+     - Number of start-time fits to run in parallel when ``t-start``
+       supplies multiple values. This is in addition to sampler-level
+       parallelism.
+   * - ``n-mode-workers``
+     - ``1``
+     - Number of NR-mode fits to run in parallel when multiple ``(l,m)``
+       modes are supplied. Mode and start-time scan jobs use isolated output
+       directories.
    * - ``t-start``
      - ``20.0``
-     - Fit start time in ``M`` relative to the selected peak.
+     - Fit start time in ``M`` relative to the selected peak. Accepts a
+       scalar, a comma/list of values, or an inclusive ``start:stop:step``
+       range.
    * - ``t-end``
      - ``140.0``
      - Fit end time in ``M`` relative to the selected peak.
@@ -241,6 +266,10 @@ version.
    * - ``n-random-seeds``
      - ``16``
      - Number of minimization starts.
+   * - ``point-estimate-posterior-samples``
+     - ``0``
+     - Optional Gaussian samples drawn from the point-estimate covariance.
+       ``0`` skips ``Algorithm/posterior.dat`` for point-estimate methods.
    * - ``linear-inversion-eigenvalue-tol``
      - ``1e-10``
      - Fisher eigenvalue floor for linear inversion.
@@ -361,7 +390,27 @@ used in mismatch/SNR diagnostics.
      - Declination in radians.
    * - ``psi``
      - ``2.659``
-     - Polarization angle in radians.
+     - Polarization angle in radians for fixed-polarisation mismatch/SNR
+       diagnostics.
+   * - ``azimuth``
+     - ``0.0``
+     - Source-frame azimuthal phase used in the spin-weighted spherical
+       harmonic recomposition for summed-higher-mode mismatch diagnostics.
+   * - ``inclination``
+     - ``0:pi:pi/4``
+     - Inclination values for summed-higher-mode mismatch diagnostics. Accepts
+       a scalar, comma/list values, or an inclusive ``start:stop:step`` range;
+       expressions using ``pi`` are accepted.
+   * - ``polarisation``
+     - ``0:3*pi/4:pi/4``
+     - Polarisation-angle samples for summed-higher-mode mismatch diagnostics.
+       By default the reported HM-sum mismatch is marginalised over these
+       samples by retaining the minimum mismatch. Pass a scalar to evaluate one
+       fixed polarisation. The spelling ``polarization`` is also accepted.
+   * - ``hm-include-negative-m``
+     - ``1``
+     - Include missing negative-``m`` partners through the non-precessing
+       symmetry ``h_{l,-m}=(-1)^l h^*_{lm}``.
 
 [Flags]
 ~~~~~~~
@@ -381,7 +430,8 @@ used in mismatch/SNR diagnostics.
      - Apply C1 fixing after smoothing.
    * - ``clear_directory``
      - ``1``
-     - Clear mismatch smoothing-output subdirectories before running.
+     - Legacy flag. Mismatch diagnostics no longer delete existing outputs;
+       inactive smoothing plot directories are simply not created.
    * - ``compare_TD_FD``
      - ``0``
      - Also compute frequency-domain checks where implemented.
@@ -391,3 +441,7 @@ used in mismatch/SNR diagnostics.
    * - ``mismatch_section_plot_flag``
      - ``0``
      - Save PSD/ACF/window sanity plots.
+   * - ``compute_hm_mismatch``
+     - ``1``
+     - Compute detector-projected summed-higher-mode mismatch diagnostics after
+       a multi-mode scan.

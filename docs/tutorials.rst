@@ -38,10 +38,10 @@ Core Usage Options
 ``method``
    Selects ``Nested-sampler``, ``Minimization`` or ``Linear-inversion``.
    Nested sampling returns posterior samples and evidence; the other methods
-   produce point estimates and synthetic posterior samples for downstream
-   plotting. ``Linear-inversion`` is available only for ``Kerr`` models whose
-   free parameters are paired amplitude/phase variables; nonlinear parameters
-   must be fixed or absent.
+   produce point estimates. Set ``point-estimate-posterior-samples > 0`` to
+   also write a synthetic Gaussian posterior. ``Linear-inversion`` is available
+   only for ``Kerr`` models whose free parameters are paired amplitude/phase
+   variables; nonlinear parameters must be fixed or absent.
 
 ``t-start`` and ``t-end``
    Select the fit interval in units of the total mass ``M``. The interval is
@@ -80,8 +80,9 @@ Two examples run without nested sampling:
      - Uses ``method = Linear-inversion`` and solves directly for free complex
        Kerr amplitudes. Nonlinear parameters must be fixed or absent.
 
-Both methods save point estimates and synthetic posterior samples so the usual
-post-processing functions can run.
+Both methods save point estimates. With the default
+``point-estimate-posterior-samples = 0``, post-processing uses the point
+estimate and one-sigma errors directly.
 
 Tracked Config Files
 ~~~~~~~~~~~~~~~~~~~~

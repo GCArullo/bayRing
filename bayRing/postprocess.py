@@ -1,7 +1,8 @@
 # Standard python packages
-import corner, h5py, matplotlib.pyplot as plt, numpy as np, os, qnm, scipy.linalg as sl, seaborn as sns, shutil, numba
+import corner, csv, hashlib, h5py, matplotlib.pyplot as plt, numpy as np, os, pickle, qnm, scipy.linalg as sl, seaborn as sns, shutil, numba
 from scipy.interpolate           import interp1d
 from itertools import product
+import math
 
 # GW-packages
 from pycbc.psd                   import from_txt
@@ -37,7 +38,7 @@ strain_components = ('real', 'imag')
 summary_percentiles = (5, 50, 95)
 plot_percentiles = (50,)
 point_estimate_methods = ('Minimization', 'Linear-inversion')
-point_estimate_posterior_samples = 10000
+point_estimate_posterior_samples = 0
 window_key_index = {
     'window_DX': 0,
     'window_SX': 1,
@@ -45,10 +46,51 @@ window_key_index = {
     'saturation_DX': 3,
     'saturation_SX': 4,
 }
+mismatch_smoothing_subfolders = {
+    'below': 'Left_smoothing',
+    'above': 'Right_smoothing',
+    'below-and-above': 'Both_edges_smoothing',
+}
+mismatch_and_snr_diagnostics_filename = 'mismatch_and_snr_diagnostics.tsv'
+mismatch_and_snr_parameters_filename = 'mismatch_and_snr_diagnostic_parameters.tsv'
+mismatch_parameter_fieldnames = (
+    'run_id',
+    'diagnostic_type',
+    'remnant_mass_solar_masses',
+    'luminosity_distance_mpc',
+    'start_time_M',
+    'n_fft',
+    'low_frequency_window_hz',
+    'high_frequency_window_hz',
+    'smoothing_steepness',
+    'low_frequency_saturation',
+    'high_frequency_saturation',
+    'smoothing_direction',
+)
+mismatch_diagnostic_fieldnames = (
+    'run_id',
+    'diagnostic_type',
+    'confidence_interval',
+    'strain_data',
+    'inclination',
+    'azimuth',
+    'psi',
+    'mismatch',
+    'optimal_snr',
+    'optimal_snr_fd',
+)
+
+class PointEstimateResults(dict):
+
+    def __init__(self, values, errors=None, covariance=None):
+
+        super().__init__(values)
+        self.errors     = {} if errors is None else dict(errors)
+        self.covariance = covariance
 
 def read_posterior_samples(outdir):
 
-    posterior_path = os.path.join(outdir, 'Algorithm/posterior.dat')
+    posterior_path = _posterior_path(outdir)
     delimiter = None
 
     with open(posterior_path, 'r') as posterior_file:
@@ -60,10 +102,101 @@ def read_posterior_samples(outdir):
 
     return np.genfromtxt(posterior_path, names=True, deletechars="", delimiter=delimiter)
 
+def _point_estimate_path(outdir):
+
+    return os.path.join(outdir, 'Algorithm', 'point_estimates.dat')
+
+def _posterior_path(outdir):
+
+    return os.path.join(outdir, 'Algorithm', 'posterior.dat')
+
+def read_point_estimates(outdir):
+
+    point_estimates_path = _point_estimate_path(outdir)
+    values = {}
+    errors = {}
+
+    with open(point_estimates_path, 'r') as point_estimates_file:
+        for line in point_estimates_file:
+            line = line.strip()
+            if(line == '' or line.startswith('#')):
+                continue
+
+            fields = line.split()
+            if(len(fields) < 2):
+                continue
+
+            values[fields[0]] = float(fields[1])
+            if(len(fields) > 2):
+                try:
+                    errors[fields[0]] = float(fields[2])
+                except ValueError:
+                    errors[fields[0]] = getattr(np, 'nan', float('nan'))
+
+    if(len(values) == 0):
+        raise ValueError("No point estimates found in {}.".format(point_estimates_path))
+
+    return PointEstimateResults(values, errors=errors)
+
+def _finite_point_estimate_errors(results, errors=None):
+
+    if(errors is None):
+        errors = getattr(results, 'errors', {})
+
+    finite_errors = {}
+    for name in results.keys():
+        try:
+            error = float(errors.get(name, 0.0))
+        except (AttributeError, TypeError, ValueError):
+            error = 0.0
+        if(math.isfinite(error) and error > 0.0):
+            finite_errors[name] = error
+
+    return finite_errors
+
+def point_estimate_parameter_samples(results, errors=None):
+
+    mean_sample = dict(results)
+    samples = [mean_sample]
+
+    for name, error in _finite_point_estimate_errors(results, errors=errors).items():
+        try:
+            mean_value = float(mean_sample[name])
+        except (TypeError, ValueError):
+            continue
+
+        upper_sample = dict(mean_sample)
+        lower_sample = dict(mean_sample)
+        upper_sample[name] = mean_value + error
+        lower_sample[name] = mean_value - error
+        samples.extend([lower_sample, upper_sample])
+
+    return samples
+
+def _structured_point_estimate_parameter_samples(results):
+
+    names = results.dtype.names
+    values = {}
+    errors = {}
+
+    for name in names:
+        samples = np.atleast_1d(results[name])
+        values[name] = float(np.mean(samples))
+        if(len(samples) > 1):
+            errors[name] = float(np.std(samples))
+
+    return point_estimate_parameter_samples(values, errors=errors)
+
 def waveform_parameter_samples(results, method=None):
 
     if isinstance(results, dict):
-        return [results]
+        if(method in point_estimate_methods):
+            return point_estimate_parameter_samples(results)
+        else:
+            return [results]
+
+    if(method in point_estimate_methods and getattr(results, 'dtype', None) is not None and results.dtype.names is not None):
+        return _structured_point_estimate_parameter_samples(results)
 
     if(getattr(results, 'shape', None) == ()):
         return [results]
@@ -73,8 +206,25 @@ def waveform_parameter_samples(results, method=None):
 def model_component_lists(results, inference_model, method=None):
 
     parameter_samples = waveform_parameter_samples(results, method)
-    models_re_list    = [np.real(np.array(inference_model.model(p))) for p in parameter_samples]
-    models_im_list    = [np.imag(np.array(inference_model.model(p))) for p in parameter_samples]
+    models_re_list    = []
+    models_im_list    = []
+    skipped_samples   = 0
+    for p in parameter_samples:
+        try:
+            model = np.array(inference_model.model(p))
+        except (FloatingPointError, OverflowError, TypeError, ValueError):
+            skipped_samples += 1
+            continue
+        if not np.all(np.isfinite(model)):
+            skipped_samples += 1
+            continue
+        models_re_list.append(np.real(model))
+        models_im_list.append(np.imag(model))
+
+    if not models_re_list:
+        raise RuntimeError("No finite waveform samples could be constructed for postprocessing.")
+    if skipped_samples:
+        print("* Warning: skipped {} invalid point-estimate waveform sample(s) during postprocessing.".format(skipped_samples))
 
     return models_re_list, models_im_list
 
@@ -98,6 +248,166 @@ def _percentile_waveforms(models_re_list, models_im_list, perc, M, dL):
 def _toeplitz_whitened_norm(acf, waveform):
     whitened = sl.solve_toeplitz(acf, waveform, check_finite=False)
     return whitened, np.sqrt(abs(np.dot(waveform, whitened)))
+
+def _time_domain_mismatch(acf, reference, comparison):
+
+    whitened_reference, reference_norm = _toeplitz_whitened_norm(acf, reference)
+    _, comparison_norm = _toeplitz_whitened_norm(acf, comparison)
+
+    if(reference_norm == 0.0 or comparison_norm == 0.0):
+        raise ValueError("Cannot compute mismatch for a waveform with zero norm.")
+
+    match = abs(np.dot(comparison, whitened_reference)) / (reference_norm * comparison_norm)
+    match = np.minimum(1 - abs(1 - match), match)
+
+    return 1 - match
+
+def _format_diagnostic_value(value):
+    if value is None:
+        return ''
+    np_generic = getattr(np, 'generic', ())
+    if np_generic and isinstance(value, np_generic):
+        value = value.item()
+    if isinstance(value, (int, float)):
+        return "{:.16g}".format(value)
+    return str(value)
+
+def _read_tsv_rows(path):
+    if not(os.path.exists(path)):
+        return []
+    with open(path, 'r', encoding='utf-8', newline='') as handle:
+        reader = csv.DictReader(handle, delimiter='\t')
+        if reader.fieldnames is None:
+            return []
+        return [dict(row) for row in reader]
+
+def _write_tsv_rows(path, fieldnames, rows):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8', newline='') as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter='\t')
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field, '') for field in fieldnames})
+
+def _upsert_tsv_row(path, fieldnames, new_row, key_fields):
+    rows = _read_tsv_rows(path)
+    new_key = tuple(new_row.get(field, '') for field in key_fields)
+    updated = False
+
+    for row in rows:
+        row_key = tuple(row.get(field, '') for field in key_fields)
+        if row_key != new_key:
+            continue
+        for field in fieldnames:
+            value = new_row.get(field, '')
+            if value != '':
+                row[field] = value
+            elif field not in row:
+                row[field] = ''
+        updated = True
+        break
+
+    if not(updated):
+        rows.append({field: new_row.get(field, '') for field in fieldnames})
+
+    _write_tsv_rows(path, fieldnames, rows)
+
+def _mismatch_diagnostics_path(outdir):
+    return os.path.join(_mismatch_root_dir(outdir), mismatch_and_snr_diagnostics_filename)
+
+def _mismatch_parameters_path(outdir):
+    return os.path.join(_mismatch_root_dir(outdir), mismatch_and_snr_parameters_filename)
+
+def _mismatch_run_id(diagnostic_type, M, dL, t_start_g, n_fft, window_size_DX,
+                     window_size_SX, k, saturation_DX, saturation_SX, direction=None):
+    parts = (
+        diagnostic_type,
+        M,
+        dL,
+        t_start_g,
+        n_fft,
+        window_size_DX,
+        window_size_SX,
+        k,
+        saturation_DX,
+        saturation_SX,
+        direction,
+    )
+    digest_source = '\t'.join(_format_diagnostic_value(part) for part in parts)
+    return 'run_' + hashlib.sha1(digest_source.encode('utf-8')).hexdigest()[:12]
+
+def _mismatch_parameter_row(run_id, diagnostic_type, M, dL, t_start_g, n_fft,
+                            window_size_DX, window_size_SX, k, saturation_DX,
+                            saturation_SX, direction=None):
+    return {
+        'run_id': run_id,
+        'diagnostic_type': diagnostic_type,
+        'remnant_mass_solar_masses': _format_diagnostic_value(M),
+        'luminosity_distance_mpc': _format_diagnostic_value(dL),
+        'start_time_M': _format_diagnostic_value(t_start_g),
+        'n_fft': _format_diagnostic_value(n_fft),
+        'low_frequency_window_hz': _format_diagnostic_value(window_size_DX),
+        'high_frequency_window_hz': _format_diagnostic_value(window_size_SX),
+        'smoothing_steepness': _format_diagnostic_value(k),
+        'low_frequency_saturation': _format_diagnostic_value(saturation_DX),
+        'high_frequency_saturation': _format_diagnostic_value(saturation_SX),
+        'smoothing_direction': _format_diagnostic_value(direction),
+    }
+
+def _record_mismatch_diagnostic(
+    outdir,
+    diagnostic_type,
+    M,
+    dL,
+    t_start_g,
+    n_fft,
+    window_size_DX,
+    window_size_SX,
+    k,
+    saturation_DX,
+    saturation_SX,
+    direction=None,
+    confidence_interval=None,
+    strain_data=None,
+    inclination=None,
+    azimuth=None,
+    psi=None,
+    mismatch=None,
+    optimal_snr=None,
+    optimal_snr_fd=None,
+):
+    run_id = _mismatch_run_id(
+        diagnostic_type, M, dL, t_start_g, n_fft, window_size_DX,
+        window_size_SX, k, saturation_DX, saturation_SX, direction
+    )
+    _upsert_tsv_row(
+        _mismatch_parameters_path(outdir),
+        mismatch_parameter_fieldnames,
+        _mismatch_parameter_row(
+            run_id, diagnostic_type, M, dL, t_start_g, n_fft,
+            window_size_DX, window_size_SX, k, saturation_DX,
+            saturation_SX, direction
+        ),
+        ('run_id',),
+    )
+    _upsert_tsv_row(
+        _mismatch_diagnostics_path(outdir),
+        mismatch_diagnostic_fieldnames,
+        {
+            'run_id': run_id,
+            'diagnostic_type': diagnostic_type,
+            'confidence_interval': _format_diagnostic_value(confidence_interval),
+            'strain_data': _format_diagnostic_value(strain_data),
+            'inclination': _format_diagnostic_value(inclination),
+            'azimuth': _format_diagnostic_value(azimuth),
+            'psi': _format_diagnostic_value(psi),
+            'mismatch': _format_diagnostic_value(mismatch),
+            'optimal_snr': _format_diagnostic_value(optimal_snr),
+            'optimal_snr_fd': _format_diagnostic_value(optimal_snr_fd),
+        },
+        ('run_id', 'diagnostic_type', 'confidence_interval', 'strain_data', 'inclination', 'azimuth', 'psi'),
+    )
+    return _mismatch_diagnostics_path(outdir)
 
 def _windowed_result_path(outdir, prefix, M, dL, t_start_g, n_fft, window_size_DX,
                           window_size_SX, k, saturation_DX, saturation_SX,
@@ -123,11 +433,106 @@ def _append_result(path, *values):
     with open(path, 'a') as outfile:
         outfile.write('\t'.join(map(str, values)) + '\n')
 
+def _mode_series_with_negative_m_symmetry(mode_series, include_negative_m):
+
+    explicit_modes = set(mode_series.keys())
+    expanded = dict(mode_series)
+    if not(include_negative_m):
+        return expanded
+
+    for (l_value, m_value), series in mode_series.items():
+        if(m_value == 0):
+            continue
+        counterpart = (l_value, -m_value)
+        if(counterpart not in explicit_modes and counterpart not in expanded):
+            expanded[counterpart] = ((-1)**l_value) * np.conjugate(series)
+
+    return expanded
+
+def _project_modes_to_polarizations(mode_series, inclination, azimuth, include_negative_m=True):
+
+    projected_strain = 0.0j
+    for (l_value, m_value), series in _mode_series_with_negative_m_symmetry(mode_series, include_negative_m).items():
+        y_lm = lal.SpinWeightedSphericalHarmonic(inclination, azimuth, -2, l_value, m_value)
+        projected_strain = projected_strain + series * y_lm
+
+    return np.real(projected_strain), -np.imag(projected_strain)
+
+def _project_modes_to_detector(mode_series, inclination, azimuth, F_plus, F_cross, include_negative_m=True):
+
+    h_plus, h_cross = _project_modes_to_polarizations(mode_series, inclination, azimuth, include_negative_m)
+
+    return F_plus * h_plus + F_cross * h_cross
+
+def _mode_percentile_waveform(model_samples, percentile):
+
+    samples = np.asarray(model_samples)
+
+    return (
+        np.percentile(np.real(samples), percentile, axis=0)
+        + 1j*np.percentile(np.imag(samples), percentile, axis=0)
+    )
+
+def _load_hm_mode_products(run_parameters):
+
+    product_path = os.path.join(run_parameters['I/O']['outdir'], 'NR_sim.pkl')
+    with open(product_path, 'rb') as product_file:
+        NR_sim, model_samples, _ = pickle.load(product_file)
+
+    return {
+        'mode': (run_parameters['NR-data']['l-NR'], run_parameters['NR-data']['m']),
+        'outdir': run_parameters['I/O']['outdir'],
+        'time': np.asarray(NR_sim.t_NR_cut),
+        'nr': np.asarray(NR_sim.NR_r_cut) + 1j*np.asarray(NR_sim.NR_i_cut),
+        'model_samples': np.asarray(model_samples),
+    }
+
+def _common_mode_time(mode_products):
+
+    t_start = max(product['time'][0] for product in mode_products)
+    t_end   = min(product['time'][-1] for product in mode_products)
+    if(t_end <= t_start):
+        raise ValueError("The selected NR modes do not have an overlapping fit interval.")
+
+    n_points = min(len(product['time']) for product in mode_products)
+
+    return np.linspace(t_start, t_end, n_points)
+
+def _interpolate_mode_series(mode_products, common_time, percentile=None):
+
+    interpolated = {}
+    for product in mode_products:
+        if(percentile is None):
+            series = product['nr']
+        else:
+            series = _mode_percentile_waveform(product['model_samples'], percentile)
+        interpolated[product['mode']] = interp1d(product['time'], series, bounds_error=False, fill_value=0.0)(common_time)
+
+    return interpolated
+
+def _hm_sum_output_dir(base_outdir, t_start, n_start_times):
+
+    outdir = os.path.join(base_outdir, 'HM_sum')
+    if(n_start_times > 1):
+        label = "{:.12g}".format(float(t_start)).replace('-', 'm').replace('+', '').replace('.', 'p')
+        outdir = os.path.join(outdir, "t_start_{}M".format(label))
+
+    return outdir
+
+def _mismatch_root_dir(outdir):
+    path = os.path.join(outdir, 'Algorithm/Mismatch')
+    os.makedirs(path, exist_ok=True)
+    return path
+
 def _mismatch_subfolder(direction):
-    return "Left_smoothing" if direction == "below" else "Right_smoothing" if direction == "above" else "Both_edges_smoothing"
+    try:
+        return mismatch_smoothing_subfolders[direction]
+    except KeyError:
+        allowed = "', '".join(mismatch_smoothing_subfolders)
+        raise ValueError("Invalid mismatch smoothing direction '{}'. Choose between '{}'.".format(direction, allowed))
 
 def _mismatch_plot_dir(outdir, direction):
-    save_path = os.path.join(outdir, "Algorithm/Mismatch", _mismatch_subfolder(direction))
+    save_path = os.path.join(_mismatch_root_dir(outdir), _mismatch_subfolder(direction))
     os.makedirs(save_path, exist_ok=True)
     return save_path
 
@@ -147,7 +552,16 @@ def read_results_object_from_previous_inference(parameters):
 
     if(parameters['Inference']['method'] in point_estimate_methods):
 
-        results_object = read_posterior_samples(parameters['I/O']['outdir'])
+        n_samples = int(parameters['Inference'].get('point-estimate-posterior-samples', point_estimate_posterior_samples))
+        posterior_path = _posterior_path(parameters['I/O']['outdir'])
+        point_estimates_path = _point_estimate_path(parameters['I/O']['outdir'])
+
+        if(n_samples > 0 and os.path.exists(posterior_path)):
+            results_object = read_posterior_samples(parameters['I/O']['outdir'])
+        elif(os.path.exists(point_estimates_path)):
+            results_object = read_point_estimates(parameters['I/O']['outdir'])
+        else:
+            results_object = read_posterior_samples(parameters['I/O']['outdir'])
 
     elif(parameters['Inference']['method'] == 'Nested-sampler'):
 
@@ -189,17 +603,8 @@ def print_point_estimate(results_object, names, method):
 
     if(isinstance(results_object, dict)):
         longest_name_length = utils.find_longest_name_length(results_object.keys())
-        errors = getattr(results_object, 'errors', {})
         for key in results_object.keys():
-            try:
-                has_finite_error = key in errors and np.isfinite(errors[key])
-            except AttributeError:
-                has_finite_error = key in errors and errors[key] == errors[key]
-
-            if(has_finite_error):
-                print('{} : {:.12f} +/- {:.12f}'.format(key.ljust(longest_name_length), results_object[key], errors[key]))
-            else:
-                print('{} : {:.12f}'.format(key.ljust(longest_name_length), results_object[key]))
+            print('{} : {:.12f}'.format(key.ljust(longest_name_length), results_object[key]))
     else:
         longest_name_length = utils.find_longest_name_length(names)
         for key in names:
@@ -216,15 +621,15 @@ def save_point_estimates(results, outdir, errors=None):
 
     Save the point estimates and one-sigma errors for point-estimate methods.
 
-    This file is an auxiliary summary product. Post-processing and plotting use
-    the posterior samples in Algorithm/posterior.dat.
+    Post-processing reads this file directly when no Gaussian point-estimate
+    posterior is requested.
 
     """
 
     if(errors is None):
         errors = getattr(results, 'errors', {})
 
-    point_estimates_path = os.path.join(outdir, 'Algorithm', 'point_estimates.dat')
+    point_estimates_path = _point_estimate_path(outdir)
     missing_error = getattr(np, 'nan', float('nan'))
 
     with open(point_estimates_path, 'w') as outfile:
@@ -275,6 +680,12 @@ def save_point_estimate_posterior(results, outdir, covariance=None, errors=None,
 
     """
 
+    n_samples = int(n_samples)
+    if(n_samples < 0):
+        raise ValueError("Cannot save a point-estimate posterior with a negative number of samples.")
+    if(n_samples == 0):
+        return None
+
     names = list(results.keys())
     if(len(names)==0):
         raise ValueError("Cannot save a point-estimate posterior with no parameters.")
@@ -287,10 +698,19 @@ def save_point_estimate_posterior(results, outdir, covariance=None, errors=None,
     rng     = np.random.default_rng(seed)
     samples = rng.multivariate_normal(mean, covariance, size=n_samples)
 
-    posterior_path = os.path.join(outdir, 'Algorithm', 'posterior.dat')
+    posterior_path = _posterior_path(outdir)
     np.savetxt(posterior_path, samples, header='\t'.join(names), delimiter='\t')
 
     return posterior_path
+
+def remove_point_estimate_posterior(outdir):
+
+    posterior_path = _posterior_path(outdir)
+    if(os.path.exists(posterior_path)):
+        os.remove(posterior_path)
+        return posterior_path
+
+    return None
 
 def store_and_print_amp_phi(amp_name, phi_name, t0, omega, tau, results_object, longest_name_length, outdir):
 
@@ -303,14 +723,14 @@ def store_and_print_amp_phi(amp_name, phi_name, t0, omega, tau, results_object, 
 
     amp_name : str
         Name of the amplitude parameter.
-    
+
     phi_name : str
         Name of the phase parameter.
 
     t0 : float
         Time at which the amplitude and phase are defined.
 
-    omega : float   
+    omega : float
         Frequency of the mode.
 
     tau : float
@@ -407,7 +827,7 @@ def post_process_amplitudes(t0, results_object, NR_metadata, qnm_cached, modes, 
 
     Mf = NR_metadata['Mf']
     af = NR_metadata['af']
-    
+
     if 'qf' in NR_metadata.keys(): qf = NR_metadata['qf']
     else                         : qf = None
 
@@ -440,10 +860,10 @@ def post_process_amplitudes(t0, results_object, NR_metadata, qnm_cached, modes, 
 
                 store_and_print_amp_phi(amp_name, phi_name, t0, omega, tau, results_object, longest_name_length, outdir)
 
-    return 
+    return
 
-def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir):
-    
+def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir, method=None):
+
     """
 
     Compare the residual of the fit with the NR error.
@@ -455,9 +875,9 @@ def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir):
 
     results_object : dict
         Dictionary containing the results of the inference algorithm.
-    
+
     inference_model : Nested sampler object
-        Nested sampler object. 
+        Nested sampler object.
 
     NR_sim : NR_sim
         NR simulation object.
@@ -476,7 +896,7 @@ def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir):
     NR_r, NR_i         = np.real(NR_sim.NR_cpx_cut)     , np.imag(NR_sim.NR_cpx_cut)
     t_cut = NR_sim.t_NR_cut
 
-    models_re_list, models_im_list = model_component_lists(results_object, inference_model)
+    models_re_list, models_im_list = model_component_lists(results_object, inference_model, method)
 
     wf_r = np.percentile(np.array(models_re_list),[50], axis=0)[0]
     wf_i = np.percentile(np.array(models_im_list),[50], axis=0)[0]
@@ -493,12 +913,12 @@ def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir):
     outFile_L2_errors.write('# L2 norm of NR error is \n')
     outFile_L2_errors.write(f'{l2_NR} \n')
 
-    return 
+    return
 
 def init_plotting():
 
     """
-    
+
     Function to set the default plotting parameters.
 
     Parameters
@@ -508,11 +928,11 @@ def init_plotting():
     Returns
     -------
     Nothing, but sets the default plotting parameters.
-    
+
     """
-    
+
     plt.rcParams['figure.max_open_warning'] = 0
-    
+
     plt.rcParams['mathtext.fontset']  = 'stix'
     plt.rcParams['font.family']       = 'STIXGeneral'
 
@@ -531,16 +951,16 @@ def init_plotting():
     plt.rcParams['ytick.minor.size']  = 3
     plt.rcParams['ytick.major.width'] = 1
     plt.rcParams['ytick.minor.width'] = 1
-    
+
     plt.rcParams['legend.frameon']             = False
     plt.rcParams['legend.loc']                 = 'center left'
     plt.rcParams['contour.negative_linestyle'] = 'solid'
-    
+
     plt.gca().spines['right'].set_color('none')
     plt.gca().spines['top'].set_color('none')
     plt.gca().xaxis.set_ticks_position('bottom')
     plt.gca().yaxis.set_ticks_position('left')
-    
+
     return
 
 def compare_with_GR_QNMs(results_object, qnm_cached, NR_sim, outdir):
@@ -586,7 +1006,7 @@ def interpolate_waveform(t_start_g, t_end_g, M, wf_lNR, acf):
 
     """
     Interpolates the waveform to match the length of the autocovariance function (ACF).
-    
+
     Parameters
     ----------
     - t_start_g (float) : Start time in geometrical units.
@@ -628,19 +1048,19 @@ def convert_asd_to_pycbc_psd(asd_file, delta_f):
 
     pycbc.types.FrequencySeries: The computed PSD as a FrequencySeries object.
     """
-    
+
     # Load ASD data from file
     data       = np.loadtxt(asd_file)
     asd_values = data[:, 1]   # Second column: ASD values
-    
+
     # Compute PSD by squaring ASD values
     psd_values = asd_values ** 2
-    
+
     print(f"Loaded ASD file: {asd_file}, PSD length: {len(psd_values)}")
 
     # Convert to PyCBC FrequencySeries
     psd = FrequencySeries(psd_values, delta_f=delta_f)
-    
+
     return psd
 
 def clear_directory(directory_path):
@@ -715,7 +1135,7 @@ def truncate_and_interpolate_acf(t_ACF, ACF_smoothed, M, t_start_g, t_end_g, t_N
         print("\nACF time array expr. in [s] (first half, associated to positive frequencies): ", t_ACF_half)
         print("\nTruncated ACF time array expr. in [s] : ", t_ACF_truncated)
         print("\nTruncated waveform time array expr. in geometrical units : ", t_NR_s/(M*C_mt))
-    
+
     return ACF_trunc
 
 def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf, M, dL, t_start_g, t_end_g, window_size_DX, window_size_SX, k):
@@ -752,7 +1172,7 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
 
     Returns
     -------
-    
+
     Nothing, only creates sanity plots.
     """
 
@@ -890,7 +1310,7 @@ def mismatch_sanity_checks(NR_sim, results, inference_model, outdir, method, acf
     return
 
 def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size, k, compare_TD_FD, sanity_check_mm):
-   
+
     """
     OLD VERSION. Compute the mismatch of the model with respect to NR simulations.
     """
@@ -920,7 +1340,7 @@ def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, metho
         except Exception as e:
             print(f"Error in NR scalar product for {NR_quant}: {e}")
             continue
-        
+
         # Load waveform template
         models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
@@ -960,20 +1380,13 @@ def compute_mismatch_check_TD_FD(NR_sim, results, inference_model, outdir, metho
 
     return
 
-def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, mismatch_print_flag, compare_TD_FD):
-   
+def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, mismatch_print_flag, compare_TD_FD, direction=None):
+
     """
     Compute the mismatch of the model with respect to NR simulations.
     """
 
     print(f"\n* Computing mismatch for plus and cross polarizations assuming: M={M}, D_L={dL}.")
-
-    # File paths for saving results
-    outFile_path = _windowed_result_path(
-        outdir, "Mismatch", M, dL, t_start_g, N_FFT,
-        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX
-    )
-    _initialise_result_files((outFile_path, '#CI\tStrain_data\tMismatch\n'))
 
     for NR_quant, NR_data in _scaled_strain_components(NR_sim, M, dL).items():
         try:
@@ -985,7 +1398,7 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
         except Exception as e:
             print(f"Error in NR scalar product for {NR_quant}: {e}")
             continue
-        
+
         # Load waveform template
         models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
@@ -1014,7 +1427,12 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
 
                 if(perc==50): print(f"* Time-domain mismatch (h {NR_quant}): {TD_mismatch}")
 
-                _append_result(outFile_path, perc, NR_quant, TD_mismatch)
+                _record_mismatch_diagnostic(
+                    outdir, "strain_components", M, dL, t_start_g, N_FFT,
+                    window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+                    direction=direction, confidence_interval=perc,
+                    strain_data=NR_quant, mismatch=TD_mismatch
+                )
 
             except Exception as e:
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
@@ -1022,20 +1440,244 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
 
     return
 
-def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, ra, dec, psi, t_start_g, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX):
-    
+def _nr_waveform_payload(label, time, real, imag, **metadata):
+
+    payload = {
+        'label': label,
+        'time': np.asarray(time),
+        'real': np.asarray(real),
+        'imag': np.asarray(imag),
+    }
+    payload.update(metadata)
+
+    return payload
+
+def _try_read_sxs_waveform(NR_sim, extrap_order, res_level):
+
+    try:
+        time, real, imag = NR_sim.read_waveform_lm_from_SXS(extrap_order, res_level)
+    except Exception:
+        return None
+
+    return _nr_waveform_payload(
+        'Lev{}_N{}'.format(res_level, extrap_order),
+        time,
+        real,
+        imag,
+        res_level=res_level,
+        extrap_order=extrap_order,
+    )
+
+def _try_read_rwz_waveform(NR_sim, extrap_order, res_level):
+
+    try:
+        time, real, imag = NR_sim.read_waveform_lm_from_RWZ(
+            res_level, extrap_order, allow_simple_fallback=False
+        )
+    except Exception:
+        return None
+
+    return _nr_waveform_payload(
+        'RL{}_EP{}'.format(res_level, extrap_order),
+        time,
+        real,
+        imag,
+        res_level=res_level,
+        extrap_order=extrap_order,
+    )
+
+def _int_value_or_none(value):
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+def _sxs_nr_comparison_pairs(NR_sim):
+
+    pairs = []
+    extrap_order = _int_value_or_none(getattr(NR_sim, 'extrap_order', None))
+    if(extrap_order is None):
+        return pairs
+
+    resolution_waveforms = []
+    for res_level in [6, 5, 4, 3, 2, 1]:
+        waveform = _try_read_sxs_waveform(NR_sim, extrap_order, res_level)
+        if(waveform is None):
+            continue
+        resolution_waveforms.append(waveform)
+        if(len(resolution_waveforms) == 2):
+            break
+
+    extrapolation_res_level = _int_value_or_none(getattr(NR_sim, 'res_level', None))
+    if(len(resolution_waveforms) == 2):
+        high, low = resolution_waveforms
+        pairs.append((
+            'nr_resolution_Lev{}_vs_Lev{}'.format(high['res_level'], low['res_level']),
+            'NR resolution',
+            high,
+            low,
+        ))
+        extrapolation_res_level = high['res_level']
+
+    if(extrapolation_res_level is not None):
+        base = _try_read_sxs_waveform(NR_sim, extrap_order, extrapolation_res_level)
+        next_extrap = _try_read_sxs_waveform(NR_sim, extrap_order + 1, extrapolation_res_level)
+        if(base is not None and next_extrap is not None):
+            pairs.append((
+                'nr_extrapolation_N{}_vs_N{}'.format(extrap_order, extrap_order + 1),
+                'NR extrapolation',
+                base,
+                next_extrap,
+            ))
+
+    return pairs
+
+def _rwz_nr_comparison_pairs(NR_sim):
+
+    pairs = []
+    extrap_order = _int_value_or_none(getattr(NR_sim, 'extrap_order', None))
+    if(extrap_order is None):
+        return pairs
+
+    try:
+        resolution_levels = NR_sim.available_RWZ_resolution_levels(extrap_order)
+    except Exception:
+        resolution_levels = []
+
+    extrapolation_res_level = _int_value_or_none(getattr(NR_sim, 'res_level', None))
+    if(len(resolution_levels) >= 2):
+        high_res, low_res = resolution_levels[-1], resolution_levels[-2]
+        high = _try_read_rwz_waveform(NR_sim, extrap_order, high_res)
+        low = _try_read_rwz_waveform(NR_sim, extrap_order, low_res)
+        if(high is not None and low is not None):
+            pairs.append((
+                'nr_resolution_RL{}_vs_RL{}'.format(high_res, low_res),
+                'NR resolution',
+                high,
+                low,
+            ))
+            extrapolation_res_level = high_res
+
+    if(extrapolation_res_level is not None):
+        base = _try_read_rwz_waveform(NR_sim, extrap_order, extrapolation_res_level)
+        next_extrap = _try_read_rwz_waveform(NR_sim, extrap_order + 1, extrapolation_res_level)
+        if(base is not None and next_extrap is not None):
+            pairs.append((
+                'nr_extrapolation_EP{}_vs_EP{}'.format(extrap_order, extrap_order + 1),
+                'NR extrapolation',
+                base,
+                next_extrap,
+            ))
+
+    return pairs
+
+def _teukolsky_nr_comparison_pairs(NR_sim):
+
+    res_level = _int_value_or_none(getattr(NR_sim, 'res_level', None))
+    if(res_level is None):
+        return []
+
+    high = None
+    low = None
+    try:
+        time, real, imag = NR_sim.read_waveform_lm_from_Teukolsky(res_level)
+        high = _nr_waveform_payload(
+            'Lev{}'.format(res_level), time, real, imag, res_level=res_level
+        )
+        time, real, imag = NR_sim.read_waveform_lm_from_Teukolsky(res_level - 1)
+        low = _nr_waveform_payload(
+            'Lev{}'.format(res_level - 1), time, real, imag, res_level=res_level - 1
+        )
+    except Exception:
+        return []
+
+    return [(
+        'nr_resolution_Lev{}_vs_Lev{}'.format(res_level, res_level - 1),
+        'NR resolution',
+        high,
+        low,
+    )]
+
+def _nr_comparison_pairs(NR_sim):
+
+    cache_key = '_bayring_nr_comparison_pairs'
+    cached_pairs = getattr(NR_sim, cache_key, None)
+    if(cached_pairs is not None):
+        return cached_pairs
+
+    catalog = getattr(NR_sim, 'NR_catalog', None)
+    if(catalog == 'SXS'):
+        pairs = _sxs_nr_comparison_pairs(NR_sim)
+    elif(catalog == 'RWZ-env'):
+        pairs = _rwz_nr_comparison_pairs(NR_sim)
+    elif(catalog == 'Teukolsky'):
+        pairs = _teukolsky_nr_comparison_pairs(NR_sim)
+    else:
+        pairs = []
+
+    setattr(NR_sim, cache_key, pairs)
+
+    return pairs
+
+def _normalise_nr_time_to_analysis_grid(time, analysis_time):
+
+    time = np.asarray(time)
+    if(len(time) == 0 or len(analysis_time) == 0):
+        return time
+    if(analysis_time[0] >= 0.0 and time[0] < 0.0):
+        return time - time[0]
+
+    return time
+
+def _interpolate_nr_waveform_component(waveform, component, analysis_time):
+
+    time = _normalise_nr_time_to_analysis_grid(waveform['time'], analysis_time)
+    if(len(time) == 0):
+        raise ValueError("comparison waveform has an empty time array")
+    if(time[0] > analysis_time[0] or time[-1] < analysis_time[-1]):
+        raise ValueError("comparison waveform does not cover the analysis interval")
+
+    return interp1d(time, waveform[component], bounds_error=False, fill_value=0.0)(analysis_time)
+
+def compute_nr_comparison_mismatches(NR_sim, outdir, acf, N_FFT, M, dL, t_start_g,
+                                     window_size_DX, window_size_SX, k,
+                                     saturation_DX, saturation_SX, direction=None):
+
+    pairs = _nr_comparison_pairs(NR_sim)
+    if(len(pairs) == 0):
+        return
+
+    analysis_time = np.asarray(NR_sim.t_NR_cut)
+    scale = _physical_strain_scale(M, dL)
+
+    for diagnostic_type, print_label, reference_waveform, comparison_waveform in pairs:
+        pair_label = '{} vs {}'.format(reference_waveform['label'], comparison_waveform['label'])
+        for component in strain_components:
+            try:
+                reference = _interpolate_nr_waveform_component(reference_waveform, component, analysis_time) * scale
+                comparison = _interpolate_nr_waveform_component(comparison_waveform, component, analysis_time) * scale
+                mismatch = _time_domain_mismatch(acf, reference, comparison)
+            except Exception as exc:
+                print("* Skipping {} mismatch ({}, h {}): {}".format(print_label, pair_label, component, exc))
+                continue
+
+            print("* {} mismatch ({}, h {}): {}".format(print_label, pair_label, component, mismatch))
+            _record_mismatch_diagnostic(
+                outdir, diagnostic_type, M, dL, t_start_g, N_FFT,
+                window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+                direction=direction, strain_data=component, mismatch=mismatch
+            )
+
+    return
+
+def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, ra, dec, psi, t_start_g, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, direction=None):
+
     """
     Compute the mismatch of the model with respect to NR simulations.
-    
+
     """
     print(f"* Computing mismatch for the strain assuming: M={M}, D_L={dL}, ra={ra}, dec={dec}, psi={psi}")
-
-    # File paths for saving results
-    outFile_path = _windowed_result_path(
-        outdir, "Mismatch_h_tot", M, dL, t_start_g, N_FFT,
-        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX
-    )
-    _initialise_result_files((outFile_path, '#CI\tStrain_data\tMismatch\n'))
 
     # Extract NR waveform components (physical units)
     NR_dict = _scaled_strain_components(NR_sim, M, dL)
@@ -1064,30 +1706,20 @@ def compute_mismatch_htot(NR_sim, results, inference_model, outdir, method, acf,
         TD_match    = h_wf_h_NR / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
         TD_mismatch = 1 - TD_match
 
-        _append_result(outFile_path, perc, TD_mismatch)
-        
-    return 
+        _record_mismatch_diagnostic(
+            outdir, "detector_strain", M, dL, t_start_g, N_FFT,
+            window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+            direction=direction, confidence_interval=perc,
+            strain_data="detector", psi=psi, mismatch=TD_mismatch
+        )
 
-def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, compare_TD_FD):
+    return
+
+def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, compare_TD_FD, direction=None):
     """
     Compute the optimal SNR of the model waveform.
     """
     print(f"\n* Optimal SNR computation for plus and cross polarizations assuming: M={M}, D_L={dL}.")
-
-    # File paths for saving results
-    outFile_path = _windowed_result_path(
-        outdir, "Optimal_SNR", M, dL, t_start_g, N_FFT,
-        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX
-    )
-    outFile_path_fd = _windowed_result_path(
-        outdir, "Optimal_SNR", M, dL, t_start_g, N_FFT,
-        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
-        include_saturation=False, fd=True
-    )
-    _initialise_result_files(
-        (outFile_path, '#CI\tStrain_data\tOptimal_SNR\n'),
-        (outFile_path_fd, '#CI\tStrain_data\tOptimal_SNR_FD\n'),
-    )
 
     models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
@@ -1099,7 +1731,12 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
 
                 optimal_SNR_TD = np.sqrt(abs(np.dot(wf_int, sl.solve_toeplitz(acf, wf_int, check_finite=False))))
 
-                _append_result(outFile_path, perc, NR_quant, optimal_SNR_TD)
+                _record_mismatch_diagnostic(
+                    outdir, "strain_components", M, dL, t_start_g, N_FFT,
+                    window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+                    direction=direction, confidence_interval=perc,
+                    strain_data=NR_quant, optimal_snr=optimal_SNR_TD
+                )
 
                 if(perc==50): print(f"* Optimal TD SNR (h {NR_quant}): {optimal_SNR_TD}")
 
@@ -1111,31 +1748,14 @@ def compute_optimal_SNR(NR_sim, results, inference_model, outdir, method, acf, N
 
     return
 
-def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, method, acf, acf_tot, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, delta_f, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX):
+def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, method, acf, acf_tot, N_FFT, M, dL, t_start_g, t_end_g, f_min, f_max, delta_f, asd_file, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX, direction=None):
     """
     Compute the optimal SNR of the model waveform.
-    
+
     Parameters:
         downsampling_factor (int): The factor by which the waveform will be downsampled. Default is 10.
     """
     print("\nProcessing optimal SNR computation (with TD/FD check) for plus and cross polarizations.\n")
-
-    # File paths for saving results
-    outFile_path = _windowed_result_path(
-        outdir, "Optimal_SNR", M, dL, t_start_g, N_FFT,
-        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX
-    )
-    outFile_path_fd = _windowed_result_path(
-        outdir, "Optimal_SNR", M, dL, t_start_g, N_FFT,
-        window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
-        include_saturation=False, fd=True
-    )
-
-    # Open output files to write results
-    _initialise_result_files(
-        (outFile_path, '#CI\tStrain_data\tOptimal_SNR\n'),
-        (outFile_path_fd, '#CI\tStrain_data\tOptimal_SNR_FD\n'),
-    )
 
     models_re_list, models_im_list = model_component_lists(results, inference_model, method)
 
@@ -1164,14 +1784,195 @@ def compute_optimal_SNR_compare_TD_FD(NR_sim, results, inference_model, outdir, 
                 optimal_SNR_FD = compute_pycbc_optimal_SNR(asd_file, h_TS, len(acf_tot), f_min, f_max, delta_f)
 
                 # Print the results for the optimal SNR in FD (and TD, but untill a certain point, or computations can be heavy)
+                optimal_SNR_TD = None
                 if T<0.5:
                     optimal_SNR_TD = np.sqrt(abs(np.dot(wf_int, sl.solve_toeplitz(acf_tot, wf_int, check_finite=False))))
                     print(f"Optimal TD SNR for perc {perc}, {NR_quant} part: {optimal_SNR_TD}")
                 print(f"Optimal FD SNR for perc {perc}, {NR_quant} part: {optimal_SNR_FD}")
+                _record_mismatch_diagnostic(
+                    outdir, "strain_components", M, dL, t_start_g, N_FFT,
+                    window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+                    direction=direction, confidence_interval=perc,
+                    strain_data=NR_quant, optimal_snr=optimal_SNR_TD,
+                    optimal_snr_fd=optimal_SNR_FD
+                )
 
             except Exception as e:
                 print(f"Error processing optimal SNR for {perc}% CI and {NR_quant}: {e}")
                 continue
+
+def compute_higher_mode_sum_mismatch(mode_products, base_parameters, t_start, n_start_times, acf, N_FFT,
+                                     window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+                                     direction=None):
+
+    base_outdir = base_parameters['I/O']['outdir']
+    M, dL, ra, dec, psi = waveform_utils.extract_GW_parameters(base_parameters)
+    azimuth = base_parameters['Mismatch-GW-parameters']['azimuth']
+    inclinations = base_parameters['Mismatch-GW-parameters']['inclination-list']
+    polarisations = base_parameters['Mismatch-GW-parameters'].get('polarisation-list', [psi])
+    include_negative_m = bool(base_parameters['Mismatch-GW-parameters']['hm-include-negative-m'])
+
+    outdir = _hm_sum_output_dir(base_outdir, t_start, n_start_times)
+    diagnostic_path = None
+
+    common_time = _common_mode_time(mode_products)
+    scale = _physical_strain_scale(M, dL)
+    nr_modes = {
+        mode: series * scale
+        for mode, series in _interpolate_mode_series(mode_products, common_time).items()
+    }
+    model_modes_by_percentile = {
+        percentile: {
+            mode: series * scale
+            for mode, series in _interpolate_mode_series(mode_products, common_time, percentile).items()
+        }
+        for percentile in summary_percentiles
+    }
+
+    detector_responses = []
+    for polarisation in polarisations:
+        resp = AntennaResponse('H1', ra=ra, dec=dec, psi=polarisation, tensor=True, times=1126259462.43)
+        detector_responses.append((polarisation, resp.plus, resp.cross))
+
+    for inclination in inclinations:
+        nr_by_polarisation = []
+        for polarisation, F_plus, F_cross in detector_responses:
+            NR_data = _project_modes_to_detector(
+                nr_modes, inclination, azimuth, F_plus, F_cross, include_negative_m
+            )
+            whiten_whiten_h_NR, h_NR_h_NR_sqrt = _toeplitz_whitened_norm(acf, NR_data)
+            if(h_NR_h_NR_sqrt == 0.0):
+                continue
+            nr_by_polarisation.append((polarisation, F_plus, F_cross, whiten_whiten_h_NR, h_NR_h_NR_sqrt))
+
+        if(len(nr_by_polarisation) == 0):
+            print("* Skipping HM-summed mismatch at inclination {} because the NR norm is zero for every polarisation.".format(inclination))
+            continue
+
+        for percentile in summary_percentiles:
+            best_result = None
+            for polarisation, F_plus, F_cross, whiten_whiten_h_NR, h_NR_h_NR_sqrt in nr_by_polarisation:
+                wf = _project_modes_to_detector(
+                    model_modes_by_percentile[percentile], inclination, azimuth, F_plus, F_cross, include_negative_m
+                )
+                _, h_wf_h_wf_sqrt = _toeplitz_whitened_norm(acf, wf)
+                if(h_wf_h_wf_sqrt == 0.0):
+                    continue
+                h_wf_h_NR = np.dot(wf, whiten_whiten_h_NR)
+                TD_match = abs(h_wf_h_NR) / (h_NR_h_NR_sqrt * h_wf_h_wf_sqrt)
+                TD_match = np.minimum(1 - abs(1 - TD_match), TD_match)
+                TD_mismatch = 1 - TD_match
+                if(best_result is None or TD_mismatch < best_result[1]):
+                    best_result = (polarisation, TD_mismatch)
+
+            if(best_result is None):
+                print("* Skipping HM-summed mismatch for percentile {} at inclination {} because the model norm is zero for every polarisation.".format(percentile, inclination))
+                continue
+
+            polarisation, TD_mismatch = best_result
+            diagnostic_path = _record_mismatch_diagnostic(
+                outdir, "higher_mode_sum", M, dL, t_start, N_FFT,
+                window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+                direction=direction, confidence_interval=percentile,
+                inclination=inclination, azimuth=azimuth, psi=polarisation,
+                mismatch=TD_mismatch
+            )
+
+    if diagnostic_path is not None:
+        print("* HM-summed mismatch written to `{}`.".format(diagnostic_path))
+    else:
+        print("* No HM-summed mismatch values were written for t-start = {} M.".format(t_start))
+
+    return
+
+def run_higher_mode_mismatch_scan(run_parameters_list, base_parameters):
+
+    groups = {}
+    for run_parameters in run_parameters_list:
+        if not(run_parameters['I/O'].get('mode-output', False)):
+            continue
+        key = run_parameters['Inference']['t-start']
+        groups.setdefault(key, []).append(run_parameters)
+
+    if not(groups):
+        return
+
+    print('\n* Computing higher-mode summed mismatch diagnostics.\n')
+    M, _, _, _, _ = waveform_utils.extract_GW_parameters(base_parameters)
+
+    for t_start, group_parameters in sorted(groups.items()):
+        mode_products = []
+        for run_parameters in group_parameters:
+            product_path = os.path.join(run_parameters['I/O']['outdir'], 'NR_sim.pkl')
+            if not(os.path.exists(product_path)):
+                print("* Skipping HM-summed mismatch for t-start = {} M because `{}` is missing.".format(t_start, product_path))
+                mode_products = []
+                break
+            mode_products.append(_load_hm_mode_products(run_parameters))
+
+        if(len(mode_products) < 2):
+            continue
+
+        common_time = _common_mode_time(mode_products)
+        duration_g = common_time[-1] - common_time[0]
+        t_NR_s = (common_time - common_time[0]) * M * C_mt
+        t_start_s, t_end_s = 0.0, duration_g * C_mt * M
+        NR_length = len(common_time)
+
+        try:
+            apply_window, _, _, C1_flag, mismatch_print_flag, mismatch_section_plot_flag = \
+                waveform_utils.extract_flags(base_parameters['Flags'])
+
+            (f_min, f_max, dt, _, N_points, n_FFT_points, asd_path,
+             n_iterations_C1, window_sizes_DX, window_sizes_SX,
+             steepness_values, saturation_DX_values, saturation_SX_values,
+             direction) = waveform_utils.extract_and_compute_psd_parameters(
+                base_parameters['Mismatch-PSD-settings'], mismatch_print_flag
+            )
+
+            n_fft_values = [N_points] if n_FFT_points == 1 else list(
+                map(int, np.logspace(np.log10(NR_length), np.log10(2 * N_points), n_FFT_points))
+            )
+
+            grid = product(
+                n_fft_values,
+                window_sizes_DX,
+                window_sizes_SX,
+                steepness_values,
+                saturation_DX_values,
+                saturation_SX_values,
+            )
+
+            for N_fft, window_size_DX, window_size_SX, k, saturation_DX, saturation_SX in grid:
+                if (t_end_s - t_start_s) > 1 / (f_min + window_size_DX) and direction != 'above':
+                    print("Please provide (t_end-t_start) < 1/(f_min+window_DX) for HM-summed mismatch.")
+                    print("Forbidden frequency:", f_min + window_size_DX)
+                    continue
+
+                window_args = (window_size_DX, window_size_SX, k, saturation_DX, saturation_SX)
+                if apply_window == 1:
+                    PSD_smoothed, ACF_smoothed = waveform_utils.acf_from_asd_with_smoothing(
+                        asd_path, f_min, f_max, N_fft, *window_args,
+                        direction, C1_flag, n_iterations_C1
+                    )
+                else:
+                    PSD_smoothed, ACF_smoothed = waveform_utils.acf_from_asd_no_window_at_edges(
+                        asd_path, f_min, f_max, N_fft
+                    )
+
+                t_ACF = np.linspace(0, N_fft * dt, len(ACF_smoothed))
+                ACF_truncated_NR = truncate_and_interpolate_acf(
+                    t_ACF, ACF_smoothed, M, 0.0, duration_g, t_NR_s, mismatch_print_flag
+                )
+                compute_higher_mode_sum_mismatch(
+                    mode_products, base_parameters, t_start, len(groups), ACF_truncated_NR, N_fft, *window_args,
+                    direction=direction
+                )
+
+        except Exception as e:
+            print("* HM-summed mismatch failed for t-start = {} M: {}".format(t_start, e))
+
+    return
 
 def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdir, method, tail_flag, extract_damping_time_flag):
 
@@ -1211,7 +2012,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     """
 
     init_plotting()
-    
+
     #take NR elements
     NR_r, NR_i, NR_r_err, NR_i_err, NR_amp, NR_f, t_NR, t_peak                                                = NR_sim.NR_r, NR_sim.NR_i, np.real(NR_sim.NR_err_cmplx), np.imag(NR_sim.NR_err_cmplx), NR_sim.NR_amp, NR_sim.NR_freq, NR_sim.t_NR, NR_sim.t_peak
     t_cut, tM_start, tM_end, NR_r_cut, NR_i_cut, NR_r_err_cut, NR_i_err_cut, NR_amp_cut, NR_phi_cut, NR_f_cut = NR_sim.t_NR_cut, NR_sim.tM_start, NR_sim.tM_end, NR_sim.NR_r_cut, NR_sim.NR_i_cut, np.real(NR_sim.NR_cpx_err_cut), np.imag(NR_sim.NR_cpx_err_cut), NR_sim.NR_amp_cut, NR_sim.NR_phi_cut, NR_sim.NR_freq_cut
@@ -1225,7 +2026,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
 
     plot_overtones_flag = 0
     f_rd_overtones      = {}
-    for n in [1,3,7,9]: 
+    for n in [1,3,7,9]:
         omega_n, _, _     = qnm.modes_cache(s=-2,l=l,m=m,n=n)(a=np.abs(metadata['af']))
         f_rd_overtones[n] = (np.real(omega_n) / metadata['Mf']) * (1./twopi)
 
@@ -1265,7 +2066,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
         color_f_ring    = 'forestgreen'
 
     if(not(tail_flag) and not(wf_data_type=='psi4') and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): tM_end = 80
-    if(wf_data_type=='psi4'): 
+    if(wf_data_type=='psi4'):
         tM_end = 120
         label_data = '\psi_{4,%s%s}'%(l,m)
     else:
@@ -1279,7 +2080,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
         f   = plt.figure(figsize=(8,12))
         ax2 = plt.subplot(2,1,1)
         ax4 = plt.subplot(2,1,2)
-        
+
         rescale = 1.4
     else:
         f   = plt.figure(figsize=(12,8))
@@ -1287,7 +2088,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
         ax2 = plt.subplot(2,2,2)
         ax3 = plt.subplot(2,2,3)
         ax4 = plt.subplot(2,2,4)
-  
+
         ax1.set_xlim([-10, tM_end])
         ax3.set_xlim(ax1.get_xlim())
 
@@ -1312,22 +2113,22 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
         ax3.set_ylabel(r'$\mathrm{Im[%s]}$'%(label_data), fontsize=fontsize_labels)
         ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
 
-    if not(tail_flag): 
-        if(extract_damping_time_flag): 
+    if not(tail_flag):
+        if(extract_damping_time_flag):
             ax2.semilogy(t_NR - t_peak, NR_amp*np.e**((t_NR - t_peak)/tau_rd_fundamental), label=r'$\mathrm{NR}$', c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
         else:
             ax2.semilogy(t_NR - t_peak, NR_amp                                           , label=r'$\mathrm{NR}$', c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
-    else             : 
+    else             :
         ax2.semilogy(    t_NR - t_peak, NR_amp                                           , label=r'$\mathrm{NR}$', c=color_NR,      lw=lw_std,    alpha=alpha_std, ls='-' )
     ax2.axvline(tM_start,                                                                                          c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
     if(not(tail_flag)): ax2.axvline(0.0,                                                                           c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
-    
-    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): 
+
+    if(not(tail_flag) and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')):
         if(extract_damping_time_flag):
             ax2.set_ylim([1e-1*amp_peak, 10*amp_peak])
         else:
             ax2.set_ylim([1e-3*amp_peak, 2*amp_peak ])
-    elif(  tail_flag  and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')): 
+    elif(  tail_flag  and (NR_sim.NR_catalog=='SXS' or NR_sim.NR_catalog=='RIT')):
         ax2.set_ylim(    [2*1e-4, 2*np.max(NR_amp)])
 
     ax2.set_xlabel(r'$\mathrm{t - t_{peak} \, [M}]$', fontsize=fontsize_labels)
@@ -1335,22 +2136,22 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     ax4.plot(t_NR - t_peak, NR_f,                                                          c=color_NR,      lw=lw_std,     alpha=alpha_std, ls='-' )
     ax4.axhline(f_rd_fundamental, label=r'$\mathit{f_{%d%d0}}$'%(l,m),                     c=color_f_ring,  lw=lw_std,     alpha=alpha_std, ls=ls_f)
     if(plot_overtones_flag):
-        for n in [1,3,9]: 
+        for n in [1,3,9]:
             if(n==1): leg = r'$\mathit{f_{%d%dn}}$'%(l,m)
             else    : leg = None
             ax4.axhline(f_rd_overtones[n], label=leg,         c=color_f_overt, lw=lw_std*0.4, alpha=alpha_std, ls=ls_f)
 
-    if(tail_flag): 
+    if(tail_flag):
         ax4.axhline(0.0,      label=r'$\mathit{f_{\rm tail}}$',                            c=color_model,   lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax4.axvline(tM_start, label=r'$\mathrm{t_{start} = t_{peak} \, + %d M}$'%tM_start, c=color_t_start, lw=lw_std,    alpha=alpha_std, ls=ls_t)
         ax4.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
-    else         : 
+    else         :
         ax4.axvline(0.0,                                                                   c=color_t_peak,  lw=lw_std,    alpha=alpha_std, ls=ls_t)
     ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$'    , fontsize=fontsize_labels)
 
     # Find the index of zero
     t_peak_idx = np.argmin(np.abs(t_NR - t_peak))
-    
+
     if not(tail_flag):
         try   : ax4.set_ylim([-1.5*NR_f[t_peak_idx], 3.5*NR_f[t_peak_idx]])
         except: pass
@@ -1360,7 +2161,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     ################################
     # Plot waveform reconstruction #
     ################################
-    
+
     if not(inference_model==None):
 
         models_re_list, models_im_list = model_component_lists(results, inference_model, method)
@@ -1372,12 +2173,12 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
 
             wf_amp, wf_phi = waveform_utils.amp_phase_from_re_im(wf_r, wf_i)
             wf_f           = np.gradient(wf_phi, t_cut)/(twopi)
-            
+
             if(perc==50):
                 if not(tail_flag):
                     ax1.plot(t_cut - t_peak, wf_r,                                               c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-')
                     ax3.plot(t_cut - t_peak, wf_i,                                               c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-')
-                    if(extract_damping_time_flag): 
+                    if(extract_damping_time_flag):
                         ax2.semilogy(t_cut - t_peak, wf_amp*np.e**((t_cut - t_peak)/tau_rd_fundamental), label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
                     else:
                         ax2.semilogy(t_cut - t_peak, wf_amp                                            , label=r'$\mathrm{%s}$'%(template.wf_model), c=color_model, lw=lw_large*rescale, alpha=alpha_std, ls='-' )
@@ -1388,7 +2189,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
                 if not(tail_flag):
                     ax1.plot(        t_cut - t_peak, wf_r                                                                                          , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--')
                     ax3.plot(        t_cut - t_peak, wf_i                                                                                          , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--')
-                    if(extract_damping_time_flag): 
+                    if(extract_damping_time_flag):
                         ax2.semilogy(t_cut - t_peak, wf_amp*np.e**((t_cut - t_peak)/tau_rd_fundamental)                                            , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--')
                     else:
                         ax2.semilogy(t_cut - t_peak, wf_amp                                                                                        , c=color_model, lw=lw_std,           alpha=alpha_med, ls='--')
@@ -1401,7 +2202,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
             # Plot QNM waveform reconstruction
             qnm_samples = [_sample_with_suppressed_tail(sample, template) for sample in waveform_parameter_samples(results, method)]
             models_re_list, models_im_list = _model_component_lists_from_samples(qnm_samples, inference_model)
-            
+
             for perc in [50, 5, 95]:
 
                 wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
@@ -1409,7 +2210,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
 
                 wf_amp, wf_phi = waveform_utils.amp_phase_from_re_im(wf_r, wf_i)
                 wf_f           = np.gradient(wf_phi, t_cut)/(twopi)
-                
+
                 if(perc==50):
                     ax2.semilogy(t_cut - t_peak, wf_amp, label=r'$\mathrm{%s \,\, QNMs}$'%(template.wf_model), c='royalblue', lw=lw_large*1.4, alpha=alpha_std, ls='-' )
                     ax4.plot(    t_cut - t_peak, wf_f,                                                         c='royalblue', lw=lw_large*1.4, alpha=alpha_std, ls='-' )
@@ -1428,7 +2229,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     ax2.legend(    loc='best', fontsize=fontsize_legend, shadow=True)
     ax4.legend(    loc='best', fontsize=fontsize_legend, shadow=True)
 
-    if not(tail_flag): 
+    if not(tail_flag):
         ax1.legend(loc='best', fontsize=fontsize_legend, shadow=True)
         ax3.legend(loc='best', fontsize=fontsize_legend, shadow=True)
         ax1.set_xlim(ax3.get_xlim())
@@ -1466,7 +2267,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     ax3.errorbar(t_cut - t_peak, np.zeros(len(NR_i_cut)), yerr=np.array(NR_i_err_cut),                               c=color_NR, lw=lw_small, alpha=alpha_std, ls='-', capsize=0.15)
 
     for perc in [50, 5, 95]:
-    
+
         wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
         wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
         wf_amp, wf_phi = waveform_utils.amp_phase_from_re_im(wf_r, wf_i)
@@ -1493,7 +2294,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
     ax3.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
     ax4.set_xlabel(r'$t - t_{peak} \, [\mathrm{M}]$', fontsize=fontsize_labels)
 
-    ax3.set_xlim(ax1.get_xlim())  
+    ax3.set_xlim(ax1.get_xlim())
     ax4.set_xlim(ax2.get_xlim())
     ax1.set_xticklabels([])
     ax2.set_xticklabels([])
@@ -1516,7 +2317,7 @@ def plot_NR_vs_model(NR_sim, template, metadata, results, inference_model, outdi
 
         models_re_list = [np.real(np.array(inference_model.model(p))) for p in results]
         models_im_list = [np.imag(np.array(inference_model.model(p))) for p in results]
-        
+
         for perc in [50, 5, 95]:
             wf_r = np.percentile(np.array(models_re_list),[perc], axis=0)[0]
             wf_i = np.percentile(np.array(models_im_list),[perc], axis=0)[0]
@@ -2019,13 +2820,13 @@ def plot_fancy_reconstruction(NR_sim, template, metadata, results, inference_mod
 def global_corner(x, names, output, truths=None):
 
     """
-    
+
     Create a corner plot of all parameters.
-    
+
     Parameters
     ----------
 
-    x       : dictionary    
+    x       : dictionary
         Dictionary of parameters.
     names   : list
         List of parameter names.
@@ -2049,11 +2850,15 @@ def global_corner(x, names, output, truths=None):
     if len(mask) == 0:
         print('* Skipping corner plot: all samples are constant.')
         return
+    labels  = list(np.array(names)[mask])
+
+    if not(truths is None):
+        truths = [truths[i] for i in mask]
 
     fig = plt.figure(figsize=(10,10))
     C   = corner.corner(samples[:,mask],
                         quantiles     = [0.05, 0.5, 0.95],
-                        labels        = names,
+                        labels        = labels,
                         color         = 'darkred',
                         show_titles   = True,
                         title_kwargs  = {"fontsize": 12},
@@ -2063,6 +2868,17 @@ def global_corner(x, names, output, truths=None):
     plt.savefig(os.path.join(output, 'Plots', 'Results', 'corner.pdf'), bbox_inches='tight')
 
     return
+
+def read_injection_truths(names, NR_sim):
+
+    if not(hasattr(NR_sim, 'injection_truths')) or NR_sim.injection_truths is None:
+        return None
+
+    truths = []
+    for name in names:
+        truths.append(NR_sim.injection_truths.get(name, None))
+
+    return truths
 
 def plot_multiple_psd(psd_data, f_min, f_max, outdir, direction, window):
     """
@@ -2137,7 +2953,7 @@ def plot_psd_and_acf(psd_data, acf_data, asd_filepath, f_min, f_max, outdir, dir
 
         # Load ASD file and convert it to PSD
         freq_file, asd_file = np.loadtxt(asd_filepath, unpack=True)
-        psd_file            = asd_file**2 
+        psd_file            = asd_file**2
 
         save_path = _mismatch_plot_dir(outdir, direction)
 
@@ -2202,7 +3018,7 @@ def plot_psd_and_acf(psd_data, acf_data, asd_filepath, f_min, f_max, outdir, dir
 def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_SX, outdir, direction):
     """
     Plot PSD curves near f_min and f_max in a single figure with two side-by-side subplots.
-    
+
     Parameters:
         psd_data (dict): Dictionary where keys are labels (str) and values are PSD arrays (np.ndarray).
         f_min (float): Minimum frequency.
@@ -2217,15 +3033,7 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_
     """
     try:
 
-        # Determine subfolder based on smoothing direction
-        subfolder = {
-            "below": "Left_smoothing",
-            "above": "Right_smoothing",
-            "below-and-above": "Both_edges_smoothing"
-        }.get(direction, "Unknown_smoothing")
-
-        save_path = os.path.join(outdir, "Algorithm/Mismatch", subfolder)
-        os.makedirs(save_path, exist_ok=True)
+        save_path = _mismatch_plot_dir(outdir, direction)
 
         # Set x-axis limits for zoomed regions
         x_min1, x_max1 = f_min * 0.9, (f_min + window_size_DX)  # Zoom near f_min
@@ -2238,7 +3046,7 @@ def plot_psd_near_fmin_fmax(psd_data, f_min, f_max, window_size_DX, window_size_
         for i, (label, PSD_smoothed) in enumerate(psd_data.items()):
             freq = np.linspace(0, f_max, len(PSD_smoothed))  # Generate frequency axis
             alpha = max(0.3, 1 - (i * 0.15))  # Decrease opacity for different curves
-            
+
             # Identify indices for zoomed regions
             idx_min1, idx_max1 = np.argmin(np.abs(freq - x_min1)), np.argmin(np.abs(freq - x_max1))
             idx_min2, idx_max2 = np.argmin(np.abs(freq - x_min2)), np.argmin(np.abs(freq - x_max2))
@@ -2585,7 +3393,7 @@ def plot_condition_numbers(outdir, condition_numbers, thresholds=(1e3, 1e6)):
     """
     Plot the condition numbers of the ACF Toeplitz matrix as a function of window size for different k values,
     including shaded regions to indicate conditioning quality.
-    
+
     Parameters:
         condition_numbers (dict): Dictionary with keys as (window_size, k) and values as condition numbers.
         outdir (str): Directory to save the plot.
@@ -2667,12 +3475,23 @@ def plot_mismatch_optimal_SNR_condition_number_window_parameters(mismatch_data, 
                 plot_function(data_dict, outdir, direction, M, dL, N_FFT)
 
 def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX_list, window_SX_list, k_list, saturation_DX_list, saturation_SX_list,  outdir, direction):
-    
+
     """
     Loop through all combinations of windowing parameters and plot mismatch (real & imaginary at 50% CI) vs N_FFT.
     """
 
     save_path = _mismatch_plot_dir(outdir, direction)
+    diagnostic_rows = _read_tsv_rows(_mismatch_diagnostics_path(outdir))
+    mismatches_by_run = {}
+    for row in diagnostic_rows:
+        if row.get('diagnostic_type') != 'strain_components':
+            continue
+        if row.get('confidence_interval') != '50':
+            continue
+        mismatch = row.get('mismatch')
+        if mismatch in (None, ''):
+            continue
+        mismatches_by_run[(row.get('run_id'), row.get('strain_data'))] = float(mismatch)
 
     for (window_DX, window_SX, k, satDX, satSX) in product(
         window_DX_list, window_SX_list, k_list, saturation_DX_list, saturation_SX_list
@@ -2682,12 +3501,26 @@ def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX
         nffts_found = []
 
         for N_fft in N_FFT_list:
-            path = _windowed_result_path(
+            run_id = _mismatch_run_id(
+                "strain_components", M, dL, t_start_g_true, N_fft,
+                window_DX, window_SX, k, satDX, satSX, direction
+            )
+            component_mismatches = {
+                'real': mismatches_by_run.get((run_id, 'real')),
+                'imag': mismatches_by_run.get((run_id, 'imag')),
+            }
+            if all(value is not None for value in component_mismatches.values()):
+                nffts_found.append(N_fft)
+                real_mismatches.append(component_mismatches['real'])
+                imag_mismatches.append(component_mismatches['imag'])
+                continue
+
+            legacy_path = _windowed_result_path(
                 outdir, "Mismatch", M, dL, t_start_g_true, N_fft,
                 window_DX, window_SX, k, satDX, satSX
             )
-            if os.path.exists(path):
-                with open(path, "r") as f:
+            if os.path.exists(legacy_path):
+                with open(legacy_path, "r") as f:
                     component_mismatches = {'real': None, 'imag': None}
                     lines = f.readlines()[1:]
                     for line in lines:
@@ -2699,7 +3532,7 @@ def plot_mismatch_vs_NFFT(N_FFT_list, N_points, M, dL, t_start_g_true, window_DX
                         real_mismatches.append(component_mismatches['real'])
                         imag_mismatches.append(component_mismatches['imag'])
             else:
-                print(f"File not found: {os.path.basename(path)}")
+                print(f"No mismatch data found for run_id={run_id}")
 
         if not nffts_found:
             print(f"Skipping: No data for combo wDX={window_DX}, wSX={window_SX}, k={k}, satDX={satDX}, satSX={satSX}")
@@ -2775,7 +3608,7 @@ def run_mismatch_and_SNR_computation(NR_sim, results_object, inference_model, pa
         t_start_g, t_end_g, t_NR_s, NR_length = wf_utils.extract_NR_params(NR_sim, M)
         t_start, t_end = t_start_g * C_mt * M, t_end_g * C_mt * M
 
-        apply_window, compare_TD_FD, clear_directory_flag, C1_flag, mismatch_print_flag, mismatch_section_plot_flag = \
+        apply_window, compare_TD_FD, _, C1_flag, mismatch_print_flag, mismatch_section_plot_flag = \
             wf_utils.extract_flags(parameters['Flags'])
 
         (f_min, f_max, dt, delta_f, N_points, n_FFT_points, asd_path,
@@ -2788,14 +3621,6 @@ def run_mismatch_and_SNR_computation(NR_sim, results_object, inference_model, pa
         n_fft_values = [N_points] if n_FFT_points == 1 else list(
             map(int, np.logspace(np.log10(NR_length), np.log10(2 * N_points), n_FFT_points))
         )
-
-        #---------------------------------------------#
-        # Directory cleanup (optional)
-        #---------------------------------------------#
-        if clear_directory_flag == 1:
-            mismatch_dir = os.path.join(outdir, "Algorithm/Mismatch")
-            for smoothing_path in ["Left_smoothing", "Right_smoothing", "Both_edges_smoothing"]:
-                clear_directory(os.path.join(mismatch_dir, smoothing_path))
 
         #---------------------------------------------#
         # Main iteration loop
@@ -2850,12 +3675,17 @@ def run_mismatch_and_SNR_computation(NR_sim, results_object, inference_model, pa
 
                 compute_mismatch_hplus_hcross(
                     *common_args, t_start_g_true, f_min, f_max, asd_path,
-                    *window_args, mismatch_print_flag, compare_TD_FD
+                    *window_args, mismatch_print_flag, compare_TD_FD, direction=direction
+                )
+
+                compute_nr_comparison_mismatches(
+                    NR_sim, outdir, ACF_truncated_NR, N_fft, M, dL,
+                    t_start_g_true, *window_args, direction=direction
                 )
 
                 compute_optimal_SNR(
                     *common_args, t_start_g_true, t_end_g, f_min, f_max, asd_path,
-                    *window_args, compare_TD_FD
+                    *window_args, compare_TD_FD, direction=direction
                 )
 
                 condition_numbers_data[window_args] = wf_utils.compute_condition_number(ACF_truncated_NR)

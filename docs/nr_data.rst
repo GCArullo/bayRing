@@ -64,11 +64,30 @@ Supported catalogue names in the current parser are:
    * - ``charged_raw``
      - Local raw charged-waveform files
      - Reads raw ``times`` and ``cross`` files from ``NR-data dir``.
-   * - ``fake_NR``
-     - Internal Kerr-QNM synthetic data
-     - Builds a fake NR waveform from metadata and requested injection modes.
+   * - ``injections``
+     - Internal synthetic data
+     - Builds an injection waveform from the selected template and supplied
+       injection parameters.
 
 The default catalogue is ``SXS`` and the default simulation ID is ``0305``.
+
+Synthetic Template Injections
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For ``catalog = injections``, the ``[Injection-data] parameters`` dictionary
+defines the synthetic waveform.  It must include ``t_start``, ``t_end``,
+``dt`` and either ``q`` or both ``m1`` and ``m2``.  Kerr-like templates
+(``Damped-sinusoids``, ``Kerr`` and ``Kerr-Damped-sinusoids``) also require
+``Mf`` and ``af``.  NR-informed templates (``KerrBinary`` and ``TEOBPM``)
+derive ``Mf`` and ``af`` from the binary parameters through the same remnant
+fits used by pyRing injections, so those entries must not be supplied
+independently.
+
+The remaining entries use the same parameter names as the selected
+``[Model] template``.  For example, ``Damped-sinusoids`` accepts names such as
+``ln_A_0``, ``phi_0``, ``f_0`` and ``tau_0``; ``KerrBinary`` accepts ``phi``;
+and ``TEOBPM`` accepts ``phi_mrg_22`` plus local fit coefficients when global
+fits are disabled.
 
 Local Data Paths
 ~~~~~~~~~~~~~~~~
@@ -101,6 +120,12 @@ Carullo2024 metadata variables. ``fits-file`` supplies fit coefficients for cali
 templates such as some ``TEOBPM`` workflows. Empty strings are treated as no
 file supplied.
 
+For ``TEOBPM``, these files are calibration-workflow inputs. The intended
+production model is a stand-alone pyRing post-merger TEOB waveform for
+real-data parameter estimation, so any NR-derived quantity read from these
+files during local SXS fits must either be calibration-only or become available
+from an internal pyRing global fit before it is used in final real-data runs.
+
 Multipole Selection
 ~~~~~~~~~~~~~~~~~~~
 
@@ -116,6 +141,32 @@ The selected ``(l-NR, m)`` is the spherical-harmonic multipole read from the NR
 data. It does not force every model QNM to have the same ``l``. In the Kerr
 template, multiple spheroidal QNMs with the same azimuthal index can contribute
 to the selected spherical multipole.
+
+Several NR multipoles can be fitted from one configuration. Either pass paired
+lists to ``l-NR`` and ``m``:
+
+.. code-block:: ini
+
+   [NR-data]
+   l-NR = 2,3,4
+   m = 2,3,4
+
+or pass explicit pairs with ``NR-modes``:
+
+.. code-block:: ini
+
+   [NR-data]
+   NR-modes = [(2,2),(3,3),(4,4)]
+
+Compact mode tokens such as ``NR-modes = 22,33,4-4`` are also accepted. When
+several modes are supplied, bayRing repeats the analysis for each mode and
+writes mode-dependent products below ``outdir/mode_l<l>_m<m>/``. Set
+``n-mode-workers`` in ``[Inference]`` to run multiple mode fits concurrently.
+Multi-mode scans also write a summed higher-mode mismatch under
+``outdir/HM_sum/Algorithm/Mismatch/``. Its inclination grid is controlled by
+``[Mismatch-GW-parameters] inclination``; its polarisation treatment defaults to
+the marginalised ``polarisation = 0:3*pi/4:pi/4`` grid, or to one fixed angle if
+``polarisation`` is set to a scalar.
 
 For informed-amplitude fits using the ``(2,2)`` peak time as reference, provide
 the time of the ``(2,2)`` peak:
@@ -247,22 +298,32 @@ Catalogue-dependent options include:
        available. For ``RWZ-env``, compare against the next lower available
        ``RL`` file.
    * - ``gaussian-X``
-     - For ``fake_NR``, set a Gaussian-noise scale ``X``.
+     - For ``injections``, set a Gaussian-noise scale ``X``.
    * - ``from-SXS-NR``
-     - For ``fake_NR``, reuse the SXS-derived error vector.
+     - For ``injections``, reuse the SXS-derived error vector.
 
 Mismatch-alignment options use:
 
 .. code-block:: ini
 
    [NR-data]
-   error-t-min = 0.3
-   error-t-max = 0.004
+   error-t-min = 0.0
+   error-t-max = 30.0
 
-The implementation converts these fractional inputs using the peak time:
+The default values align over ``[0,30]M`` after the peak. When both values are
+in ``[0,1]``, the implementation keeps the legacy fractional pre-peak
+convention:
 
 .. math::
 
    t_{\min}^{\mathrm{mm}} = t_{\mathrm{peak}}(1 - \mathrm{error\mbox{-}t\mbox{-}min}),
    \qquad
    t_{\max}^{\mathrm{mm}} = t_{\mathrm{peak}}(1 - \mathrm{error\mbox{-}t\mbox{-}max}).
+
+Otherwise the values are interpreted as offsets from the peak time:
+
+.. math::
+
+   t_{\min}^{\mathrm{mm}} = t_{\mathrm{peak}} + \mathrm{error\mbox{-}t\mbox{-}min},
+   \qquad
+   t_{\max}^{\mathrm{mm}} = t_{\mathrm{peak}} + \mathrm{error\mbox{-}t\mbox{-}max}.

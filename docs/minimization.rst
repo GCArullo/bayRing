@@ -20,6 +20,7 @@ The minimization path is selected in ``[Inference]``:
    min-method = trf
    min-iter-max = 1000
    n-random-seeds = 16
+   point-estimate-posterior-samples = 0
 
 Allowed ``min-method`` values are ``trf`` and ``dogbox``, passed to
 ``scipy.optimize.least_squares``.
@@ -66,6 +67,9 @@ Important minimization controls are:
 * **min-iter-max:** maximum number of solver iterations.
 * **n-random-seeds:** number of starting points tried before keeping the
   best result.
+* **point-estimate-posterior-samples:** number of optional Gaussian samples
+  drawn from the local covariance. The default ``0`` skips
+  ``Algorithm/posterior.dat``.
 * **\*-start prior entries:** explicit starting values for selected free
   parameters.
 
@@ -97,12 +101,20 @@ Minimization runs write point-estimate products compatible with the usual
 post-processing path:
 
 * **Point estimates:** best-fit parameter values and local uncertainties.
-* **Synthetic posterior samples:** Gaussian approximations used by plotting
-  utilities.
+* **Synthetic posterior samples:** optional Gaussian approximations written
+  only when ``point-estimate-posterior-samples > 0``.
+* **Prior-bound railing flags:** ``Algorithm/Parameters_prior_railing.txt``
+  uses the synthetic posterior samples when present. For point-estimate-only
+  outputs, it flags best-fit values close to the configured prior bounds.
 * **Waveform reconstructions:** fitted waveform and residual plots when
   plotting is enabled.
 * **Mismatch/SNR diagnostics:** available through the same diagnostic switches
   used by other methods.
+
+When ``point-estimate-posterior-samples = 0``, parameter summaries are printed
+from the point estimate. Waveform intervals are built from the central
+point-estimate parameters and one-at-a-time ``+/- 1 sigma`` parameter
+perturbations.
 
 Validation Checklist
 ~~~~~~~~~~~~~~~~~~~~
