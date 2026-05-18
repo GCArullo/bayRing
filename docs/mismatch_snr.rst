@@ -127,6 +127,60 @@ The optimal SNR diagnostic is:
    \rho_{\mathrm{opt}} =
    \sqrt{(h,h)}.
 
+Summed Higher-Mode Mismatches
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For multi-mode scans, bayRing can also compute a detector-projected mismatch
+after summing the fitted NR multipoles into one waveform. The recomposition
+uses the standard spin-weighted spherical-harmonic convention:
+
+.. math::
+
+   h_+ - i h_\times =
+   \sum_{\ell,m} h_{\ell m}\,{}_{-2}Y_{\ell m}(\iota,\varphi_0).
+
+The detector strain is then built as:
+
+.. math::
+
+   h_{\mathrm{det}} = F_+(\alpha,\delta,\psi) h_+
+   + F_\times(\alpha,\delta,\psi) h_\times,
+
+using the same sky position inputs already present in
+``[Mismatch-GW-parameters]``. The source-frame azimuth ``azimuth`` sets
+``\varphi_0``. The inclination grid is controlled by ``inclination`` and
+defaults to ``0:pi:pi/4``.
+
+The summed-HM mismatch is marginalised over polarisation by default. In this
+diagnostic that means bayRing evaluates the mismatch over the configured
+``polarisation`` samples and reports the minimum mismatch; the ``psi`` column in
+the output file records the selected polarisation angle. The default grid is
+``0:3*pi/4:pi/4``, covering the independent ``[0,\pi)`` polarisation domain at
+``\pi/4`` spacing. Pass a scalar to compute one fixed-polarisation value:
+
+.. code-block:: ini
+
+   [Mismatch-GW-parameters]
+   polarisation = 2.659
+
+The American spelling ``polarization`` is accepted as an alias.
+
+If only positive-``m`` modes are provided, ``hm-include-negative-m = 1`` fills
+the missing partners with the usual non-precessing symmetry
+``h_{l,-m}=(-1)^l h^*_{lm}``. Set it to ``0`` for generic mode sets where this
+symmetry should not be assumed.
+
+The summed-HM diagnostics are written under:
+
+.. code-block:: text
+
+   outdir/HM_sum/Algorithm/Mismatch/
+
+with one subdirectory per start time when the same configuration also scans
+``t-start``. They use the same ``mismatch_and_snr_diagnostics.tsv`` and
+``mismatch_and_snr_diagnostic_parameters.tsv`` layout described below, with
+``diagnostic_type = higher_mode_sum``.
+
 Percentile Waveforms
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -139,28 +193,47 @@ percentiles and plot percentiles from ``bayRing.postprocess``:
    summary_percentiles = (5, 50, 95)
    plot_percentiles = (50,)
 
-For point-estimate methods, ``bayRing`` writes a Gaussian approximation to
-``Algorithm/posterior.dat`` so the same percentile-based machinery can be used.
+For point-estimate methods with ``point-estimate-posterior-samples = 0``,
+``bayRing`` builds waveform percentiles from the central point estimate and
+one-at-a-time ``+/- 1 sigma`` parameter perturbations. Positive
+``point-estimate-posterior-samples`` values also write a Gaussian approximation
+to ``Algorithm/posterior.dat`` for diagnostic use.
 
 Output Files
 ~~~~~~~~~~~~
 
-Mismatch and SNR text files are written under:
+Mismatch and SNR tables are written under:
 
 .. code-block:: text
 
    outdir/Algorithm/Mismatch/
 
-File names encode mass, distance, start time, window settings and FFT length,
-for example:
+The mismatch writer does not delete previous diagnostics. Re-running the same
+settings updates rows with the same ``run_id``; different settings append rows
+with a different ``run_id``.
+
+The main mismatch and SNR value table is:
 
 .. code-block:: text
 
-   Mismatch_M_60_dL_410_t_s_30.0M_wDX_0.8Hz_wSX_0.8Hz_k_7.0_satDX_1.0_satSD_1.0_NFFT_4096.txt
-   Optimal_SNR_M_60_dL_410_t_s_30.0M_wDX_0.8Hz_wSX_0.8Hz_k_7.0_satDX_1.0_satSD_1.0_NFFT_4096.txt
+   outdir/Algorithm/Mismatch/mismatch_and_snr_diagnostics.tsv
 
-Each file stores confidence interval or percentile labels, the strain
-component and the corresponding mismatch or SNR value.
+It stores one row per ``run_id``, confidence interval and strain component,
+with ``mismatch``, ``optimal_snr`` and ``optimal_snr_fd`` columns. The
+frequency-domain SNR column is left empty unless that diagnostic was actually
+computed; no separate header-only FD file is created.
+
+The run settings live in:
+
+.. code-block:: text
+
+   outdir/Algorithm/Mismatch/mismatch_and_snr_diagnostic_parameters.tsv
+
+That table maps each short ``run_id`` to explicit columns such as
+``remnant_mass_solar_masses``, ``luminosity_distance_mpc``, ``start_time_M``,
+``n_fft``, ``low_frequency_window_hz``, ``high_frequency_window_hz``,
+``smoothing_steepness``, ``low_frequency_saturation`` and
+``high_frequency_saturation``.
 
 Sanity Plots
 ~~~~~~~~~~~~
@@ -179,6 +252,10 @@ Depending on the smoothing direction, plots are placed under one of:
    Algorithm/Mismatch/Left_smoothing/
    Algorithm/Mismatch/Right_smoothing/
    Algorithm/Mismatch/Both_edges_smoothing/
+
+Only the directory matching the configured ``direction`` is created for a run.
+The other smoothing-direction directories are not created unless a run actually
+writes plots for those directions.
 
 These plots are useful when tuning window widths, steepness, saturation and
 FFT length. Inspect them whenever changing PSD settings; a numerically smooth

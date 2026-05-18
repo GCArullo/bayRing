@@ -318,7 +318,7 @@ TEOBPM
    TEOB-global-fit = 1
    TEOB-merger-data = 0
 
-``TEOB-template`` can be:
+``TEOB-template`` selects the post-merger template branch:
 
 .. list-table::
    :header-rows: 1
@@ -327,10 +327,15 @@ TEOBPM
    * - Value
      - Meaning
    * - ``HypTan``
-     - Hyperbolic-tangent amplitude template for quasi-circular TEOBPM fits.
+     - Hyperbolic-tangent amplitude template.
    * - ``RatExp``
-     - Rational-exponential amplitude template used for noncircular TEOBPM
-       fits.
+     - Rational-exponential amplitude template.
+
+The production target for ``TEOBPM`` is a stand-alone post-merger TEOB model
+usable by pyRing parameter estimation on real detector data with no NR inputs.
+NR files may be used while calibrating the model against simulations, but every
+NR-derived quantity that affects the runtime waveform must ultimately be
+provided by an internal or packaged pyRing global fit.
 
 ``TEOB-global-fit`` controls whether TEOB calibration coefficients come from
 global fits or are sampled locally:
@@ -347,6 +352,7 @@ global fits or are sampled locally:
        coefficients through ``[NR-data] fits-file``.
    * - ``0``
      - Sample local amplitude and phase calibration coefficients.
+       This is a calibration mode, not the intended final real-data PE path.
 
 ``TEOB-merger-data`` controls the peak quantities used by TEOBPM:
 
@@ -361,7 +367,10 @@ global fits or are sampled locally:
    * - ``1``
      - Use NR merger peak quantities from ``[NR-data] properties-file``.
        ``RatExp`` runs require this option and the corresponding NR merger
-       metadata.
+       peak metadata, because the ansatz uses the second derivative of the
+       peak amplitude. This is acceptable for SXS local fits that generate
+       calibration labels; a final real-data pyRing run must obtain the needed
+       peak quantities from global fits instead of an NR properties table.
 
 For all TEOBPM runs, the merger phase for the fitted multipole is sampled:
 

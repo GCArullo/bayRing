@@ -1,11 +1,317 @@
-import ast, json, os, sys
+import ast, json, math, os, re, shutil, subprocess, sys
 try:                import configparser
 except ImportError: import ConfigParser as configparser
 
 import pyRing.utils    as pyRing_utils
 from pyRing.initialise import store_git_info
 
-def set_output(outdir, screen_output, method, config_file, run_type):
+def _clean_float(value):
+
+    value = float(value)
+    if(abs(value) < 1e-12): value = 0.0
+    return float("{:.12g}".format(value))
+
+def parse_start_time_values(raw_value):
+
+    """
+
+    Parse the `t-start` configuration value.
+
+    Accepted forms are:
+    - a scalar value, e.g. `30.0`;
+    - a comma-separated or Python-style list/tuple, e.g. `20,30,40`;
+    - an inclusive colon range, e.g. `20:40:5`.
+
+    """
+
+    raw_value = str(raw_value).strip()
+    if(raw_value == ''):
+        raise ValueError("The `t-start` option cannot be empty.")
+
+    if(':' in raw_value):
+        range_values = [value.strip() for value in raw_value.split(':')]
+        if(len(range_values) != 3):
+            raise ValueError("Invalid `t-start` range `{}`. Use `start:stop:step`.".format(raw_value))
+
+        start, stop, step = [_clean_float(value) for value in range_values]
+        if(step == 0.0):
+            raise ValueError("Invalid `t-start` range `{}`. The step cannot be zero.".format(raw_value))
+        if((stop - start)*step < 0.0):
+            raise ValueError("Invalid `t-start` range `{}`. The step sign must move from start to stop.".format(raw_value))
+
+        values  = []
+        current = start
+        tol     = abs(step)*1e-10 + 1e-12
+        if(step > 0.0):
+            while(current <= stop + tol):
+                values.append(_clean_float(current))
+                current = current + step
+        else:
+            while(current >= stop - tol):
+                values.append(_clean_float(current))
+                current = current + step
+    else:
+        try:
+            literal_value = ast.literal_eval(raw_value)
+        except (ValueError, SyntaxError):
+            literal_value = raw_value
+
+        if(isinstance(literal_value, (list, tuple))):
+            values = [_clean_float(value) for value in literal_value]
+        else:
+            values = [_clean_float(literal_value)]
+
+    if(len(values) == 0):
+        raise ValueError("The `t-start` option must provide at least one value.")
+    if(len(set(values)) != len(values)):
+        raise ValueError("The `t-start` option contains duplicate values: {}.".format(values))
+
+    return values
+
+def _clean_int(value):
+
+    value = float(value)
+    if not(value.is_integer()):
+        raise ValueError("Expected an integer value, got `{}`.".format(value))
+
+    return int(value)
+
+def _safe_numeric_value(raw_value):
+
+    node = ast.parse(str(raw_value).strip(), mode='eval')
+    allowed_names = {'pi': math.pi}
+    allowed_binops = (ast.Add, ast.Sub, ast.Mult, ast.Div)
+    allowed_unaryops = (ast.UAdd, ast.USub)
+
+    def evaluate(subnode):
+        if isinstance(subnode, ast.Expression):
+            return evaluate(subnode.body)
+        if isinstance(subnode, ast.Constant) and isinstance(subnode.value, (int, float)):
+            return float(subnode.value)
+        if isinstance(subnode, ast.Name) and subnode.id in allowed_names:
+            return allowed_names[subnode.id]
+        if isinstance(subnode, ast.UnaryOp) and isinstance(subnode.op, allowed_unaryops):
+            value = evaluate(subnode.operand)
+            return value if isinstance(subnode.op, ast.UAdd) else -value
+        if isinstance(subnode, ast.BinOp) and isinstance(subnode.op, allowed_binops):
+            left, right = evaluate(subnode.left), evaluate(subnode.right)
+            if isinstance(subnode.op, ast.Add): return left + right
+            if isinstance(subnode.op, ast.Sub): return left - right
+            if isinstance(subnode.op, ast.Mult): return left * right
+            if isinstance(subnode.op, ast.Div): return left / right
+        raise ValueError("Invalid numeric expression `{}`.".format(raw_value))
+
+    return evaluate(node)
+
+def parse_angle_values(raw_value, option_name='inclination'):
+
+    raw_value = str(raw_value).strip()
+    if(raw_value == ''):
+        raise ValueError("The {} option cannot be empty.".format(option_name))
+
+    if(':' in raw_value):
+        range_values = [value.strip() for value in raw_value.split(':')]
+        if(len(range_values) != 3):
+            raise ValueError("Invalid {} range `{}`. Use `start:stop:step`.".format(option_name, raw_value))
+
+        start, stop, step = [_safe_numeric_value(value) for value in range_values]
+        values = parse_start_time_values("{}:{}:{}".format(start, stop, step))
+    else:
+        try:
+            literal_value = ast.literal_eval(raw_value)
+        except (ValueError, SyntaxError):
+            literal_value = raw_value
+
+        if(isinstance(literal_value, (list, tuple))):
+            values = [_clean_float(_safe_numeric_value(value)) for value in literal_value]
+        else:
+            values = [_clean_float(_safe_numeric_value(value)) for value in str(raw_value).split(',')]
+
+    if(len(values) == 0):
+        raise ValueError("The {} option must provide at least one value.".format(option_name))
+    if(len(set(values)) != len(values)):
+        raise ValueError("The {} option contains duplicate values: {}.".format(option_name, values))
+
+    return values
+
+def parse_int_values(raw_value, option_name):
+
+    raw_value = str(raw_value).strip()
+    if(raw_value == ''):
+        raise ValueError("The `{}` option cannot be empty.".format(option_name))
+
+    if(':' in raw_value):
+        values = [_clean_int(value) for value in parse_start_time_values(raw_value)]
+    else:
+        try:
+            literal_value = ast.literal_eval(raw_value)
+        except (ValueError, SyntaxError):
+            literal_value = raw_value
+
+        if(isinstance(literal_value, (list, tuple))):
+            values = [_clean_int(value) for value in literal_value]
+        else:
+            values = [_clean_int(value) for value in str(raw_value).split(',')]
+
+    if(len(values) == 0):
+        raise ValueError("The `{}` option must provide at least one value.".format(option_name))
+
+    return values
+
+def _parse_compact_nr_mode(token):
+
+    match = re.fullmatch(r'([1-9]\d*)([+-]?\d+)', token.strip())
+    if(match is None):
+        raise ValueError("Invalid compact NR mode `{}`. Use e.g. `22`, `3-3`, or Python pairs like `(2, 2)`.".format(token))
+
+    return (int(match.group(1)), int(match.group(2)))
+
+def _normalise_nr_mode_pairs(raw_modes):
+
+    modes = []
+    for mode in raw_modes:
+        if(isinstance(mode, str)):
+            modes.append(_parse_compact_nr_mode(mode))
+        elif(isinstance(mode, (list, tuple)) and len(mode) == 2):
+            modes.append((_clean_int(mode[0]), _clean_int(mode[1])))
+        else:
+            raise ValueError("Invalid NR mode `{}`. Use `(l, m)` pairs.".format(mode))
+
+    return modes
+
+def parse_nr_mode_values(raw_value):
+
+    raw_value = str(raw_value).strip()
+    if(raw_value == ''):
+        raise ValueError("The `NR-modes` option cannot be empty.")
+
+    try:
+        literal_value = ast.literal_eval(raw_value)
+    except (ValueError, SyntaxError):
+        literal_value = raw_value
+
+    if(isinstance(literal_value, (list, tuple))):
+        if(len(literal_value) == 2 and all(isinstance(value, (int, float)) for value in literal_value)):
+            modes = _normalise_nr_mode_pairs([literal_value])
+        else:
+            modes = _normalise_nr_mode_pairs(literal_value)
+    else:
+        modes = _normalise_nr_mode_pairs([token for token in str(raw_value).split(',') if token.strip()])
+
+    return validate_nr_mode_values(modes)
+
+def nr_mode_values_from_l_m(l_values, m_values):
+
+    if(len(l_values) == 1 and len(m_values) > 1):
+        modes = [(l_values[0], m_value) for m_value in m_values]
+    elif(len(m_values) == 1 and len(l_values) > 1):
+        modes = [(l_value, m_values[0]) for l_value in l_values]
+    elif(len(l_values) == len(m_values)):
+        modes = list(zip(l_values, m_values))
+    else:
+        raise ValueError("When `NR-modes` is not set, `l-NR` and `m` must be scalars, equal-length lists, or one scalar plus one list.")
+
+    return validate_nr_mode_values(modes)
+
+def validate_nr_mode_values(modes):
+
+    if(len(modes) == 0):
+        raise ValueError("At least one NR mode must be provided.")
+
+    normalised_modes = []
+    for l_value, m_value in modes:
+        l_value, m_value = int(l_value), int(m_value)
+        if(l_value < 2):
+            raise ValueError("Invalid NR mode ({}, {}). The spherical index l must be at least 2.".format(l_value, m_value))
+        if(abs(m_value) > l_value):
+            raise ValueError("Invalid NR mode ({}, {}). The condition |m| <= l is required.".format(l_value, m_value))
+        normalised_modes.append((l_value, m_value))
+
+    if(len(set(normalised_modes)) != len(normalised_modes)):
+        raise ValueError("The NR mode list contains duplicate values: {}.".format(normalised_modes))
+
+    return normalised_modes
+
+def format_start_time_label(t_start):
+
+    label = "{:.12g}".format(float(t_start))
+    label = label.replace('-', 'm').replace('+', '').replace('.', 'p')
+
+    return "t_start_{}M".format(label)
+
+def start_time_output_dir(base_outdir, t_start):
+
+    return os.path.join(base_outdir, format_start_time_label(t_start))
+
+def format_nr_mode_label(l_value, m_value):
+
+    m_label = str(int(m_value)).replace('-', 'm')
+
+    return "mode_l{}_m{}".format(int(l_value), m_label)
+
+def nr_mode_output_dir(base_outdir, nr_mode):
+
+    return os.path.join(base_outdir, format_nr_mode_label(*nr_mode))
+
+def get_start_time_values(parameters):
+
+    return list(parameters['Inference'].get('t-start-list', [parameters['Inference']['t-start']]))
+
+def get_nr_mode_values(parameters):
+
+    return list(parameters['NR-data'].get('NR-mode-list', [(parameters['NR-data']['l-NR'], parameters['NR-data']['m'])]))
+
+def _copy_config_to_output(config_file, outdir, run_type):
+
+    try:
+        if(run_type == 'full' and config_file is not None):
+            shutil.copy2(config_file, outdir)
+    except: pass
+
+    return
+
+def _redirect_output(outdir, screen_output):
+
+    if not(screen_output):
+        sys.stdout = open(os.path.join(outdir,'stdout_bayRing.txt'), 'w')
+        sys.stderr = open(os.path.join(outdir,'stderr_bayRing.txt'), 'w')
+
+    return
+
+def _is_git_repository():
+
+    try:
+        return subprocess.call(['git', 'rev-parse', '--is-inside-work-tree'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
+    except OSError:
+        return False
+
+def _store_git_info(outdir):
+
+    if not(_is_git_repository()):
+        print("The current directory is not a git repository. Git info will not be stored.")
+        return
+
+    store_git_info(outdir)
+
+    return
+
+def set_shared_output(outdir, screen_output, config_file, run_type):
+
+    """
+
+    Set output files that are shared by all start times in a scan.
+
+    """
+
+    if not os.path.exists(outdir): os.makedirs(outdir)
+
+    _redirect_output(outdir, screen_output)
+    _store_git_info(outdir)
+    _copy_config_to_output(config_file, outdir, run_type)
+
+    return
+
+def set_output(outdir, screen_output, method, config_file, run_type, shared_files=True, redirect_streams=True):
 
     """
 
@@ -40,16 +346,12 @@ def set_output(outdir, screen_output, method, config_file, run_type):
     if not os.path.exists(os.path.join(outdir,'Plots','Results')):     os.makedirs(os.path.join(outdir,'Plots','Results'))
     if not os.path.exists(os.path.join(outdir,'Plots','Comparisons')): os.makedirs(os.path.join(outdir,'Plots','Comparisons'))
 
-    if not(screen_output):
-        sys.stdout = open(os.path.join(outdir,'stdout_bayRing.txt'), 'w')
-        sys.stderr = open(os.path.join(outdir,'stderr_bayRing.txt'), 'w')
+    if(redirect_streams):
+        _redirect_output(outdir, screen_output)
 
-    store_git_info(outdir)
-
-    try:
-        if (run_type=='full'):
-            os.system('cp {} {}/.'.format(config_file, outdir))
-    except: pass
+    if(shared_files):
+        _store_git_info(outdir)
+        _copy_config_to_output(config_file, outdir, run_type)
 
     return
 
@@ -100,9 +402,10 @@ def read_config(Config):
         'pert-order'       : 'lin', 
         'l-NR'             : 2,
         'm'                : 2,
-        'error'            : 'align-with-mismatch-res-only',
-        'error-t-min'      : 3e-1,
-        'error-t-max'      : 4e-3,
+        'NR-modes'         : '',
+        'error'            : 'align-with-mismatch-all',
+        'error-t-min'      : 0.0,
+        'error-t-max'      : 30.0,
         'add-const'        : '0.0,0.0',
         'properties-file'  : '',
         'fits-file'        : '',
@@ -116,6 +419,7 @@ def read_config(Config):
         'times'            : 'from-SXS-NR',
         'noise'            : None,
         'tail'             : 0.0,
+        'parameters'       : '',
         },
 
         'Model':
@@ -128,6 +432,7 @@ def read_config(Config):
         'Kerr-tail'                        : 0            ,
         'Kerr-tail-modes'                  : '22'         ,
         'KerrBinary-version'               : 'London2018' ,
+        'KerrBinary-final-state-nc-version': ''           ,
         'KerrBinary-amplitudes-nc-version' : ''           ,
         'TEOB-template'                    : 'HypTan'     ,
         'TEOB-global-fit'                  : 1            ,
@@ -144,6 +449,8 @@ def read_config(Config):
         'seed'             : 1234            ,
         'nnest'            : 1               ,
         'nensemble'        : 1               ,
+        'n-start-time-workers': 1            ,
+        'n-mode-workers'   : 1               ,
 
         't-start'          : 20.0 ,
         't-end'            : 140.0,
@@ -152,6 +459,7 @@ def read_config(Config):
         'min-method'       : 'trf',
         'min-iter-max'     : 1000,
         'n-random-seeds'   : 16  ,
+        'point-estimate-posterior-samples': 0,
         'linear-inversion-eigenvalue-tol': 1e-10,
         },
 
@@ -185,7 +493,11 @@ def read_config(Config):
         'dL'                   : 410    ,
         'ra'                   : 1.375  ,
         'dec'                  : -0.2108,
-        'psi'                  : 2.659
+        'psi'                  : 2.659  ,
+        'azimuth'              : 0.0    ,
+        'inclination'          : '0:pi:pi/4',
+        'polarisation'         : '0:3*pi/4:pi/4',
+        'hm-include-negative-m': 1
         },
 
         'Flags': 
@@ -196,19 +508,50 @@ def read_config(Config):
         'compare_TD_FD'                : 0,
         'mismatch_print_flag'          : 0,
         'mismatch_section_plot_flag'   : 0,
+        'compute_hm_mismatch'          : 1,
         }
 
     }
+    if Config.has_option('Injection-data', 'Kerr-parameters'):
+        raise ValueError(
+            "[Injection-data] Kerr-parameters is no longer supported. "
+            "Use [Injection-data] parameters with the current parameter names."
+        )
+
     #General input read.
     for parameters_section in parameters.keys():
 
         pyRing_utils.print_subsection(f'[{parameters_section}]')
 
         try:
-            for key in parameters[parameters_section].keys():
+            for key in list(parameters[parameters_section].keys()):
                 keytype = type(parameters[parameters_section][key])
-                try                                                     : parameters[parameters_section][key] = keytype(Config.get(parameters_section, key))
-                except (KeyError, configparser.NoOptionError, TypeError): pass
+                try:
+                    if(parameters_section == 'Mismatch-GW-parameters' and key == 'polarisation' and Config.has_option(parameters_section, 'polarization') and not(Config.has_option(parameters_section, key))):
+                        raw_value = Config.get(parameters_section, 'polarization')
+                    else:
+                        raw_value = Config.get(parameters_section, key)
+                    if(parameters_section == 'Inference' and key == 't-start'):
+                        t_start_values = parse_start_time_values(raw_value)
+                        parameters[parameters_section][key] = t_start_values[0]
+                        parameters[parameters_section]['t-start-list'] = t_start_values
+                    elif(parameters_section == 'NR-data' and key in ['l-NR', 'm']):
+                        mode_index_values = parse_int_values(raw_value, key)
+                        parameters[parameters_section][key] = mode_index_values[0]
+                        parameters[parameters_section]['{}-list'.format(key)] = mode_index_values
+                    elif(parameters_section == 'NR-data' and key == 'NR-modes'):
+                        if(str(raw_value).strip() != ''):
+                            nr_mode_values = parse_nr_mode_values(raw_value)
+                            parameters[parameters_section][key] = raw_value
+                            parameters[parameters_section]['NR-mode-list'] = nr_mode_values
+                    elif(parameters_section == 'Mismatch-GW-parameters' and key in ['inclination', 'polarisation']):
+                        angle_values = parse_angle_values(raw_value, key)
+                        parameters[parameters_section][key] = raw_value
+                        parameters[parameters_section]['{}-list'.format(key)] = angle_values
+                    else:
+                        parameters[parameters_section][key] = keytype(raw_value)
+                except (KeyError, configparser.NoOptionError, TypeError):
+                    pass
 
                 # Other reading options
                 # if   ('ds-modes'        in key): parameters[parameters_section][key] = json.loads(      Config.get(parameters_section, f'{key}')) # dict
@@ -216,8 +559,43 @@ def read_config(Config):
                 # elif ('Kerr-tail-modes' in key): parameters[parameters_section][key] = eval(            Config.get(parameters_section, f'{key}')) # list
                 # elif ('mode'            in key): parameters[parameters_section][key] = ast.literal_eval(Config.get(parameters_section,    key  )) # lists
                     
-                print("{name} : {value}".format(name=key.ljust(max_len_keyword), value=parameters[parameters_section][key]))
+                print_value = parameters[parameters_section][key]
+                if(parameters_section == 'Inference' and key == 't-start'):
+                    print_value = parameters[parameters_section].get('t-start-list', [parameters[parameters_section][key]])
+                    if(len(print_value) == 1): print_value = print_value[0]
+                if(parameters_section == 'NR-data' and key in ['l-NR', 'm']):
+                    print_value = parameters[parameters_section].get('{}-list'.format(key), [parameters[parameters_section][key]])
+                    if(len(print_value) == 1): print_value = print_value[0]
+                if(parameters_section == 'NR-data' and key == 'NR-modes'):
+                    print_value = parameters[parameters_section].get('NR-mode-list', parameters[parameters_section][key])
+                if(parameters_section == 'Mismatch-GW-parameters' and key in ['inclination', 'polarisation']):
+                    print_value = parameters[parameters_section].get('{}-list'.format(key), parameters[parameters_section][key])
+                    if(isinstance(print_value, list) and len(print_value) == 1): print_value = print_value[0]
+                print("{name} : {value}".format(name=key.ljust(max_len_keyword), value=print_value))
         except (KeyError, configparser.NoSectionError, configparser.NoOptionError, TypeError): pass
+
+    if('t-start-list' not in parameters['Inference']):
+        parameters['Inference']['t-start-list'] = [float(parameters['Inference']['t-start'])]
+    if(parameters['Inference']['n-start-time-workers'] < 1):
+        raise ValueError("Invalid start-time parallelization option: `n-start-time-workers` must be at least 1.")
+    if(parameters['Inference']['n-mode-workers'] < 1):
+        raise ValueError("Invalid mode parallelization option: `n-mode-workers` must be at least 1.")
+    if(parameters['Inference']['point-estimate-posterior-samples'] < 0):
+        raise ValueError("Invalid point-estimate posterior option: `point-estimate-posterior-samples` must be non-negative.")
+
+    if('NR-mode-list' not in parameters['NR-data']):
+        l_values = parameters['NR-data'].get('l-NR-list', [parameters['NR-data']['l-NR']])
+        m_values = parameters['NR-data'].get('m-list', [parameters['NR-data']['m']])
+        parameters['NR-data']['NR-mode-list'] = nr_mode_values_from_l_m(l_values, m_values)
+    parameters['NR-data']['l-NR'], parameters['NR-data']['m'] = parameters['NR-data']['NR-mode-list'][0]
+
+    if('inclination-list' not in parameters['Mismatch-GW-parameters']):
+        parameters['Mismatch-GW-parameters']['inclination-list'] = parse_angle_values(parameters['Mismatch-GW-parameters']['inclination'], 'inclination')
+    if(Config.has_option('Mismatch-GW-parameters', 'polarization') and not(Config.has_option('Mismatch-GW-parameters', 'polarisation'))):
+        parameters['Mismatch-GW-parameters']['polarisation'] = Config.get('Mismatch-GW-parameters', 'polarization')
+        parameters['Mismatch-GW-parameters']['polarisation-list'] = parse_angle_values(parameters['Mismatch-GW-parameters']['polarisation'], 'polarisation')
+    if('polarisation-list' not in parameters['Mismatch-GW-parameters']):
+        parameters['Mismatch-GW-parameters']['polarisation-list'] = parse_angle_values(parameters['Mismatch-GW-parameters']['polarisation'], 'polarisation')
 
     # Cleanup specific parameters formatting
     if(parameters['Inference']['sampler'] == 'raynest'):
@@ -243,6 +621,11 @@ def read_config(Config):
     else                                                                                                : parameters['Model']['charge'] = 0
 
     if not(parameters['NR-data']['add-const']==None): parameters['NR-data']['add-const'] = [float(value) for value in parameters['NR-data']['add-const'].split(',')]
+    injection_parameters = parameters['Injection-data']['parameters']
+    if not(injection_parameters==''):
+        parameters['Injection-data']['parameters'] = ast.literal_eval(injection_parameters)
+    else:
+        parameters['Injection-data']['parameters'] = None
 
     if ((parameters['Model']['template']=='KerrBinary' or parameters['Model']['template']=='TEOBPM') and not(parameters['NR-data']['l-NR']==2 and parameters['NR-data']['m']==2) and parameters['NR-data']['t-peak-22']==0.0): raise ValueError("The time of the peak of the 22 mode must be provided for the KerrBinary and TEOBPM models when fitting the HMs, to correctly rescale the NR-calibrated quantities.")
 
@@ -302,7 +685,7 @@ A dot is present at the end of each description line and is not to be intended a
         
         dir                     Absolute path of NR local data.                                                                     Default: ''.
         
-        catalog                 NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'fake_NR']. Default: 'SXS'.
+        catalog                 NR catalog used. Available options: ['SXS', 'RIT', 'RWZ-env', 'Teukolsky', 'cbhdb', 'charged_raw', 'injections']. Default: 'SXS'.
         
         ID                      Simulation ID to be considered. Example for SXS: 0305. Example for Teukolsky: \
                                 `a_0.7_A_0.141_w_1.4_ingoing_ang_15`.                                                               Default: 0305.
@@ -322,19 +705,24 @@ A dot is present at the end of each description line and is not to be intended a
         pert-order              Perturbation order to consider in Teukolsky data. Available options: ['lin', 'scd'].                Default: `lin`.
         
         l-NR                    Polar NR spherical index to be fitted, possibly different than QNM ones, \
-                   since mixing between different l happens.                                                                        Default: 2.
+                   since mixing between different l happens. Can be a scalar or a list paired with `m`.                             Default: 2.
         
-        m                       Angular spherical index to be fitted (same for IMR and QNMs), since only modes with same m do mix.  Default: 2.
+        m                       Angular spherical index to be fitted (same for IMR and QNMs), since only modes with same m do mix. \
+                                Can be a scalar or a list paired with `l-NR`.                                                       Default: 2.
+
+        NR-modes                Optional list of NR `(l,m)` modes to fit in one invocation. Accepts Python pairs such as \
+                                `[(2,2),(3,3)]` or compact tokens such as `22,33,4-4`. Overrides list values passed to \
+                                `l-NR` and `m` when non-empty.                                                                      Default: ''.
         
         error                   Method to compute the NR error. Available options for `SXS`: \
                                 ['constant-X', 'align-with-mismatch-all', 'align-with-mismatch-res-only', 'align-at-peak'], \
                                 for `Teukolsky`: ['constant-X', 'resolution'] where X is the constant value selected by the user, \
-                                for `RIT`: ['constant-X', 'late-time-const-error']. For 'fake_NR': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
-                                deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-res-only'.
+                                for `RIT`: ['constant-X', 'late-time-const-error']. For 'injections': ['gaussian-X', 'from-SXS-NR'] where X is the standard \
+                                deviation of the Gaussian distribution of the noise.                                                Default: 'align-with-mismatch-all'.
         
-        error-t-min             Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_min_mm = t_peak * (1-`error-t-min`). Default: 3e-1.
+        error-t-min             Lower time to be used in the computation of the NR error with the 'align-with-mismatch' option. When both `error-t-min` and `error-t-max` are in [0, 1], the legacy fractional pre-peak convention is used: t_min_mm = t_peak * (1-`error-t-min`). Otherwise the value is interpreted as an offset from t_peak. Default: 0.0.
         
-        error-t-max             Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option, expressed as minus the percentace of the peak time. Example: t_max_mm = t_peak * (1-`error-t-max`). Default: 4e-3.
+        error-t-max             Upper time to be used in the computation of the NR error with the 'align-with-mismatch' option. When both `error-t-min` and `error-t-max` are in [0, 1], the legacy fractional pre-peak convention is used: t_max_mm = t_peak * (1-`error-t-max`). Otherwise the value is interpreted as an offset from t_peak. Default: 30.0.
         
         add-const               Parameter of the complex constant to be added to the fit template. Required to account for spurious \
                                 effects in simulations. Example format: '--add-const A,phi'.                                        Default: '0.0,0.0'.
@@ -359,11 +747,16 @@ A dot is present at the end of each description line and is not to be intended a
                          'from-SXS-NR']. If the error is taken from the SXS simulation, the times must be taken \
                          from the SXS sim as well.                                                                           Default: 'from-SXS-NR'.
         
-        noise            Noise injection option. If None, the noise is not added to the simulated Kerr QNMs data; \
+        noise            Noise injection option. If None, the noise is not added to the injection data; \
             if '1', the noise is added to the data. Options: None, '1'.                                                      Default: None.
         
-        tail             Option to add the tail to the simulated Kerr QNMs data; if '1', the tail is added to the data. \
+        tail             Option to add the Kerr tail to the injection data; if '1', the tail is added to the data. \
             Options: None, '1'.                                                                                              Default: None.
+        parameters       Dictionary used to generate a template injection from config values when catalog='injections'. \
+                         Required keys are: `t_start`, `t_end`, `dt` and either `q` or both `m1`, `m2`. \
+                         Kerr-like templates also require `Mf`, `af`; NR-informed templates compute those from \
+                         binary parameters. Waveform keys match the selected template parameter names, e.g. \
+                         `ln_A_220`, `phi_220`, `f_0`, `tau_0`, `phi`, `phi_mrg_22`.                                       Default: ''.
 
     ***************************************************
     * Parameters to be passed to the [Model] section. *
@@ -385,9 +778,13 @@ A dot is present at the end of each description line and is not to be intended a
         Kerr-tail                        Boolean to add a tail factor to the Kerr template.                                                                               Default: 0.
         
         Kerr-tail-modes                  Modes to which a tail will be added in the fitting template. Example format: '22,32'.                                            Default: '22'.
-        
+
         KerrBinary-version               Option to select the version of the KerrBinary model to be used. Available options: ['London2018', 'Cheung2023', 'Carullo2024'].     Default: 'London2018'.
-        
+
+        KerrBinary-final-state-nc-version Option to select the version of the KerrBinary model final-state noncircular correction fit. Format: `X-Y`, \
+                                         where each entry selects a noncircular variable to be used for the noncircular fit, among ['Emrg', 'Jmrg']. \
+                                         Required only for Carullo2024 template injections.                                                                         Default: ''.
+
         KerrBinary-amplitudes-nc-version Option to select the version of the KerrBinary model amplitudes noncircular correction fit to be used. Format: `X-Y`, \ 
                                          where each entry selects a noncircular variable to be used for the noncircular fit, among ['bmrg','Emrg', 'Jmrg', 'Mf', 'af']. \
                                          Can also pass a single variable instead of two, but not less than one or more than two.                                          Default: ''.
@@ -419,7 +816,10 @@ A dot is present at the end of each description line and is not to be intended a
         method           Inference method to be used. Available options: ['Nested-sampler', 'Minimization', 'Linear-inversion']. Default: 'Nested-sampler'.
         
         t-start          Start time of the fit and reference time of amplitudes [M units]. \
-            Relative to complex strain amplitude peak time.                                                                  Default: 20.
+            Relative to complex strain amplitude peak time. Can be a scalar, a comma/list of values \
+            such as `20,30,40`, or a colon range `start:stop:step` such as `20:40:5`. \
+            When multiple start times are supplied, bayRing repeats the fit in one process and stores \
+            each run under `outdir/t_start_<value>M/`.                                                                        Default: 20.
         t-end            End time of the fit and reference time of amplitudes [M units]. \
             Relative to complex strain amplitude peak time.                                                                  Default: 140.
         dt-scd           Positive delay between the complex strain amplitude peak time of (child) second order modes \
@@ -445,6 +845,17 @@ A dot is present at the end of each description line and is not to be intended a
                          of live points being substituted at each NS step. Requires N_ev << nlive. \
                          Also n_cpu = nnest+nensemble.                                                                       Default: 1.
 
+        n-start-time-workers
+                         Number of start-time fits to run in parallel when `t-start` supplies multiple values. \
+                         Each fit is run in a separate process and keeps its products under its \
+                         `outdir/t_start_<value>M/` directory. This is in addition to sampler-level \
+                         parallelism set by options such as `nnest` and `nensemble`.                                           Default: 1.
+
+        n-mode-workers
+                         Number of NR-mode fits to run in parallel when multiple `(l,m)` modes are supplied. \
+                         Each fit is run in a separate process and keeps its products under its \
+                         `outdir/mode_l<l>_m<m>/` directory, with start-time subdirectories below it when needed.               Default: 1.
+
         *****************************************
         * Point-estimate specific parameters.   *
         *****************************************  
@@ -462,6 +873,10 @@ A dot is present at the end of each description line and is not to be intended a
             min-iter-max     Maximum number of iterations for the minimization algorithm.                                        Default: 1000.
             
             n-random-seeds   Number of random seeds to be used to initialize the minimization.                                   Default: 16.
+
+            point-estimate-posterior-samples
+                             Number of Gaussian posterior samples to draw from the local point-estimate covariance. \
+                             Set to 0 to skip this file and post-process from the point estimate and one-sigma errors.             Default: 0.
 
             The linear inversion:
 
@@ -551,6 +966,9 @@ A dot is present at the end of each description line and is not to be intended a
                                     Determines whether to plot sanity check plots regarding the mismatch section (for instance, the windowed PSD vs the original one).
                                     Default: 0.    
 
+        compute_hm_mismatch         Boolean to compute detector-projected summed-higher-mode mismatch diagnostics after a multi-mode scan.
+                                    Default: 1.
+
     ********************************************************************
     * Parameters to be passed to the [Mismatch-GW-parameters] section. *
     ********************************************************************
@@ -563,8 +981,24 @@ A dot is present at the end of each description line and is not to be intended a
         
         dec              Declination (in radiants).                                                 Default: -0.2108.
         
-        psi              Polarization angle (in radiants).                                          Default: 2.659.
-        
+        psi              Polarization angle (in radiants) used by fixed-polarisation diagnostics.    Default: 2.659.
+
+        azimuth          Source-frame azimuthal phase entering the spin-weighted spherical harmonic \
+                         recomposition of multiple NR modes.                                        Default: 0.0.
+
+        inclination      Inclination values used for summed-higher-mode mismatch diagnostics. Accepts a scalar, \
+                         comma/list values, or an inclusive range `start:stop:step`; expressions using `pi` are \
+                         accepted.                                                                  Default: `0:pi:pi/4`.
+
+        polarisation     Polarisation-angle values used for summed-higher-mode mismatch diagnostics. The reported \
+                         summed-HM mismatch is marginalised over these samples by retaining the minimum mismatch. \
+                         Pass a scalar to compute at one fixed polarisation. Expressions using `pi` are accepted. \
+                                                                                                      Default: `0:3*pi/4:pi/4`.
+
+        hm-include-negative-m
+                         Boolean to include non-precessing negative-m counterparts via \
+                         h_{l,-m}=(-1)^l h^*_{lm} when they are not explicitly fitted.              Default: 1.
+
 """
                                                      
 try:
@@ -607,4 +1041,7 @@ __ascii_art__ = """\n\n \u001b[\u001b[38;5;39m
                                                  @
 \u001b[0m"""
 
-max_len_keyword = len('KerrBinary-amplitudes-nc-version')
+max_len_keyword = max(
+    len('KerrBinary-amplitudes-nc-version'),
+    len('KerrBinary-final-state-nc-version'),
+)

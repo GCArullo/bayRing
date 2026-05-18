@@ -2,8 +2,10 @@ corner
 cpnest
 matplotlib
 numpy
+pandas
 pycbc
 pyRingGW
+pyyaml
 qnm
 seaborn
 scipy
