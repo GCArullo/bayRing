@@ -80,6 +80,12 @@ class _FakeArray(list):
     def __ne__(self, other):
         return self._binary_op(other, operator.ne)
 
+    def __and__(self, other):
+        return self._binary_op(other, lambda a, b: bool(a and b))
+
+    def __or__(self, other):
+        return self._binary_op(other, lambda a, b: bool(a or b))
+
     @property
     def shape(self):
         return (len(self),)
@@ -112,6 +118,11 @@ class _FakeArray(list):
         rows = list(zip(*[list(row) for row in self]))
         return _FakeArray([_FakeArray(row) for row in rows])
 
+    def reshape(self, *shape):
+        if shape == (-1,) or shape == ((-1,),):
+            return _FakeArray(self)
+        raise NotImplementedError("FakeArray.reshape only supports -1")
+
 
 class _FakeRandom:
     def uniform(self, low, high, size):
@@ -129,10 +140,14 @@ class _FakeNumpy(types.ModuleType):
         super().__init__(name)
         self.random = types.SimpleNamespace(uniform=_FakeRandom().uniform)
 
-    def array(self, data: Iterable):
+    def array(self, data: Iterable, dtype=None):
         if isinstance(data, _FakeArray):
-            return _FakeArray(data)
-        return _FakeArray(list(data))
+            values = _FakeArray(data)
+        else:
+            values = _FakeArray(list(data))
+        if dtype is not None:
+            return _FakeArray(dtype(value) for value in values)
+        return values
 
     def insert(self, arr, index: int, value):
         values = list(arr)
@@ -231,8 +246,17 @@ class _FakeNumpy(types.ModuleType):
         shift = shift % len(seq) if seq else 0
         return _FakeArray(seq[-shift:] + seq[:-shift])
 
-    def asarray(self, value):
-        return self.array(value)
+    def asarray(self, value, dtype=None):
+        return self.array(value, dtype=dtype)
+
+    def concatenate(self, values):
+        concatenated = []
+        for value in values:
+            concatenated.extend(list(value))
+        return _FakeArray(concatenated)
+
+    def any(self, values):
+        return any(values)
 
     def isscalar(self, value):
         return isinstance(value, (int, float, complex, bool))

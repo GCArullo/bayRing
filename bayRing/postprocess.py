@@ -2486,6 +2486,80 @@ def _model_waveform_quantiles(models_re_list, models_im_list, t_cut):
 
     return quantiles
 
+def _model_component_lists_on_time(results, inference_model, t_eval, method=None):
+
+    wf_model      = inference_model.wf_model
+    original_t_NR = wf_model.t_NR
+
+    try:
+        wf_model.t_NR = _as_1d_float_array(t_eval)
+        return model_component_lists(results, inference_model, method)
+    finally:
+        wf_model.t_NR = original_t_NR
+
+def _slice_waveform_quantiles(quantiles, time_slice):
+
+    return {
+        perc: {
+            quantity: _as_1d_float_array(values)[time_slice]
+            for quantity, values in waveform_quantiles.items()
+        }
+        for perc, waveform_quantiles in quantiles.items()
+    }
+
+def _masked_float_series(values, mask):
+
+    values = _as_1d_float_array(values)
+    if(len(values)!=len(mask)):
+        return None
+
+    return values[mask]
+
+def _pre_fit_extrapolation(NR_sim, results, inference_model, method, t_cut):
+
+    if(inference_model is None):
+        return None
+
+    t_NR   = _as_1d_float_array(NR_sim.t_NR)
+    t_cut  = _as_1d_float_array(t_cut)
+    t_peak = float(NR_sim.t_peak)
+
+    if(len(t_NR)==0 or len(t_cut)==0):
+        return None
+
+    fit_start_time = t_cut[0]
+    pre_fit_mask   = (t_NR >= t_peak) & (t_NR < fit_start_time)
+
+    if(not(np.any(pre_fit_mask))):
+        return None
+
+    t_pre  = t_NR[pre_fit_mask]
+    t_eval = np.concatenate((t_pre, t_cut))
+
+    models_re_list, models_im_list = _model_component_lists_on_time(results, inference_model, t_eval, method)
+    quantiles_eval                 = _model_waveform_quantiles(models_re_list, models_im_list, t_eval)
+    pre_slice                      = slice(0, len(t_pre))
+    quantiles_pre                  = _slice_waveform_quantiles(quantiles_eval, pre_slice)
+
+    NR_err_cmplx = getattr(NR_sim, 'NR_err_cmplx', None)
+    NR_real_err  = None if NR_err_cmplx is None else _masked_float_series(np.real(NR_err_cmplx), pre_fit_mask)
+    NR_imag_err  = None if NR_err_cmplx is None else _masked_float_series(np.imag(NR_err_cmplx), pre_fit_mask)
+
+    return {
+        't'        : t_pre,
+        'x'        : t_pre - t_peak,
+        'quantiles': quantiles_pre,
+        'has_band' : len(models_re_list) > 1,
+        'NR'       : {
+            'real'    : _masked_float_series(NR_sim.NR_r   , pre_fit_mask),
+            'imag'    : _masked_float_series(NR_sim.NR_i   , pre_fit_mask),
+            'amp'     : _masked_float_series(NR_sim.NR_amp , pre_fit_mask),
+            'freq'    : _masked_float_series(NR_sim.NR_freq, pre_fit_mask),
+            'real_err': NR_real_err,
+            'imag_err': NR_imag_err,
+        },
+    }
+
 def _plot_series_with_band(ax, x, median, lower=None, upper=None, color='firebrick',
                            label=None, lw=1.8, alpha=0.18, linestyle='-', semilogy=False):
 
@@ -2585,6 +2659,7 @@ def plot_fancy_residual(NR_sim, template, metadata, results, inference_model, ou
     models_re_list, models_im_list = model_component_lists(results, inference_model, method)
     quantiles = _model_waveform_quantiles(models_re_list, models_im_list, t_cut)
     has_band  = len(models_re_list) > 1
+    extrapolation = _pre_fit_extrapolation(NR_sim, results, inference_model, method, t_cut)
 
     color_model = '#cc0033'
     color_error = '0.25'
@@ -2597,7 +2672,7 @@ def plot_fancy_residual(NR_sim, template, metadata, results, inference_model, ou
 
     for ax in np.ravel(axs):
         ax.axhline(0.0, c='0.2', lw=0.8, alpha=0.65, ls=':')
-        ax.set_xlim([tM_start, tM_end])
+        ax.set_xlim([0.0 if extrapolation is not None else tM_start, tM_end])
 
     ax1.fill_between(x_cut, -NR_r_err_cut, NR_r_err_cut,
                      color=color_error, alpha=0.16, lw=0, label=r'$\mathrm{NR\ error}$')
@@ -2632,6 +2707,49 @@ def plot_fancy_residual(NR_sim, template, metadata, results, inference_model, ou
         quantiles[95]['freq'] - NR_f_cut if has_band else None,
         color=color_model, lw=lw_std
     )
+
+    if(extrapolation is not None):
+        x_pre     = extrapolation['x']
+        q_pre     = extrapolation['quantiles']
+        NR_pre    = extrapolation['NR']
+        pre_band  = extrapolation['has_band']
+        pre_label = r'$\mathrm{%s - NR\ extrap.}$'%(template.wf_model)
+
+        if(NR_pre['real_err'] is not None):
+            ax1.fill_between(x_pre, -NR_pre['real_err'], NR_pre['real_err'],
+                             color=color_error, alpha=0.10, lw=0)
+        if(NR_pre['imag_err'] is not None):
+            ax3.fill_between(x_pre, -NR_pre['imag_err'], NR_pre['imag_err'],
+                             color=color_error, alpha=0.10, lw=0)
+
+        _plot_series_with_band(
+            ax1, x_pre,
+            q_pre[50]['real'] - NR_pre['real'],
+            q_pre[5]['real']  - NR_pre['real'] if pre_band else None,
+            q_pre[95]['real'] - NR_pre['real'] if pre_band else None,
+            color=color_model, label=pre_label, lw=lw_std, linestyle=':'
+        )
+        _plot_series_with_band(
+            ax2, x_pre,
+            q_pre[50]['amp'] - NR_pre['amp'],
+            q_pre[5]['amp']  - NR_pre['amp'] if pre_band else None,
+            q_pre[95]['amp'] - NR_pre['amp'] if pre_band else None,
+            color=color_model, lw=lw_std, linestyle=':'
+        )
+        _plot_series_with_band(
+            ax3, x_pre,
+            q_pre[50]['imag'] - NR_pre['imag'],
+            q_pre[5]['imag']  - NR_pre['imag'] if pre_band else None,
+            q_pre[95]['imag'] - NR_pre['imag'] if pre_band else None,
+            color=color_model, lw=lw_std, linestyle=':'
+        )
+        _plot_series_with_band(
+            ax4, x_pre,
+            q_pre[50]['freq'] - NR_pre['freq'],
+            q_pre[5]['freq']  - NR_pre['freq'] if pre_band else None,
+            q_pre[95]['freq'] - NR_pre['freq'] if pre_band else None,
+            color=color_model, lw=lw_std, linestyle=':'
+        )
 
     ax1.set_ylabel(r'$\Delta \mathrm{Re[%s]}$'%(label_data))
     ax2.set_ylabel(r'$\Delta A_{%d%d}(t)$'%(l,m))
@@ -2826,6 +2944,7 @@ def plot_fancy_reconstruction(NR_sim, template, metadata, results, inference_mod
         models_re_list, models_im_list = model_component_lists(results, inference_model, method)
         quantiles = _model_waveform_quantiles(models_re_list, models_im_list, t_cut)
         has_band  = len(models_re_list) > 1
+        extrapolation = _pre_fit_extrapolation(NR_sim, results, inference_model, method, t_cut)
 
         model_label = r'$\mathrm{%s}$'%(template.wf_model)
         amp_50 = _scaled_amplitude(quantiles[50]['amp'], x_cut, tau_rd_fundamental, tail_flag, extract_damping_time_flag)
@@ -2848,6 +2967,33 @@ def plot_fancy_reconstruction(NR_sim, template, metadata, results, inference_mod
                                quantiles[5]['freq'] if has_band else None,
                                quantiles[95]['freq'] if has_band else None,
                                color=color_model, lw=lw_model)
+
+        if(extrapolation is not None):
+            x_pre    = extrapolation['x']
+            q_pre    = extrapolation['quantiles']
+            pre_band = extrapolation['has_band']
+            amp_pre_50 = _scaled_amplitude(q_pre[50]['amp'], x_pre, tau_rd_fundamental, tail_flag, extract_damping_time_flag)
+            amp_pre_5  = _scaled_amplitude(q_pre[5]['amp'] , x_pre, tau_rd_fundamental, tail_flag, extract_damping_time_flag) if pre_band else None
+            amp_pre_95 = _scaled_amplitude(q_pre[95]['amp'], x_pre, tau_rd_fundamental, tail_flag, extract_damping_time_flag) if pre_band else None
+            extrapolated_label = r'$\mathrm{%s\ extrap.}$'%(template.wf_model)
+
+            if not(tail_flag):
+                _plot_series_with_band(ax1, x_pre, q_pre[50]['real'],
+                                       q_pre[5]['real'] if pre_band else None,
+                                       q_pre[95]['real'] if pre_band else None,
+                                       color=color_model, label=extrapolated_label, lw=lw_model, linestyle=':')
+                _plot_series_with_band(ax3, x_pre, q_pre[50]['imag'],
+                                       q_pre[5]['imag'] if pre_band else None,
+                                       q_pre[95]['imag'] if pre_band else None,
+                                       color=color_model, lw=lw_model, linestyle=':')
+
+            _plot_series_with_band(ax2, x_pre, amp_pre_50, amp_pre_5, amp_pre_95,
+                                   color=color_model, label=extrapolated_label if tail_flag else None,
+                                   lw=lw_model, linestyle=':', semilogy=True)
+            _plot_series_with_band(ax4, x_pre, q_pre[50]['freq'],
+                                   q_pre[5]['freq'] if pre_band else None,
+                                   q_pre[95]['freq'] if pre_band else None,
+                                   color=color_model, lw=lw_model, linestyle=':')
 
         if(tail_flag):
             qnm_samples = [_sample_with_suppressed_tail(sample, template) for sample in waveform_parameter_samples(results, method)]
