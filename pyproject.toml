@@ -8,8 +8,10 @@ dependencies = [
     "cpnest",
     "matplotlib",
     "numpy",
+    "pandas",
     "pycbc",
     "pyRingGW",
+    "pyyaml",
     "qnm",
     "seaborn",
     "scipy",
@@ -28,6 +30,7 @@ license = "MIT"
 
 [project.scripts]
 bayRing = "bayRing.bayRing:main"
+ringdown-quality = "scripts.ringdown_quality.cli:main"
 
 [project.optional-dependencies]
 docs = [

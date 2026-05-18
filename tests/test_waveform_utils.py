@@ -1,4 +1,5 @@
 import cmath
+import math
 
 import numpy as np
 
@@ -43,6 +44,16 @@ def test_mismatch_waveforms_zero_for_identical_inputs():
     )
 
     assert abs(mismatch) < 1e-12
+
+
+def test_resolve_mismatch_window_preserves_legacy_fractional_inputs():
+    t_min, t_max = waveform_utils._resolve_mismatch_window(100.0, 0.3, 0.004)
+    assert math.isclose(t_min, 70.0)
+    assert math.isclose(t_max, 99.6)
+
+
+def test_resolve_mismatch_window_uses_absolute_offsets_for_current_default():
+    assert waveform_utils._resolve_mismatch_window(100.0, 0.0, 30.0) == (100.0, 130.0)
 
 
 def test_find_peak_time_uses_last_peak_for_eccentric_waveforms(monkeypatch):

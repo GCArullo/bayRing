@@ -199,13 +199,13 @@ class _FakeNumpy(types.ModuleType):
         return _FakeArray(bool(a and b) for a, b in zip(left, right))
 
     def real(self, values):
-        if isinstance(values, _FakeArray):
-            return _FakeArray((v.real if isinstance(v, complex) else v) for v in values)
+        if isinstance(values, (list, tuple, _FakeArray)):
+            return _FakeArray(self.real(v) for v in values)
         return values.real if isinstance(values, complex) else values
 
     def imag(self, values):
-        if isinstance(values, _FakeArray):
-            return _FakeArray((v.imag if isinstance(v, complex) else 0.0) for v in values)
+        if isinstance(values, (list, tuple, _FakeArray)):
+            return _FakeArray(self.imag(v) for v in values)
         return values.imag if isinstance(values, complex) else 0.0
 
     def exp(self, values):
@@ -233,6 +233,32 @@ class _FakeNumpy(types.ModuleType):
 
     def asarray(self, value):
         return self.array(value)
+
+    def isscalar(self, value):
+        return isinstance(value, (int, float, complex, bool))
+
+    def conjugate(self, values):
+        if isinstance(values, _FakeArray):
+            return _FakeArray(self.conjugate(value) for value in values)
+        return values.conjugate() if isinstance(values, complex) else values
+
+    def percentile(self, values, percentile, axis=None):
+        def percentile_1d(sequence):
+            ordered = sorted(sequence)
+            if not ordered:
+                return 0.0
+            rank = (len(ordered) - 1) * percentile / 100.0
+            lower = int(math.floor(rank))
+            upper = int(math.ceil(rank))
+            if lower == upper:
+                return ordered[lower]
+            weight = rank - lower
+            return ordered[lower] * (1.0 - weight) + ordered[upper] * weight
+
+        if axis == 0 and values and isinstance(values[0], (list, tuple, _FakeArray)):
+            return _FakeArray(percentile_1d(column) for column in zip(*values))
+
+        return percentile_1d(values)
 
     def column_stack(self, values):
         if not values:
@@ -289,13 +315,21 @@ class _FakeTesting:
             assert diff <= tolerance, f"{a} !~= {b} (diff={diff}, tol={tolerance})"
 
 
-if "numpy" not in sys.modules:
+def _real_module_available(name: str) -> bool:
+    try:
+        __import__(name)
+    except Exception:
+        return False
+    return True
+
+
+if "numpy" not in sys.modules and not _real_module_available("numpy"):
     fake_numpy = _FakeNumpy("numpy")
     fake_numpy.testing = _FakeTesting()
     sys.modules["numpy"] = fake_numpy
 
 
-if "pandas" not in sys.modules:
+if "pandas" not in sys.modules and not _real_module_available("pandas"):
     fake_pandas = types.ModuleType("pandas")
     fake_pandas.DataFrame = lambda *args, **kwargs: {"args": args, "kwargs": kwargs}
     sys.modules["pandas"] = fake_pandas
@@ -334,6 +368,7 @@ if "pyRing" not in sys.modules:
     fake_pyRing = types.ModuleType("pyRing")
     fake_pyRing_utils = types.ModuleType("pyRing.utils")
     fake_pyRing_waveform = types.ModuleType("pyRing.waveform")
+    fake_pyRing_initialise = types.ModuleType("pyRing.initialise")
 
     def _fake_print_section(message):
         return message
@@ -344,29 +379,41 @@ if "pyRing" not in sys.modules:
     def _fake_compute_binary_quantities(m1, m2, chi1, chi2):
         return 1.0, 0.25, 0.1, -0.1
 
+    class _FakeRemnantModel:
+        def compute_remnant_parameters_from_inspiral_aligned_spins_quasicircular_parameters(self, m1, m2, chi1, chi2):
+            return 0.95*(m1 + m2), 0.7 + 0.1*(chi1 + chi2)
+
+        def compute_remnant_parameters_from_inspiral_aligned_spins_noncircular_parameters(self, m1, m2, chi1, chi2, nc_params, version):
+            return 0.94*(m1 + m2), 0.65 + 0.1*(chi1 + chi2)
+
     fake_modes = {
         "linear": {(2, 2): ["mode"]},
         "quadratic": {(2, 2): ["quad"]},
     }
 
     fake_pyRing_utils.print_section = _fake_print_section
+    fake_pyRing_utils.print_subsection = _fake_print_section
     fake_pyRing_utils.railing_check = _fake_railing_check
     fake_pyRing_utils.compute_KerrBinary_binary_quantities = _fake_compute_binary_quantities
+    fake_pyRing_utils.RemnantModel = _FakeRemnantModel
     fake_pyRing_utils.available_modes_dict_KerrBinary = {"London2018": fake_modes, "Carullo2024": fake_modes}
 
     fake_pyRing_waveform.KerrBH = lambda *args, **kwargs: {"args": args, "kwargs": kwargs}
     fake_pyRing_waveform.damped_sinusoid = lambda *args, **kwargs: 0j
     fake_pyRing_waveform.KerrBinary = lambda *args, **kwargs: {"args": args, "kwargs": kwargs}
+    fake_pyRing_initialise.store_git_info = lambda *args, **kwargs: None
 
     fake_pyRing.utils = fake_pyRing_utils
     fake_pyRing.waveform = fake_pyRing_waveform
+    fake_pyRing.initialise = fake_pyRing_initialise
 
     sys.modules["pyRing"] = fake_pyRing
     sys.modules["pyRing.utils"] = fake_pyRing_utils
     sys.modules["pyRing.waveform"] = fake_pyRing_waveform
+    sys.modules["pyRing.initialise"] = fake_pyRing_initialise
 
 
-if "scipy" not in sys.modules:
+if "scipy" not in sys.modules and not _real_module_available("scipy"):
     fake_scipy = types.ModuleType("scipy")
     fake_optimize = types.ModuleType("scipy.optimize")
     fake_interpolate = types.ModuleType("scipy.interpolate")
@@ -392,6 +439,7 @@ if "scipy" not in sys.modules:
     fake_optimize.minimize = _fake_minimize
     fake_optimize.fmin = _fake_minimize
     fake_interpolate.interp1d = _fake_interp1d
+    fake_interpolate.CubicSpline = _fake_interp1d
     fake_linalg.toeplitz = lambda values: _FakeArray(_FakeArray(values) for _ in values)
     fake_linalg.solve_toeplitz = lambda acf, values, check_finite=True: values
     fake_signal.find_peaks = _fake_find_peaks
@@ -455,6 +503,7 @@ if "lal" not in sys.modules:
     fake_lal.G_SI = 1.0
     fake_lal.C_SI = 1.0
     fake_lal.PC_SI = 1.0
+    fake_lal.SpinWeightedSphericalHarmonic = lambda theta, phi, s, l, m: complex(math.cos(theta) + 0.1*l, math.sin(phi) + 0.1*m)
     fake_lal_antenna.AntennaResponse = _FakeAntennaResponse
     fake_lal.antenna = fake_lal_antenna
 
@@ -511,7 +560,13 @@ if "matplotlib" not in sys.modules:
 if "qnm" not in sys.modules:
     fake_qnm = types.ModuleType("qnm")
     fake_qnm.modes_cache = lambda *args, **kwargs: (lambda **inner_kwargs: types.SimpleNamespace())
+    fake_qnm.download_data = lambda *args, **kwargs: None
     sys.modules["qnm"] = fake_qnm
+
+
+if "sxs" not in sys.modules:
+    fake_sxs = types.ModuleType("sxs")
+    sys.modules["sxs"] = fake_sxs
 
 
 if "seaborn" not in sys.modules:

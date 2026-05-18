@@ -100,6 +100,12 @@ def mismatch_waveforms(deltaT_deltaPhi, time, amp1, amp2, phase1, phase2, t1, t2
 
     return result
 
+def _resolve_mismatch_window(t_peak, t_min_mismatch, t_max_mismatch):
+
+    if(0.0 <= t_min_mismatch <= 1.0 and 0.0 <= t_max_mismatch <= 1.0):
+        return t_peak * (1 - t_min_mismatch), t_peak * (1 - t_max_mismatch)
+    return t_peak + t_min_mismatch, t_peak + t_max_mismatch
+
 def align_waveforms_with_mismatch(t_NR, NR_amp, NR_phi, t_2, NR_r_2, NR_i_2, t_min_mismatch, t_max_mismatch):
 
     """
@@ -141,9 +147,8 @@ def align_waveforms_with_mismatch(t_NR, NR_amp, NR_phi, t_2, NR_r_2, NR_i_2, t_m
     # Estimate t_peak from first waveform
     t_peak = t_NR[np.argmax(NR_amp)]
 
-    # Convert mismatch time fractions into actual times
-    t_max_mismatch = t_peak * (1 - t_max_mismatch)
-    t_min_mismatch = t_peak * (1 - t_min_mismatch)
+    # Convert mismatch window inputs into actual waveform times.
+    t_min_mismatch, t_max_mismatch = _resolve_mismatch_window(t_peak, t_min_mismatch, t_max_mismatch)
 
     print(f"* Mismatch window: t_min = {t_min_mismatch:.3f}, t_max = {t_max_mismatch:.3f} (based on t_peak = {t_peak:.3f})")
 
