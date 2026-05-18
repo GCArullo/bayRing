@@ -18,6 +18,10 @@ The corresponding linear-inversion example can be run with:
 
 `bayRing --config-file config_SXS_0305_Kerr_220_linear_inversion.ini`
 
+The SXS precessing-spin example can be run with:
+
+`bayRing --config-file config_SXS_1389_precessing_Kerr_220_quick.ini`
+
 The `t-start` option accepts a single start time, a list such as `t-start = 20,30,40`, or a colon range such as `t-start = 20:40:5`. If more than one start time is supplied, bayRing repeats the fit for each value in the same invocation and writes each run to a dedicated subdirectory named like `outdir/t_start_20M/`, with its own `Algorithm`, `Peak_quantities`, and `Plots` tree. Set `n-start-time-workers = N` in the `[Inference]` section to run up to `N` of these start-time fits in parallel; this is in addition to sampler-level parallelism.
 
 The NR multipole options also accept scans. Use paired lists such as `l-NR = 2,3,4` and `m = 2,3,4`, or set `NR-modes = [(2,2),(3,3),(4,4)]` in `[NR-data]`. Set `n-mode-workers = N` in `[Inference]` to run up to `N` mode fits in parallel. Multi-mode scans also compute a detector-projected summed-higher-mode mismatch under `outdir/HM_sum/Algorithm/Mismatch/`; the inclination grid is controlled by `[Mismatch-GW-parameters] inclination` and defaults to `0:pi:pi/4`. The summed-HM mismatch marginalises over `[Mismatch-GW-parameters] polarisation = 0:3*pi/4:pi/4` by default, reporting the minimum mismatch over that grid; set `polarisation` to a scalar for one fixed angle.

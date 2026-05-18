@@ -1,5 +1,5 @@
 # General python imports
-import h5py, numpy as np, os, pandas as pd, subprocess, tempfile
+import h5py, math, numpy as np, os, pandas as pd, subprocess, tempfile
 from scipy import interpolate
 
 os.environ.setdefault("NUMBA_CACHE_DIR", os.path.join(tempfile.gettempdir(), "bayring_numba_cache"))
@@ -16,6 +16,99 @@ import pyRing.utils           as pyRing_utils
 
 twopi = 2.*np.pi
 
+def _metadata_value(metadata, key):
+    key_options = [key]
+    if '_' in key:
+        key_options.append(key.replace('_', '-'))
+    if '-' in key:
+        key_options.append(key.replace('-', '_'))
+
+    for candidate in key_options:
+        try:
+            return metadata[candidate]
+        except KeyError:
+            pass
+
+    raise KeyError("Metadata key '{}' not found.".format(key))
+
+
+def _metadata_float(metadata, key):
+    value = _metadata_value(metadata, key)
+    if isinstance(value, str):
+        value = value.strip()
+        if value.startswith(('<', '>')):
+            value = value[1:].strip()
+    return float(value)
+
+
+def _metadata_vector(metadata, key):
+    try:
+        value = _metadata_value(metadata, key)
+    except KeyError:
+        value = [_metadata_value(metadata, '{}_{}'.format(key, axis)) for axis in ['x', 'y', 'z']]
+
+    if hasattr(value, 'tolist'):
+        value = value.tolist()
+    if isinstance(value, str):
+        value = value.strip().strip('[]()').replace(',', ' ').split()
+
+    vector = np.array([float(component) for component in value])
+    if len(vector) != 3:
+        raise ValueError("Metadata key '{}' must contain three vector components.".format(key))
+
+    return vector
+
+
+def _vector_norm(vector):
+    return math.sqrt(sum(float(component)*float(component) for component in vector))
+
+
+def _unit_vector(vector, fallback=None):
+    norm = _vector_norm(vector)
+    if norm == 0.0 or not math.isfinite(norm):
+        if fallback is None:
+            raise ValueError("Cannot normalize a zero or non-finite vector.")
+        return fallback
+    return vector / norm
+
+
+def _spin_projection_and_tilt(spin_vector, reference_axis):
+    spin_norm = _vector_norm(spin_vector)
+    if spin_norm == 0.0 or not math.isfinite(spin_norm):
+        return 0.0, 0.0
+
+    chi_parallel = sum(float(spin_component)*float(axis_component) for spin_component, axis_component in zip(spin_vector, reference_axis))
+    cos_tilt     = max(min(chi_parallel/spin_norm, 1.0), -1.0)
+    tilt         = math.acos(cos_tilt)
+
+    return chi_parallel, tilt
+
+
+def _metadata_spin_magnitude(metadata, key):
+    try:
+        return _vector_norm(_metadata_vector(metadata, key))
+    except KeyError:
+        return abs(_metadata_float(metadata, '{}_mag'.format(key)))
+
+
+def _read_SXS_metadata_values(metadata):
+    q, Mf = _metadata_float(metadata, 'reference_mass_ratio'), _metadata_float(metadata, 'remnant_mass')
+    ecc   = _metadata_float(metadata, 'reference_eccentricity')
+
+    spin1 = _metadata_vector(metadata, 'reference_dimensionless_spin1')
+    spin2 = _metadata_vector(metadata, 'reference_dimensionless_spin2')
+
+    z_axis = np.array([0.0, 0.0, 1.0])
+    try:
+        reference_axis = _unit_vector(_metadata_vector(metadata, 'reference_orbital_frequency'), fallback=z_axis)
+    except KeyError:
+        reference_axis = z_axis
+
+    chi1, tilt1 = _spin_projection_and_tilt(spin1, reference_axis)
+    chi2, tilt2 = _spin_projection_and_tilt(spin2, reference_axis)
+    chif        = _metadata_spin_magnitude(metadata, 'remnant_dimensionless_spin')
+
+    return q, chi1, chi2, tilt1, tilt2, ecc, Mf, chif
 
 def _prime_sxs_simulations_cache():
 
@@ -770,7 +863,7 @@ class NR_simulation():
                  injection_model_parameters = None              ,
                  waveform_type  = 'strain'                      ,
                  download       = False                         , 
-                 NR_error       = 'align-with-mismatch-all'     , 
+                 NR_error       = 'align-with-mismatch-all'     ,
                  tM_start       = 30.0                          , 
                  tM_end         = 150.0                         , 
                  t_delay_scd    = 0.0                           , 
@@ -1547,33 +1640,27 @@ class NR_simulation():
         q
             Mass ratio.
         chi1
-            Dimensionless spin of the primary black hole.
+            Dimensionless spin of the primary black hole projected along the reference orbital-frequency direction.
         chi2
-            Dimensionless spin of the secondary black hole.
+            Dimensionless spin of the secondary black hole projected along the reference orbital-frequency direction.
         tilt1
-            Tilt of the primary black hole.
+            Tilt of the primary black hole relative to the reference orbital-frequency direction.
         tilt2
-            Tilt of the secondary black hole.
+            Tilt of the secondary black hole relative to the reference orbital-frequency direction.
         ecc
             Eccentricity of the binary.
         Mf
             Final mass of the remnant black hole.
         chif
-            Final dimensionless spin of the remnant black hole.
+            Final dimensionless spin magnitude of the remnant black hole.
 
         """
         
         _prime_sxs_simulations_cache()
         sim      = sxs.load("SXS:BBH:{}".format(self.NR_ID), download=self.download, auto_supersede=False, ignore_deprecation=True)
         metadata = sim.metadata
-        
-        tilt1, tilt2  = 0.0, 0.0
 
-        q, Mf            = metadata['reference_mass_ratio'], metadata['remnant_mass']
-        chi1, chi2, chif = metadata['reference_dimensionless_spin1'][2], metadata['reference_dimensionless_spin2'][2], metadata['remnant_dimensionless_spin'][2]
-        ecc              = _parse_sxs_reference_eccentricity(metadata['reference-eccentricity'])
-
-        return q, chi1, chi2, tilt1, tilt2, ecc, Mf, chif
+        return _read_SXS_metadata_values(metadata)
 
 
     def load_SXS_addn_metadata(self, csv_path, ID_str):
