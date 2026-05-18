@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import pandas as pd
 
 from scripts.ringdown_quality.config import Config
@@ -10,8 +11,10 @@ from scripts.ringdown_quality.scoring import (
     add_mode_percentiles,
     selected_per_mode_metrics,
     select_simulations,
+    score_candidate,
     simulation_scores,
 )
+from scripts.ringdown_quality.waveform_io import WaveformData
 
 
 def test_e_mode_uses_default_weights_exactly():
@@ -76,3 +79,70 @@ def test_common_selection_penalizes_one_bad_mode():
     assert list(selected["sxs_id"]) == ["SXS:BBH:0002"]
     assert set(selected_metrics["sxs_id"]) == {"SXS:BBH:0002"}
     assert set(zip(selected_metrics["ell"], selected_metrics["m"])) == {(2, 2), (3, 3)}
+
+
+def test_score_candidate_can_use_zero_weight_optional_extrapolation(monkeypatch):
+    import scripts.ringdown_quality.waveform_io as waveform_io_module
+
+    def fake_waveform(sxs_id: str, lev: int, extrapolation_order: str, config: Config) -> WaveformData:
+        time = np.linspace(-10.0, 40.0, 256)
+        scale = 1.0 if lev == 4 else 0.99
+        base = scale * np.exp(-(time**2) / 60.0) * np.exp(-1j * 0.1 * time)
+        modes = {
+            (2, 2): base,
+            (2, -2): np.conjugate(base),
+        }
+        return WaveformData(
+            sxs_id=sxs_id,
+            lev=lev,
+            extrapolation_order=extrapolation_order,
+            time=time,
+            modes=modes,
+            ell_min=2,
+            ell_max=2,
+            metadata={},
+        )
+
+    config = Config()
+    config.modes.target_modes = [(2, 2)]
+    config.waveform.comparison_extrapolation_orders = []
+    config.filters.require_extrapolation_comparison = False
+    config.metrics.weights = {
+        "resolution": 7.0 / 9.0,
+        "extrapolation": 0.0,
+        "floor": 1.0 / 9.0,
+        "symmetry": 1.0 / 9.0,
+    }
+    candidate = pd.Series({"sxs_id": "SXS:BBH:0001", "lev_low": 3, "lev_high": 4})
+
+    monkeypatch.setattr(waveform_io_module, "load_waveform", fake_waveform)
+
+    rows = score_candidate(candidate, config)
+
+    assert len(rows) == 1
+    assert rows[0]["valid_mode"] is True
+    assert rows[0]["delta_ext"] == 0.0
+
+
+def test_score_candidate_marks_waveform_load_failures(monkeypatch):
+    import scripts.ringdown_quality.waveform_io as waveform_io_module
+
+    config = Config()
+    config.modes.target_modes = [(2, 2)]
+    config.waveform.comparison_extrapolation_orders = []
+    config.filters.require_extrapolation_comparison = False
+    candidate = pd.Series({"sxs_id": "SXS:BBH:0001", "lev_low": 3, "lev_high": 4})
+
+    monkeypatch.setattr(waveform_io_module, "extrapolation_order_available", lambda *args, **kwargs: True)
+
+    def fail_load(*args, **kwargs):
+        raise RuntimeError("download failed")
+
+    monkeypatch.setattr(waveform_io_module, "load_waveform", fail_load)
+
+    rows = score_candidate(candidate, config)
+
+    assert len(rows) == 1
+    assert rows[0]["valid_mode"] is False
+    assert rows[0]["flags"] == "waveform_load_failed"
+    assert "failed to load required waveform" in rows[0]["rejection_reason"]

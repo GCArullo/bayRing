@@ -26,8 +26,15 @@ import numpy as np
 
 
 DEFAULT_MODES = [(2, 2), (2, 1), (3, 3), (3, 2), (3, 1), (4, 4), (4, 3), (4, 2), (4, 1), (5, 5)]
-TEOB_MODE_MIXING_PARENTS = {(3, 2): (2, 2), (4, 3): (3, 3), (4, 2): (3, 2)}
+TEOB_MODE_MIXING_PARENTS = {
+    (3, 1): (2, 1),
+    (3, 2): (2, 2),
+    (4, 1): (2, 1),
+    (4, 2): (2, 2),
+    (4, 3): (3, 3),
+}
 DEFAULT_MODE_MIXING_MODES = sorted(TEOB_MODE_MIXING_PARENTS)
+DEFAULT_COUNTER_ROTATING_MODES = [(2, 1)]
 QQNM_TERMS_BY_MODE = {(5, 5): 'Px220x330'}
 REFERENCE_FIT_TARGETS = (
     "A_ref_over_nu",
@@ -40,6 +47,11 @@ REFERENCE_FIT_TARGETS = (
 LOCAL_FIT_TARGETS_HYPTAN = ("A_peak_over_nu", "omg_peak", "c3A", "c3p", "c4p") + REFERENCE_FIT_TARGETS
 LOCAL_FIT_TARGETS_RATEXP = ("A_peak_over_nu", "A_peakdotdot_over_nu", "omg_peak", "c2A", "c3A", "c2p", "c3p", "c4p") + REFERENCE_FIT_TARGETS
 LOCAL_FIT_TARGETS_SEOBNRV5 = ("A_peak_over_nu", "omg_peak", "c2A", "c2p", "c3A", "c3p") + REFERENCE_FIT_TARGETS
+TEOB_44_WINDOW_TARGETS = (
+    "quad44_window_delay",
+    "quad44_window_width",
+    "quad44_window_steepness",
+)
 PHASE_TARGET_PREFIX = "delta_phi_"
 FIT_SCHEMA = "bayRing.teobpm.global-fit.v1"
 APPENDIX_A_SCHEMA = "bayRing.teobpm.appendix-a.v1"
@@ -100,6 +112,7 @@ class CalibrationConfig:
     output_dir: str
     modes: list[tuple[int, int]] = field(default_factory=lambda: list(DEFAULT_MODES))
     mode_mixing_modes: list[tuple[int, int]] = field(default_factory=lambda: list(DEFAULT_MODE_MIXING_MODES))
+    counter_rotating_modes: list[tuple[int, int]] = field(default_factory=lambda: list(DEFAULT_COUNTER_ROTATING_MODES))
     template: str = "RatExp"
     teob_calibration: str = "qc"
     validation_fraction: float = 0.33
@@ -160,6 +173,10 @@ def _as_float(value: Any, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _as_bool(value: Any) -> bool:
+    return bool(_as_float(value, default=0.0))
 
 
 def _as_int(value: Any, default: int = 0) -> int:
@@ -637,9 +654,6 @@ def _local_prior_text(mode: tuple[int, int], template: str) -> str:
 
 
 def _local_counter_rotating_prior_text(mode: tuple[int, int], template: str) -> str:
-    if mode != (2, 1):
-        return ""
-
     counter_mode_label = _mode_label((mode[0], -mode[1]))
     if template == "HypTan":
         bounds = {
@@ -688,7 +702,7 @@ def local_config_text(record: SimulationRecord, mode: tuple[int, int], config: C
     merger_data = 1 if _teobpm_requires_merger_peak_data(config.template) else 0
     global_fit = 0
     mode_mixing = 1 if mode in config.mode_mixing_modes else 0
-    counter_rotating = 1 if mode == (2, 1) else 0
+    counter_rotating = 1 if mode in config.counter_rotating_modes else 0
     t_start = _local_fit_t_start(record, mode, config)
     prior_text = _local_prior_text(mode, config.template)
     quadratic_modes = QQNM_TERMS_BY_MODE.get(mode, '')
@@ -1154,7 +1168,7 @@ def fill_higher_mode_inputs(
 ) -> dict[str, Any]:
     """Fill generated HM configs with t-peak-22 and parent local-fit values.
 
-    Higher-mode TEOBPM fits need the 22 peak time. Mixed 32/42/43 fits also need
+    Higher-mode TEOBPM fits need the 22 peak time. Mixed modes also need
     fixed parent-mode phase and local coefficients, because pyRing internally
     constructs the parent multipole before projecting the requested spherical
     mode.
@@ -1196,10 +1210,16 @@ def fill_higher_mode_inputs(
                 parser.set("NR-data", "t-peak-22", f"{t_peak_22:.17g}")
                 changed = True
 
-        if mode in mode_mixing_set:
+        model_uses_parent_mode = (
+            mode in mode_mixing_set
+            or (mode == (4, 4) and _as_bool(parser.get("Model", "TEOB-quadratic-44", fallback="0")))
+        )
+        if model_uses_parent_mode:
             parent = TEOB_MODE_MIXING_PARENTS.get(mode)
+            if parent is None and mode == (4, 4):
+                parent = (2, 2)
             if parent is None:
-                missing_parent_fits.append({"sxs_id": job.sxs_id, "mode": job.mode, "reason": "unsupported mixed mode"})
+                missing_parent_fits.append({"sxs_id": job.sxs_id, "mode": job.mode, "reason": "unsupported parent mode"})
             else:
                 parent_label = _mode_label(parent)
                 parent_estimates = estimates_by_job.get((job.sxs_id, parent_label))
@@ -1244,10 +1264,9 @@ def fill_higher_mode_inputs(
 
 
 TEOB_44_ADDITIVE_TARGETS = {
-    "ln_A_sum_440_220_220",
-    "phi_sum_440_220_220",
     "ln_A_tapered_441",
     "phi_tapered_441",
+    *TEOB_44_WINDOW_TARGETS,
 }
 
 
@@ -1269,11 +1288,11 @@ def _wrap_phase(value: float) -> float:
 
 def _local_fit_targets_for_template(template: str) -> tuple[str, ...]:
     if template == "HypTan":
-        return LOCAL_FIT_TARGETS_HYPTAN
+        return LOCAL_FIT_TARGETS_HYPTAN + TEOB_44_WINDOW_TARGETS
     if template == "RatExp":
-        return LOCAL_FIT_TARGETS_RATEXP
+        return LOCAL_FIT_TARGETS_RATEXP + TEOB_44_WINDOW_TARGETS
     if template == "SEOBNRv5":
-        return LOCAL_FIT_TARGETS_SEOBNRV5
+        return LOCAL_FIT_TARGETS_SEOBNRV5 + TEOB_44_WINDOW_TARGETS
     raise ValueError(f"Unknown TEOBPM template `{template}`.")
 
 
@@ -1353,6 +1372,13 @@ def _fixed_prior_targets_from_config(job: LocalFitJob, template: str) -> list[di
         value = _as_float(parser.get("Priors", f"fix-{target}_{job.mode}", fallback=None), default=math.nan)
         if math.isfinite(value):
             rows.append(_local_fit_row(job, target, value, math.nan, source="fixed_prior"))
+    if job.mode == "44":
+        for target in TEOB_44_WINDOW_TARGETS:
+            if target not in allowed_targets:
+                continue
+            value = _as_float(parser.get("Priors", f"fix-{target}", fallback=None), default=math.nan)
+            if math.isfinite(value):
+                rows.append(_local_fit_row(job, target, value, math.nan, source="fixed_prior"))
     return rows
 
 
@@ -1822,6 +1848,23 @@ MISMATCH_PEAK22_REFERENCE_VALUES = {
     "mode22-peak",
     "mode22_peak",
 }
+MISMATCH_HISTOGRAM_TEMPLATE_COLORS = {
+    "hyptan_ratexp_nr": "#6f4bb1",
+    "hyptan": "#6f4bb1",
+    "ratexp": "#d55e00",
+    "seobnrv5": "#0072b2",
+}
+MISMATCH_HISTOGRAM_FAMILY_ORDER = {
+    "nonspinning": 0,
+    "equal_mass_spinning": 1,
+    "generic_spinning": 2,
+}
+MISMATCH_HISTOGRAM_TEMPLATE_ORDER = {
+    "hyptan_ratexp_nr": 0,
+    "hyptan": 0,
+    "ratexp": 1,
+    "seobnrv5": 2,
+}
 
 
 def _first_finite(row: dict[str, Any], columns: Iterable[str], default: float = math.nan) -> float:
@@ -2117,6 +2160,22 @@ def _mismatch_summary_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return summary_rows
 
 
+def _percentile(values: Iterable[float], percentile: float) -> float:
+    finite = sorted(float(value) for value in values if math.isfinite(float(value)))
+    if not finite:
+        return math.nan
+    if len(finite) == 1:
+        return finite[0]
+    rank = (len(finite) - 1) * percentile / 100.0
+    lower_index = int(math.floor(rank))
+    upper_index = int(math.ceil(rank))
+    if lower_index == upper_index:
+        return finite[lower_index]
+    lower_weight = upper_index - rank
+    upper_weight = rank - lower_index
+    return float(finite[lower_index] * lower_weight + finite[upper_index] * upper_weight)
+
+
 def _finite_mismatch_limits(rows: list[dict[str, Any]]) -> tuple[float, float]:
     values = [float(row["mismatch"]) for row in rows if math.isfinite(float(row["mismatch"])) and float(row["mismatch"]) > 0.0]
     if not values:
@@ -2285,6 +2344,472 @@ def plot_teobpm_mismatch_comparison(
         },
     }
     (output_path / "teobpm_mismatch_comparison_summary.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    return payload
+
+
+def _discover_campaign_mismatch_tables(campaign_roots: Iterable[str | Path] | None) -> list[Path]:
+    tables: list[Path] = []
+    for root in campaign_roots or []:
+        root_path = Path(root)
+        tables.extend(sorted(root_path.glob("*/*/mismatch_summary.csv")))
+    return tables
+
+
+def _case_label_from_mismatch_table(table_path: str | Path, campaign_roots: Iterable[str | Path] | None = None) -> str:
+    path = Path(table_path)
+    for root in campaign_roots or []:
+        root_path = Path(root)
+        try:
+            relative = path.resolve().relative_to(root_path.resolve())
+        except ValueError:
+            continue
+        parts = relative.parts
+        if len(parts) >= 3 and parts[-1] == "mismatch_summary.csv":
+            template, family = parts[0], parts[1]
+            return f"{family}-{template}"
+    if path.name == "mismatch_summary.csv" and len(path.parts) >= 3:
+        family = path.parent.name
+        template = path.parent.parent.name
+        return f"{family}-{template}"
+    return path.stem.replace("_", " ")
+
+
+def _mismatch_histogram_label_parts(label: Any) -> tuple[str, str, str]:
+    text = str(label)
+    source, separator, suffix = text.partition(":")
+    family = ""
+    template = ""
+    if "-" in source:
+        family, template = source.rsplit("-", 1)
+    return family, template, suffix.strip() if separator else ""
+
+
+def _mismatch_histogram_display_label(label: Any) -> str:
+    family, template, suffix = _mismatch_histogram_label_parts(label)
+    family_names = {
+        "nonspinning": "nonspinning",
+        "equal_mass_spinning": "equal-mass spinning",
+        "generic_spinning": "generic spinning",
+    }
+    template_names = {
+        "hyptan_ratexp_nr": "HypTan (RatExp NR)",
+        "hyptan": "HypTan",
+        "ratexp": "RatExp",
+        "seobnrv5": "SEOBNRv5",
+    }
+    if family and template:
+        display = f"{template_names.get(template, template.replace('_', ' '))} / {family_names.get(family, family.replace('_', ' '))}"
+    else:
+        display = str(label).replace("_", " ")
+    if suffix:
+        display = f"{display}: {suffix}"
+    return display
+
+
+def _mismatch_histogram_sort_key(label: Any) -> tuple[int, int, str]:
+    family, template, suffix = _mismatch_histogram_label_parts(label)
+    return (
+        MISMATCH_HISTOGRAM_FAMILY_ORDER.get(family, 99),
+        MISMATCH_HISTOGRAM_TEMPLATE_ORDER.get(template, 99),
+        suffix or str(label),
+    )
+
+
+def _mismatch_histogram_color(label: Any, index: int) -> str:
+    _, template, _ = _mismatch_histogram_label_parts(label)
+    if template in MISMATCH_HISTOGRAM_TEMPLATE_COLORS:
+        return MISMATCH_HISTOGRAM_TEMPLATE_COLORS[template]
+    palette = ("#0072b2", "#d55e00", "#009e73", "#cc79a7", "#56b4e9", "#e69f00", "#6f4bb1", "#4d4d4d")
+    return palette[index % len(palette)]
+
+
+def _mismatch_histogram_linestyle(label: Any) -> str:
+    family, _, _ = _mismatch_histogram_label_parts(label)
+    return {
+        "nonspinning": "-",
+        "equal_mass_spinning": "--",
+        "generic_spinning": "-.",
+    }.get(family, "-")
+
+
+def _mismatch_histogram_points(
+    mismatch_tables: list[str | Path],
+    labels: list[str] | None = None,
+    campaign_roots: Iterable[str | Path] | None = None,
+) -> list[dict[str, Any]]:
+    if labels is not None and len(labels) != len(mismatch_tables):
+        raise ValueError("The number of labels must match the number of mismatch tables.")
+
+    grouped: dict[tuple[str, str, str, str], list[dict[str, Any]]] = {}
+    source_by_group: dict[tuple[str, str, str, str], str] = {}
+    input_by_group: dict[tuple[str, str, str, str], str] = {}
+    for table_index, table in enumerate(mismatch_tables):
+        table_path = Path(table)
+        if not table_path.exists():
+            raise FileNotFoundError(f"Mismatch table `{table_path}` does not exist.")
+        source_label = labels[table_index] if labels is not None else _case_label_from_mismatch_table(table_path, campaign_roots)
+        for row_index, row in enumerate(_read_table(table_path)):
+            for expanded in _expanded_mismatch_rows(row, source_label):
+                comparison_label = _mismatch_series_label(expanded, source_label)
+                case_label = source_label
+                if comparison_label and comparison_label != source_label:
+                    case_label = f"{source_label}: {comparison_label}"
+                mode = str(expanded.get("mode") or expanded.get("lm") or "all").strip() or "unknown"
+                sxs_id = str(
+                    expanded.get("sxs_id")
+                    or expanded.get("simulation")
+                    or expanded.get("simulation_id")
+                    or expanded.get("run_id")
+                    or f"row_{row_index}"
+                ).strip()
+                split = str(expanded.get("split") or "").strip()
+                key = (case_label, mode, sxs_id, split)
+                grouped.setdefault(key, []).append(expanded)
+                source_by_group[key] = source_label
+                input_by_group[key] = str(table_path)
+
+    points: list[dict[str, Any]] = []
+    for key, rows in sorted(grouped.items()):
+        label, mode, sxs_id, split = key
+        mismatch = _representative_tabular_mismatch(rows)
+        if not math.isfinite(mismatch) or mismatch <= 0.0:
+            continue
+        points.append({
+            "input_table": input_by_group[key],
+            "label": label,
+            "mode": mode,
+            "mismatch": float(mismatch),
+            "n_aggregated_rows": len(rows),
+            "source": source_by_group[key],
+            "split": split,
+            "sxs_id": sxs_id,
+        })
+    return points
+
+
+def _mismatch_histogram_summary_rows(points: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for point in points:
+        grouped.setdefault((str(point["label"]), str(point["mode"])), []).append(point)
+        grouped.setdefault((str(point["label"]), "all"), []).append(point)
+
+    summary_rows: list[dict[str, Any]] = []
+    for (label, mode), rows in sorted(grouped.items()):
+        values = [float(row["mismatch"]) for row in rows]
+        summary_rows.append({
+            "label": label,
+            "mode": mode,
+            "n": len(values),
+            "mismatch_min": min(values),
+            "mismatch_p05": _percentile(values, 5.0),
+            "mismatch_median": _median(values),
+            "mismatch_p95": _percentile(values, 95.0),
+            "mismatch_max": max(values),
+        })
+    return summary_rows
+
+
+def _mismatch_histogram_bins(values: list[float], bins: int) -> np.ndarray:
+    finite = [float(value) for value in values if math.isfinite(float(value)) and float(value) > 0.0]
+    if not finite:
+        return np.linspace(0.0, 1.0, max(2, bins + 1))
+    lower = min(finite)
+    upper = max(finite)
+    if abs(upper - lower) < max(1.0e-16, abs(upper) * 1.0e-12):
+        lower *= 0.85
+        upper *= 1.15
+    lower = max(lower, np.nextafter(0.0, 1.0))
+    return np.logspace(math.log10(lower), math.log10(upper), max(2, bins + 1))
+
+
+def _plot_mismatch_histogram_series(
+    series: list[tuple[str, list[float]]],
+    output_file: str | Path,
+    title: str,
+    bins: int,
+) -> Path | None:
+    import matplotlib.pyplot as plt
+
+    cleaned = [
+        (label, [float(value) for value in values if math.isfinite(float(value)) and float(value) > 0.0])
+        for label, values in series
+    ]
+    cleaned = [(label, values) for label, values in cleaned if values]
+    if not cleaned:
+        return None
+
+    all_values = [value for _, values in cleaned for value in values]
+    bin_edges = _mismatch_histogram_bins(all_values, bins)
+    output_path = Path(output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    plt.rcParams.update({
+        "axes.grid": True,
+        "grid.alpha": 0.25,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+        "font.size": 10,
+        "figure.facecolor": "white",
+    })
+    if len(cleaned) == 1:
+        fig, ax = plt.subplots(figsize=(7.4, 4.6))
+    else:
+        fig_height = max(7.2, 1.4 + 0.9 * len(cleaned))
+        fig, ax = plt.subplots(figsize=(10.4, fig_height))
+    if isinstance(ax, (list, tuple, np.ndarray)):
+        ax = np.asarray(ax, dtype=object).flat[0]
+    if len(cleaned) == 1:
+        label, values = cleaned[0]
+        color = _mismatch_histogram_color(label, 0)
+        median = _median(values)
+        p05 = _percentile(values, 5.0)
+        p95 = _percentile(values, 95.0)
+        ax.hist(values, bins=bin_edges, color=color, edgecolor="white", linewidth=0.8, alpha=0.78)
+        ax.axvspan(p05, p95, color=color, alpha=0.12, lw=0)
+        ax.axvline(median, color="#202124", lw=1.7, label=f"median = {median:.2g}")
+        ax.axvline(p05, color=color, lw=1.1, ls="--", alpha=0.85)
+        ax.axvline(p95, color=color, lw=1.1, ls="--", alpha=0.85, label="5-95%")
+        ax.text(
+            0.025,
+            0.96,
+            f"n = {len(values)}\nmedian = {median:.2g}",
+            transform=ax.transAxes,
+            va="top",
+            ha="left",
+            fontsize=9,
+            bbox={"boxstyle": "round,pad=0.32", "fc": "white", "ec": "#d0d7de", "alpha": 0.92},
+        )
+        ax.legend(loc="upper right", frameon=False, fontsize=8)
+        ax.set_ylabel("Count")
+    else:
+        row_step = 1.25
+        row_amplitude = 0.92
+        y_positions = []
+        display_labels = []
+        tick_colors = []
+        for index, (label, values) in enumerate(cleaned):
+            baseline = (len(cleaned) - index - 1) * row_step
+            color = _mismatch_histogram_color(label, index)
+            counts, _ = np.histogram(values, bins=bin_edges)
+            counts = counts.astype(float)
+            if counts.max() > 0:
+                counts = counts / counts.max() * row_amplitude
+            x_values = np.repeat(bin_edges, 2)[1:-1]
+            y_values = baseline + np.repeat(counts, 2)
+            ax.fill_between(x_values, baseline, y_values, color=color, alpha=0.22, lw=0)
+            ax.plot(x_values, y_values, color=color, lw=2.0)
+            median = _median(values)
+            ax.vlines(median, baseline, baseline + row_amplitude, color=color, lw=1.45)
+            ax.text(
+                bin_edges[-1],
+                baseline + 0.13,
+                f"n={len(values)}",
+                ha="right",
+                va="bottom",
+                fontsize=8,
+                color="#4b5563",
+            )
+            y_positions.append(baseline + 0.42 * row_step)
+            display_labels.append(_mismatch_histogram_display_label(label))
+            tick_colors.append(color)
+        ax.set_yticks(y_positions)
+        ax.set_yticklabels(display_labels, fontsize=9)
+        for tick_label, color in zip(ax.get_yticklabels(), tick_colors):
+            tick_label.set_color(color)
+        ax.set_ylim(-0.25, len(cleaned) * row_step - 0.05)
+        ax.set_ylabel("")
+    ax.set_xscale("log")
+    ax.set_xlim(bin_edges[0], bin_edges[-1])
+    ax.set_xlabel("Mismatch")
+    ax.set_title(title)
+    ax.grid(axis="x", which="major", alpha=0.28)
+    ax.grid(axis="y", alpha=0.08)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=220)
+    plt.close(fig)
+    return output_path
+
+
+def _plot_mismatch_cdf_series(
+    series: list[tuple[str, list[float]]],
+    output_file: str | Path,
+    title: str,
+) -> Path | None:
+    import matplotlib.pyplot as plt
+
+    cleaned = [
+        (label, sorted(float(value) for value in values if math.isfinite(float(value)) and float(value) > 0.0))
+        for label, values in series
+    ]
+    cleaned = [(label, values) for label, values in cleaned if values]
+    if not cleaned:
+        return None
+
+    output_path = Path(output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    all_values = [value for _, values in cleaned for value in values]
+    x_edges = _mismatch_histogram_bins(all_values, 32)
+
+    plt.rcParams.update({
+        "axes.grid": True,
+        "grid.alpha": 0.25,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+        "font.size": 10,
+        "figure.facecolor": "white",
+    })
+    fig, ax = plt.subplots(figsize=(9.8, 5.8))
+    if isinstance(ax, (list, tuple, np.ndarray)):
+        ax = np.asarray(ax, dtype=object).flat[0]
+
+    for index, (label, values) in enumerate(cleaned):
+        cumulative = np.arange(1, len(values) + 1, dtype=float) / float(len(values))
+        color = _mismatch_histogram_color(label, index)
+        ax.step(
+            values,
+            cumulative,
+            where="post",
+            color=color,
+            linestyle=_mismatch_histogram_linestyle(label),
+            linewidth=2.0,
+            label=f"{_mismatch_histogram_display_label(label)} (n={len(values)})",
+        )
+
+    ax.set_xscale("log")
+    ax.set_xlim(x_edges[0], x_edges[-1])
+    ax.set_ylim(0.0, 1.0)
+    ax.set_xlabel("Mismatch")
+    ax.set_ylabel("Empirical CDF")
+    ax.set_title(title)
+    ax.grid(axis="x", which="major", alpha=0.28)
+    ax.grid(axis="y", alpha=0.18)
+    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=False, fontsize=8)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=220)
+    plt.close(fig)
+    return output_path
+
+
+def plot_mismatch_histograms(
+    mismatch_tables: list[str | Path] | None,
+    output_dir: str | Path,
+    labels: list[str] | None = None,
+    campaign_roots: list[str | Path] | None = None,
+    bins: int = 24,
+) -> dict[str, Any]:
+    tables = [Path(table) for table in (mismatch_tables or [])]
+    tables.extend(_discover_campaign_mismatch_tables(campaign_roots))
+    tables = list(dict.fromkeys(tables))
+    if not tables:
+        raise ValueError("Provide at least one --mismatch-table or --campaign-root with mismatch_summary.csv files.")
+    if labels is not None and len(labels) != len(tables):
+        raise ValueError("The number of labels must match the number of discovered and explicit mismatch tables.")
+
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    points = _mismatch_histogram_points(tables, labels=labels, campaign_roots=campaign_roots)
+    points_table = output_path / "mismatch_histogram_points.csv"
+    summary_table = output_path / "mismatch_histogram_summary.csv"
+    _write_rows_csv(points, points_table)
+    summary_rows = _mismatch_histogram_summary_rows(points)
+    _write_rows_csv(summary_rows, summary_table)
+
+    plot_paths: list[Path] = []
+    histogram_paths: list[Path] = []
+    cdf_paths: list[Path] = []
+    labels_seen = sorted({str(point["label"]) for point in points}, key=_mismatch_histogram_sort_key)
+    modes_seen = sorted({str(point["mode"]) for point in points})
+    for label in labels_seen:
+        label_points = [point for point in points if point["label"] == label]
+        case_dir = output_path / "cases" / _safe_filename_token(label)
+        path = _plot_mismatch_histogram_series(
+            [(label, [float(point["mismatch"]) for point in label_points])],
+            case_dir / "mismatch_histogram_all_modes.png",
+            f"Mismatch histogram: {_mismatch_histogram_display_label(label)}, all modes",
+            bins,
+        )
+        if path is not None:
+            plot_paths.append(path)
+            histogram_paths.append(path)
+        for mode in modes_seen:
+            mode_points = [point for point in label_points if point["mode"] == mode]
+            if not mode_points:
+                continue
+            path = _plot_mismatch_histogram_series(
+                [(label, [float(point["mismatch"]) for point in mode_points])],
+                case_dir / "modes" / f"mismatch_histogram_mode_{_safe_filename_token(mode)}.png",
+                f"Mismatch histogram: {_mismatch_histogram_display_label(label)}, mode {mode}",
+                bins,
+            )
+            if path is not None:
+                plot_paths.append(path)
+                histogram_paths.append(path)
+
+    combined_dir = output_path / "combined"
+    path = _plot_mismatch_histogram_series(
+        [
+            (label, [float(point["mismatch"]) for point in points if point["label"] == label])
+            for label in labels_seen
+        ],
+        combined_dir / "mismatch_histogram_all_modes.png",
+        "Mismatch histograms by case: all modes",
+        bins,
+    )
+    if path is not None:
+        plot_paths.append(path)
+        histogram_paths.append(path)
+    for mode in modes_seen:
+        path = _plot_mismatch_histogram_series(
+            [
+                (label, [float(point["mismatch"]) for point in points if point["label"] == label and point["mode"] == mode])
+                for label in labels_seen
+            ],
+            combined_dir / f"mismatch_histogram_mode_{_safe_filename_token(mode)}.png",
+            f"Mismatch histograms by case: mode {mode}",
+            bins,
+        )
+        if path is not None:
+            plot_paths.append(path)
+            histogram_paths.append(path)
+
+    cdf_dir = output_path / "cdfs" / "combined"
+    path = _plot_mismatch_cdf_series(
+        [
+            (label, [float(point["mismatch"]) for point in points if point["label"] == label])
+            for label in labels_seen
+        ],
+        cdf_dir / "mismatch_cdf_all_modes.png",
+        "Mismatch CDFs by case: all modes",
+    )
+    if path is not None:
+        plot_paths.append(path)
+        cdf_paths.append(path)
+    for mode in modes_seen:
+        path = _plot_mismatch_cdf_series(
+            [
+                (label, [float(point["mismatch"]) for point in points if point["label"] == label and point["mode"] == mode])
+                for label in labels_seen
+            ],
+            cdf_dir / f"mismatch_cdf_mode_{_safe_filename_token(mode)}.png",
+            f"Mismatch CDFs by case: mode {mode}",
+        )
+        if path is not None:
+            plot_paths.append(path)
+            cdf_paths.append(path)
+
+    payload = {
+        "bins": bins,
+        "cdf_plots": [str(path) for path in cdf_paths],
+        "histogram_plots": [str(path) for path in histogram_paths],
+        "input_tables": [str(table) for table in tables],
+        "labels": labels_seen,
+        "modes": modes_seen,
+        "plots": [str(path) for path in plot_paths],
+        "points": len(points),
+        "points_table": str(points_table),
+        "summary_table": str(summary_table),
+    }
+    (output_path / "mismatch_histogram_summary.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     return payload
 
 
@@ -4110,6 +4635,7 @@ def _config_from_args(args: argparse.Namespace) -> CalibrationConfig:
         output_dir=args.output_dir,
         modes=parse_modes(args.modes),
         mode_mixing_modes=parse_modes(args.mode_mixing_modes) if getattr(args, "mode_mixing_modes", "") else [],
+        counter_rotating_modes=parse_modes(args.counter_rotating_modes) if getattr(args, "counter_rotating_modes", "") else [],
         template=args.template,
         teob_calibration=args.teob_calibration,
         validation_fraction=args.validation_fraction,
@@ -4146,7 +4672,8 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--output-dir", required=True)
     prepare.add_argument("--catalog-file", default=None)
     prepare.add_argument("--modes", default=",".join(_mode_label(mode) for mode in DEFAULT_MODES))
-    prepare.add_argument("--mode-mixing-modes", default=",".join(_mode_label(mode) for mode in DEFAULT_MODE_MIXING_MODES), help="Comma-separated TEOBPM modes that should enable TEOB mode-mixing, e.g. 32,42,43.")
+    prepare.add_argument("--mode-mixing-modes", default=",".join(_mode_label(mode) for mode in DEFAULT_MODE_MIXING_MODES), help="Comma-separated TEOBPM modes that should enable TEOB mode-mixing, e.g. 31,32,41,42,43.")
+    prepare.add_argument("--counter-rotating-modes", default=",".join(_mode_label(mode) for mode in DEFAULT_COUNTER_ROTATING_MODES), help="Comma-separated TEOBPM modes that should add an independent counter-rotating contribution, e.g. 21.")
     prepare.add_argument("--template", choices=["HypTan", "RatExp", "SEOBNRv5"], default="RatExp")
     prepare.add_argument("--teob-calibration", choices=["qc", "noncirc"], default="qc")
     prepare.add_argument("--validation-fraction", type=float, default=0.33)
@@ -4280,6 +4807,16 @@ def build_parser() -> argparse.ArgumentParser:
     mismatch_compare.add_argument("--output-dir", required=True)
     mismatch_compare.add_argument("--family", choices=["auto", "all", "nonspinning", "spinning"], default="auto")
 
+    mismatch_histograms = subparsers.add_parser(
+        "plot-mismatch-histograms",
+        help="Plot mismatch histograms per case and combined by mode.",
+    )
+    mismatch_histograms.add_argument("--mismatch-table", action="append", default=None, help="CSV table containing mismatch rows. May be repeated.")
+    mismatch_histograms.add_argument("--campaign-root", action="append", default=None, help="Campaign root containing template/family/mismatch_summary.csv tables. May be repeated.")
+    mismatch_histograms.add_argument("--label", action="append", default=None, help="Series label for the corresponding --mismatch-table. Must match the final table count when provided.")
+    mismatch_histograms.add_argument("--output-dir", required=True)
+    mismatch_histograms.add_argument("--bins", type=int, default=24)
+
     local_plot = subparsers.add_parser("plot-local-fits", help="Plot collected local-fit coefficients and optional 22-peak evaluation mismatch diagnostics.")
     local_plot.add_argument("--local-fit-table", required=True)
     local_plot.add_argument("--output-dir", required=True)
@@ -4391,6 +4928,14 @@ def main(argv: list[str] | None = None) -> None:
             args.output_dir,
             labels=args.label,
             family=args.family,
+        )
+    elif args.command == "plot-mismatch-histograms":
+        summary = plot_mismatch_histograms(
+            args.mismatch_table,
+            args.output_dir,
+            labels=args.label,
+            campaign_roots=args.campaign_root,
+            bins=args.bins,
         )
     elif args.command == "plot-local-fits":
         summary = plot_local_fit_diagnostics(

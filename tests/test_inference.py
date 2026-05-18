@@ -17,6 +17,9 @@ class FakeConfig:
         except KeyError as exc:
             raise inference.configparser.NoOptionError(option, section) from exc
 
+    def has_option(self, section, option):
+        return (section, option) in self.values
+
 
 class PickleBase:
     pass
@@ -564,6 +567,188 @@ def test_minimization_constraint_residuals_penalize_damped_sinusoid_frequency_or
     residuals = model.minimization_constraint_residuals(invalid)
     assert len(residuals) == 1
     assert residuals[0] > 0.0
+
+
+def test_teobpm_quadratic_44_uses_fixed_parent_22_without_free_quadratic_amplitude(monkeypatch):
+    monkeypatch.setattr(inference.pyRing_utils, "print_section", lambda *args, **kwargs: None, raising=False)
+    monkeypatch.setattr(inference.pyRing_utils, "print_fixed_parameters", lambda *args, **kwargs: None, raising=False)
+
+    model_class = inference.Dynamic_InferenceModel(PickleBase)
+    waveform = FakeWaveform(
+        "TEOBPM",
+        l_NR=4,
+        m_NR=4,
+        TEOB_global_fit=0,
+        TEOB_merger_data=0,
+        TEOB_quadratic_44=1,
+    )
+    config = FakeConfig(
+        {
+            ("Priors", "fix-phi_mrg_22"): 0.2,
+            ("Priors", "fix-c3A_22"): -0.3,
+            ("Priors", "fix-c3p_22"): 3.1,
+            ("Priors", "fix-c4p_22"): 2.5,
+        }
+    )
+
+    model = model_class(
+        np.array([0j, 0j, 0j]),
+        np.array([1.0 + 1.0j, 1.0 + 1.0j, 1.0 + 1.0j]),
+        waveform,
+        config,
+        "Minimization",
+        "trf",
+    )
+
+    assert "ln_A_sum_440_220_220" not in model.names
+    assert "phi_sum_440_220_220" not in model.names
+    assert "quad44_window_delay" not in model.names
+    assert "quad44_window_width" not in model.names
+    assert "quad44_window_steepness" not in model.names
+    assert model.fixed_params["phi_mrg_22"] == 0.2
+    assert model.fixed_params["c3A_22"] == -0.3
+    assert model.fixed_params["c3p_22"] == 3.1
+    assert model.fixed_params["c4p_22"] == 2.5
+
+
+def test_teobpm_quadratic_44_samples_requested_window_parameters(monkeypatch):
+    monkeypatch.setattr(inference.pyRing_utils, "print_section", lambda *args, **kwargs: None, raising=False)
+    monkeypatch.setattr(inference.pyRing_utils, "print_fixed_parameters", lambda *args, **kwargs: None, raising=False)
+
+    model_class = inference.Dynamic_InferenceModel(PickleBase)
+    waveform = FakeWaveform(
+        "TEOBPM",
+        l_NR=4,
+        m_NR=4,
+        TEOB_global_fit=0,
+        TEOB_merger_data=0,
+        TEOB_quadratic_44=1,
+    )
+    config = FakeConfig(
+        {
+            ("Priors", "quad44_window_delay-min"): -2.0,
+            ("Priors", "quad44_window_delay-max"): 20.0,
+            ("Priors", "quad44_window_width-min"): 1.0,
+            ("Priors", "quad44_window_width-max"): 60.0,
+            ("Priors", "quad44_window_steepness-min"): 0.25,
+            ("Priors", "quad44_window_steepness-max"): 8.0,
+        }
+    )
+
+    model = model_class(
+        np.array([0j, 0j, 0j]),
+        np.array([1.0 + 1.0j, 1.0 + 1.0j, 1.0 + 1.0j]),
+        waveform,
+        config,
+        "Minimization",
+        "trf",
+    )
+
+    assert "quad44_window_delay" in model.names
+    assert "quad44_window_width" in model.names
+    assert "quad44_window_steepness" in model.names
+    assert model.bounds[model.names.index("quad44_window_delay")] == [-2.0, 20.0]
+    assert model.bounds[model.names.index("quad44_window_width")] == [1.0, 60.0]
+    assert model.bounds[model.names.index("quad44_window_steepness")] == [0.25, 8.0]
+
+
+def test_teobpm_quadratic_44_fixed_window_end_samples_delay_and_steepness_only(monkeypatch):
+    monkeypatch.setattr(inference.pyRing_utils, "print_section", lambda *args, **kwargs: None, raising=False)
+    monkeypatch.setattr(inference.pyRing_utils, "print_fixed_parameters", lambda *args, **kwargs: None, raising=False)
+
+    model_class = inference.Dynamic_InferenceModel(PickleBase)
+    waveform = FakeWaveform(
+        "TEOBPM",
+        l_NR=4,
+        m_NR=4,
+        TEOB_global_fit=0,
+        TEOB_merger_data=0,
+        TEOB_quadratic_44=1,
+        TEOB_quadratic_44_window_end=20.0,
+    )
+    config = FakeConfig(
+        {
+            ("Priors", "quad44_window_delay-min"): 0.0,
+            ("Priors", "quad44_window_delay-max"): 19.0,
+            ("Priors", "quad44_window_steepness-min"): 0.25,
+            ("Priors", "quad44_window_steepness-max"): 8.0,
+        }
+    )
+
+    model = model_class(
+        np.array([0j, 0j, 0j]),
+        np.array([1.0 + 1.0j, 1.0 + 1.0j, 1.0 + 1.0j]),
+        waveform,
+        config,
+        "Minimization",
+        "trf",
+    )
+
+    assert "quad44_window_delay" in model.names
+    assert "quad44_window_width" not in model.names
+    assert "quad44_window_steepness" in model.names
+    assert model.bounds[model.names.index("quad44_window_delay")] == [0.0, 19.0]
+    assert model.bounds[model.names.index("quad44_window_steepness")] == [0.25, 8.0]
+
+
+def test_teobpm_hyptan_counter_rotating_uses_selected_mode_without_optional_priors(monkeypatch):
+    monkeypatch.setattr(inference.pyRing_utils, "print_section", lambda *args, **kwargs: None, raising=False)
+    monkeypatch.setattr(inference.pyRing_utils, "print_fixed_parameters", lambda *args, **kwargs: None, raising=False)
+
+    model_class = inference.Dynamic_InferenceModel(PickleBase)
+    waveform = FakeWaveform(
+        "TEOBPM",
+        l_NR=3,
+        m_NR=3,
+        TEOB_template="HypTan",
+        TEOB_global_fit=0,
+        TEOB_merger_data=0,
+        TEOB_counter_rotating=1,
+    )
+
+    model = model_class(
+        np.array([0j, 0j, 0j]),
+        np.array([1.0 + 1.0j, 1.0 + 1.0j, 1.0 + 1.0j]),
+        waveform,
+        FakeConfig({}),
+        "Minimization",
+        "trf",
+    )
+
+    assert "ln_A_counter_scale_3-3" in model.names
+    assert "phi_mrg_counter_3-3" in model.names
+    assert "c3A_counter_3-3" in model.names
+    assert "c3p_counter_3-3" in model.names
+    assert "c4p_counter_3-3" in model.names
+    assert "c2A_counter_3-3" not in model.names
+    assert "c2p_counter_3-3" not in model.names
+
+
+def test_teobpm_quadratic_modes_add_free_amplitude_priors(monkeypatch):
+    monkeypatch.setattr(inference.pyRing_utils, "print_section", lambda *args, **kwargs: None, raising=False)
+    monkeypatch.setattr(inference.pyRing_utils, "print_fixed_parameters", lambda *args, **kwargs: None, raising=False)
+
+    model_class = inference.Dynamic_InferenceModel(PickleBase)
+    waveform = FakeWaveform(
+        "TEOBPM",
+        l_NR=5,
+        m_NR=5,
+        TEOB_global_fit=0,
+        TEOB_merger_data=0,
+        quadratic_modes={"sum": [((5, 5, 0), (2, 2, 0), (3, 3, 0))], "diff": []},
+    )
+
+    model = model_class(
+        np.array([0j, 0j, 0j]),
+        np.array([1.0 + 1.0j, 1.0 + 1.0j, 1.0 + 1.0j]),
+        waveform,
+        FakeConfig({}),
+        "Minimization",
+        "trf",
+    )
+
+    assert "ln_A_sum_550_220_330" in model.names
+    assert "phi_sum_550_220_330" in model.names
 
 
 def test_minimization_constraint_residuals_penalize_kerr_tail_exponent_ordering(monkeypatch):

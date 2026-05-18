@@ -384,22 +384,35 @@ global fits or are sampled locally:
        qc/noncirc calibration selector.
 
 ``TEOB-quadratic-44`` adds a narrow opt-in nonlinear term to TEOBPM ``(4,4)``
-fits. The term is a ``220x220`` sum-frequency QNM with a half-cosine early-time
-taper:
+fits. The term uses the time-dependent TEOBPM parent template and a fitted
+perturbative QQNM ratio,
+``h_quad = k(af) * W(t) * h_22(t)^2``, with a half-cosine early-time taper:
 
 .. code-block:: ini
 
    TEOB-quadratic-44 = 1
    TEOB-quadratic-44-window-start = 10.0
    TEOB-quadratic-44-window-width = 15.0
+   TEOB-quadratic-44-window-end = -1.0
+   TEOB-quadratic-44-window-steepness = 1.0
+   TEOB-quadratic-44-ratio-fit = khera-total
 
-The sampled complex amplitude uses the same naming convention as Kerr
-quadratic terms:
+The ``h_22(t)`` branch needs the 22 merger phase and, for local TEOBPM fits,
+the fixed 22 calibration coefficients from a parent 22 fit. The ratio fit can
+be ``khera-total`` for the complex nonprecessing total ratio, ``khera-r++`` for
+the complex ``++`` channel alone, or ``redondo-yuste`` for the real
+surface-gravity magnitude fit.
 
-.. code-block:: text
-
-   ln_A_sum_440_220_220
-   phi_sum_440_220_220
+The fixed window values above are used unless local-fit priors are supplied for
+``quad44_window_delay``, ``quad44_window_width``, or
+``quad44_window_steepness``. ``quad44_window_delay`` is measured relative to
+the target ``(4,4)`` peak, so the actual taper start is
+``DeltaT_44 + quad44_window_delay``. A steepness value of ``1`` recovers the
+half-cosine taper; larger values make the turn-on sharper.
+Setting ``TEOB-quadratic-44-window-end`` to a non-negative value fixes the
+taper end relative to the target ``(4,4)`` peak and derives the taper width
+from ``quad44_window_delay``. In that mode, ``quad44_window_width`` must not be
+fixed or sampled.
 
 ``TEOB-tapered-overtone-44`` adds an opt-in ``441`` QNM contribution with its
 own half-cosine early-time taper:

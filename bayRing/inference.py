@@ -8,6 +8,7 @@ from cpnest.nest2pos import draw_posterior, compute_weights
 import cpnest, cpnest.model
 import pyRing.utils      as pyRing_utils
 import bayRing.postprocess as postprocess
+import bayRing.template_waveforms as template_waveforms
 import bayRing.utils       as utils
 
 twopi                  = 2.*np.pi
@@ -235,6 +236,14 @@ def teobpm_optional_reference_bounds():
         'omg_ref'            : [1.0e-4, 1.0],
         'c2A'                : [1.0e-4, 20.0],
         'c2p'                : [1.0e-4, 20.0],
+    }
+
+def teobpm_quadratic_44_window_bounds():
+
+    return {
+        'quad44_window_delay'    : [-10.0, 50.0],
+        'quad44_window_width'    : [1.0e-3, 80.0],
+        'quad44_window_steepness': [0.1, 10.0],
     }
 
 def has_teobpm_optional_prior(Config, fullname):
@@ -547,7 +556,9 @@ def Dynamic_InferenceModel(base):
             self.TEOB_mode_mixing = getattr(self.wf_model, 'TEOB_mode_mixing', 0)
             self.TEOB_counter_rotating = getattr(self.wf_model, 'TEOB_counter_rotating', 0)
             self.TEOB_quadratic_44 = getattr(self.wf_model, 'TEOB_quadratic_44', 0)
+            self.TEOB_quadratic_44_window_end = float(getattr(self.wf_model, 'TEOB_quadratic_44_window_end', -1.0))
             self.TEOB_tapered_overtone_44 = getattr(self.wf_model, 'TEOB_tapered_overtone_44', 0)
+            self.quadratic_modes = getattr(self.wf_model, 'quadratic_modes', None)
             self.min_method    = min_method
             self.Config        = Config
 
@@ -722,9 +733,8 @@ def Dynamic_InferenceModel(base):
                                 self.bounds.append(single_bounds)
 
                 if self.TEOB_mode_mixing:
-                    parent_modes = {(3, 2): (2, 2), (4, 3): (3, 3)}
                     requested_mode = (self.wf_model.l_NR, self.wf_model.m_NR)
-                    parent_mode = parent_modes.get(requested_mode)
+                    parent_mode = template_waveforms.TEOB_MODE_MIXING_PARENTS.get(requested_mode)
                     if parent_mode is not None:
                         for name in default_bounds_TEOBPM.keys():
                             if self.TEOB_global_fit and name != 'phi_mrg':
@@ -781,18 +791,59 @@ def Dynamic_InferenceModel(base):
                                     self.names.append(fullname)
                                     self.bounds.append(single_bounds)
 
+                if self.quadratic_modes is not None:
+                    default_bounds_quadratic = read_default_bounds('Kerr')
+                    for quad_term in self.quadratic_modes:
+                        for modes in self.quadratic_modes[quad_term]:
+                            label = '{}_{}{}{}_{}{}{}_{}{}{}'.format(
+                                quad_term,
+                                modes[0][0], modes[0][1], modes[0][2],
+                                modes[1][0], modes[1][1], modes[1][2],
+                                modes[2][0], modes[2][1], modes[2][2],
+                            )
+                            for name in default_bounds_quadratic.keys():
+                                fullname = '{}_{}'.format(name, label)
+                                try:
+                                    self.fixed_params[fullname] = self.Config.getfloat("Priors", 'fix-'+fullname)
+                                except(configparser.NoOptionError):
+                                    single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_quadratic)
+                                    self.names.append(fullname)
+                                    self.bounds.append(single_bounds)
+
                 if self.TEOB_quadratic_44:
-                    default_bounds_quadratic_44 = {
-                        'ln_A_sum_440_220_220': [-20.0, 5.0],
-                        'phi_sum_440_220_220' : [0.0, twopi],
-                    }
-                    for name in default_bounds_quadratic_44.keys():
+                    default_bounds_quadratic_44_window = teobpm_quadratic_44_window_bounds()
+                    for name in default_bounds_quadratic_44_window.keys():
+                        if name == 'quad44_window_width' and self.TEOB_quadratic_44_window_end >= 0.0:
+                            if has_teobpm_optional_prior(self.Config, name):
+                                raise ValueError(
+                                    "quad44_window_width cannot be fixed or sampled when "
+                                    "TEOB-quadratic-44-window-end is enabled."
+                                )
+                            continue
                         try:
                             self.fixed_params[name] = self.Config.getfloat("Priors",'fix-'+name)
                         except(configparser.NoOptionError):
-                            single_bounds = read_parameter_bounds(Config, configparser, name, name, default_bounds_quadratic_44)
-                            self.names.append(name)
-                            self.bounds.append(single_bounds)
+                            if has_teobpm_optional_prior(self.Config, name):
+                                single_bounds = read_parameter_bounds(Config, configparser, name, name, default_bounds_quadratic_44_window)
+                                self.names.append(name)
+                                self.bounds.append(single_bounds)
+
+                    parent_mode_label = '22'
+                    for name in default_bounds_TEOBPM.keys():
+                        fullname = '{}_{}'.format(name, parent_mode_label)
+                        try:
+                            self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                        except(configparser.NoOptionError):
+                            pass
+                    optional_bounds_TEOBPM = teobpm_optional_reference_bounds()
+                    for name in optional_bounds_TEOBPM.keys():
+                        if name in default_bounds_TEOBPM:
+                            continue
+                        fullname = '{}_{}'.format(name, parent_mode_label)
+                        try:
+                            self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                        except(configparser.NoOptionError):
+                            pass
 
                 if self.TEOB_tapered_overtone_44:
                     default_bounds_tapered_overtone_44 = {

@@ -222,7 +222,7 @@ def score_candidate(candidate: pd.Series, config: Config) -> list[dict[str, Any]
             lev_high,
             lev_low,
             f"failed to load required waveform: {exc}",
-            ["missing_extrapolation_order"],
+            ["waveform_load_failed"],
         )
 
     try:
@@ -399,7 +399,14 @@ def _score_mode(
         return row
 
     delta_res = resolution_error(h_ref, h_low_aligned, t_grid, config.metrics.norm_floor)
-    delta_ext = extrapolation_error(h_ref, comparison_modes, t_grid, config.metrics.norm_floor)
+    if comparison_modes:
+        delta_ext = extrapolation_error(h_ref, comparison_modes, t_grid, config.metrics.norm_floor)
+    elif config.filters.require_extrapolation_comparison or config.metrics.weights.get("extrapolation", 0.0) != 0.0:
+        row["flags"] = "missing_extrapolation_order"
+        row["rejection_reason"] = "required extrapolation comparison is missing"
+        return row
+    else:
+        delta_ext = 0.0
     delta_floor = floor_penalty(
         h_ref,
         h_low_aligned,

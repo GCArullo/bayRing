@@ -23,7 +23,9 @@ Typical campaign preparation
    bayRing-teobpm-calibrate prepare \
      --family nonspinning \
      --output-dir runs/teobpm_nonspinning \
-     --modes 22,21,33,32,44,43 \
+     --modes 22,21,33,32,31,44,43,42,41,55 \
+     --mode-mixing-modes 31,32,41,42,43 \
+     --counter-rotating-modes 21 \
      --template RatExp \
      --t-start 0
 
@@ -46,6 +48,13 @@ global-fit checks must compare from the ``(2,2)`` peak with ``t-start = 0`` and
 ``tref = peak22``. Higher modes can therefore be empty over the initial
 ``0 <= t < DeltaT_lm`` part of the comparison window.
 
+By default the prepared campaign enables mode mixing for ``31``, ``32``,
+``41``, ``42`` and ``43``, adds the ``Px220x330`` quadratic term to ``55``, and
+adds an independent counter-rotating contribution to ``21``. The
+``--mode-mixing-modes`` and ``--counter-rotating-modes`` arguments are explicit
+selectors, so exploratory campaigns can add or remove those contributions
+without editing the generated configs by hand.
+
 Local fits and collection
 -------------------------
 
@@ -60,10 +69,10 @@ Run the indexed ``22`` local fits first with:
      --workers 4
 
 Then fill the higher-mode metadata and run every higher mode whose dependencies
-are available. This can include ``32`` and ``42`` because their mixed-mode parents are ``22`` and ``32`` respectively;
-hold back ``43`` until ``33`` has completed:
-
-The ``55`` mode uses a default quadratic term, ``Px220x330``.
+are available. This can include ``32`` and ``42`` because their mixed-mode parent
+is ``22``. Hold back ``31`` and ``41`` until ``21`` has completed, and hold back
+``43`` until ``33`` has completed. The ``55`` mode uses a default quadratic term,
+``Px220x330``.
 
 .. code-block:: bash
 
@@ -73,11 +82,11 @@ The ``55`` mode uses a default quadratic term, ``Px220x330``.
    bayRing-teobpm-calibrate run-local-fits \
      --campaign-dir runs/teobpm_nonspinning \
      --split training \
-     --modes 21,33,32,31,44,42,41,55 \
+     --modes 21,33,32,44,42,55 \
      --workers 4
 
-After ``33`` finishes, fill the mixed ``43`` parent coefficients and run ``43``
-as its own parallel simulation batch:
+After ``21`` and ``33`` finish, fill the mixed parent coefficients and run
+``31``, ``41``, and ``43`` as their own parallel simulation batch:
 
 .. code-block:: bash
 
@@ -87,7 +96,7 @@ as its own parallel simulation batch:
    bayRing-teobpm-calibrate run-local-fits \
      --campaign-dir runs/teobpm_nonspinning \
      --split training \
-     --modes 43 \
+     --modes 31,41,43 \
      --workers 4
 
 The runner skips jobs that already contain
@@ -114,6 +123,11 @@ as reference. Representative construction mismatches are stored as
 for 22-peak evaluation mismatches. Re-run collection with ``--split all`` after
 validation local fits are available if the same table should drive both
 global-fit construction and validation diagnostics.
+
+For quadratic-44 runs, the collector also recognises the unsuffixed local
+window targets ``quad44_window_delay``, ``quad44_window_width``, and
+``quad44_window_steepness``. These rows are accepted by the same global-fit
+construction command as the TEOBPM coefficient targets.
 
 Local-fit plots
 ---------------
@@ -200,6 +214,30 @@ column or wide comparison columns such as ``new_global_mismatch`` and
 The command writes point-level and summary CSV files plus
 ``teobpm_mismatch_comparison_spinning.png`` and/or
 ``teobpm_mismatch_comparison_nonspinning.png`` depending on the rows supplied.
+
+Mismatch histograms
+-------------------
+
+The collected ``mismatch_summary.csv`` tables can be summarized without
+parameter-space metadata using histogram diagnostics. For a multi-template
+campaign root, the command discovers every
+``template/family/mismatch_summary.csv`` table, writes one histogram directory
+per case, and writes combined plots that overlay all cases mode by mode:
+
+.. code-block:: bash
+
+   bayRing-teobpm-calibrate plot-mismatch-histograms \
+     --campaign-root runs/teobpm_current_spinning_refit \
+     --output-dir runs/teobpm_current_spinning_refit/mismatch_histograms
+
+The outputs include ``mismatch_histogram_points.csv``,
+``mismatch_histogram_summary.csv``, per-case plots under ``cases/``, combined
+histogram plots under ``combined/``, and empirical CDF overlays under
+``cdfs/combined/``. Per-case plots mark the median and the 5--95 percentile
+range. Combined histogram plots use one normalized horizontal track per case,
+color-coded by template, so all cases can be compared without overplotting. The
+combined mode plots are named ``combined/mismatch_histogram_mode_<lm>.png`` and
+``cdfs/combined/mismatch_cdf_mode_<lm>.png``.
 
 The report command renders a LaTeX summary and compiles it when ``pdflatex`` is
 available. When campaign summaries and validation figures exist, they are

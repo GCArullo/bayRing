@@ -9,8 +9,10 @@ when `Algorithm/posterior.dat` already exists for nested-sampler runs. Pass
 and mode.
 
 The default higher-mode set is
-`22,21,33,32,31,44,43,42,41,55`. Mode mixing is enabled by default for `32`, `42`, and `43`; those modes need completed
-parent-mode fits before they are run.
+`22,21,33,32,31,44,43,42,41,55`. Mode mixing is enabled by default for `31`,
+`32`, `41`, `42`, and `43`; those modes need completed parent-mode fits before
+they are run. Counter-rotating terms are enabled by default for `21`; override
+`COUNTER_ROTATING_MODES` to explore a different externally selected set.
 
 The `55` mode is generated with the quadratic term `Px220x330` by default.
 `run-local-fits` uses all available CPU cores by default and prints one status
@@ -31,7 +33,8 @@ export BINARY_TYPE=nonspinning        # nonspinning, equal-mass-spinning, spinni
 export LOCAL_ALGORITHM=Minimization
 export MAX_POLYNOMIAL_DEGREE=3
 export MODES=22,21,33,32,31,44,43,42,41,55
-export MIXED_MODES=32,42,43
+export MIXED_MODES=31,32,41,42,43
+export COUNTER_ROTATING_MODES=21
 export RANDOM_FRACTION=1.0
 export CAMPAIGN_DIR="${ROOT}/${TEMPLATE}/${BINARY_TYPE}"
 export GLOBAL_FIT="${CAMPAIGN_DIR}/teobpm_global_fit.json"
@@ -116,6 +119,7 @@ bayRing-teobpm-calibrate prepare \
   "${PREPARE_BASE_ARGS[@]}" \
   --modes "$MODES" \
   --mode-mixing-modes "$MIXED_MODES" \
+  --counter-rotating-modes "$COUNTER_ROTATING_MODES" \
   --template "$TEMPLATE" \
   --teob-calibration qc \
   --method "$LOCAL_ALGORITHM" \
@@ -139,17 +143,18 @@ bayRing-teobpm-calibrate fill-hm-inputs \
   --mode-mixing-modes "$MIXED_MODES"
 ```
 
-Run the higher modes whose dependencies are available. This includes `32` and `42`
-because their parents are `22` and `32` respectively; hold back `43` until `33` has completed:
+Run the higher modes whose dependencies are available. This includes `32` and
+`42` because their parent is `22`. Hold back `31` and `41` until `21` has
+completed, and hold back `43` until `33` has completed:
 
 ```bash
 OMP_NUM_THREADS=1 bayRing-teobpm-calibrate run-local-fits \
   --campaign-dir "$CAMPAIGN_DIR" \
-  --modes 21,33,32,31,44,42,41,55
+  --modes 21,33,32,44,42,55
 ```
 
-Fill the `43` parent coefficients from the completed `33` fits and run `43` as
-its own parallel simulation batch:
+Fill the mixed parent coefficients from the completed `21` and `33` fits, then
+run `31`, `41`, and `43` as their own parallel simulation batch:
 
 ```bash
 bayRing-teobpm-calibrate fill-hm-inputs \
@@ -158,7 +163,7 @@ bayRing-teobpm-calibrate fill-hm-inputs \
 
 OMP_NUM_THREADS=1 bayRing-teobpm-calibrate run-local-fits \
   --campaign-dir "$CAMPAIGN_DIR" \
-  --modes 43
+  --modes 31,41,43
 ```
 
 Collect local coefficients, construction mismatch files, and failures:
@@ -172,6 +177,10 @@ bayRing-teobpm-calibrate collect-local-fits \
 Inspect `local_fit_collection_failures.csv` before moving on. Representative
 construction mismatches are written as `construction_mismatch` in
 `local_fit_summary.csv`; they are not used as evaluation mismatches.
+For quadratic-44 runs, the collector also recognises
+`quad44_window_delay`, `quad44_window_width`, and
+`quad44_window_steepness`, and the `global-fit` command accepts those targets
+from the same table.
 
 ## 2. Local-Fit Plots
 
@@ -250,3 +259,20 @@ Nonspinning mismatch plots use `nu`. Spinning mismatch plots use `nu` and
 `chi_eff`. If a mismatch table declares `t_start`/`t-start` or
 `tref`/`reference_time`, the plotting command checks that the comparison uses
 `t_start = 0` and `tref = peak22`.
+
+To summarize the collected mismatch rows as histograms, use the campaign-root
+histogram action. It discovers every `template/family/mismatch_summary.csv`
+table, writes per-case histograms, and writes one combined overlay per mode:
+
+```bash
+bayRing-teobpm-calibrate plot-mismatch-histograms \
+  --campaign-root "$CAMPAIGN_ROOT" \
+  --output-dir "$CAMPAIGN_ROOT/mismatch_histograms"
+```
+
+The combined mode plots are written as
+`mismatch_histograms/combined/mismatch_histogram_mode_<lm>.png`. Per-case
+plots mark the median and 5-95 percentile range; combined plots use separated
+normalized tracks, color-coded by template, to avoid overplotting. The same
+command also writes empirical CDF overlays for all cases under
+`mismatch_histograms/cdfs/combined/mismatch_cdf_mode_<lm>.png`.

@@ -201,6 +201,9 @@ def _run_single_start(Config, parameters, config_file):
                                                 TEOB_quadratic_44         = parameters['Model']['TEOB-quadratic-44']                ,
                                                 TEOB_quadratic_44_window_start = parameters['Model']['TEOB-quadratic-44-window-start'],
                                                 TEOB_quadratic_44_window_width = parameters['Model']['TEOB-quadratic-44-window-width'],
+                                                TEOB_quadratic_44_window_end = parameters['Model']['TEOB-quadratic-44-window-end']  ,
+                                                TEOB_quadratic_44_window_steepness = parameters['Model']['TEOB-quadratic-44-window-steepness'],
+                                                TEOB_quadratic_44_ratio_fit = parameters['Model']['TEOB-quadratic-44-ratio-fit']   ,
                                                 TEOB_tapered_overtone_44  = parameters['Model']['TEOB-tapered-overtone-44']        ,
                                                 TEOB_tapered_overtone_44_window_start = parameters['Model']['TEOB-tapered-overtone-44-window-start'],
                                                 TEOB_tapered_overtone_44_window_width = parameters['Model']['TEOB-tapered-overtone-44-window-width'],
@@ -263,11 +266,12 @@ def _run_single_start(Config, parameters, config_file):
                 continue
             model_samples.append(model_sample)
         if not model_samples:
-            raise RuntimeError("No finite waveform samples could be constructed for serialization.")
-        if skipped_samples:
-            print("* Warning: skipped {} invalid point-estimate waveform sample(s) during serialization.".format(skipped_samples))
-        with open(os.path.join(parameters['I/O']['outdir'], 'NR_sim.pkl'), 'wb') as f:
-            pickle.dump([NR_sim, model_samples, wf_model], f)
+            print("* Warning: no finite point-estimate waveform samples could be constructed for serialization; skipping NR_sim.pkl.")
+        else:
+            if skipped_samples:
+                print("* Warning: skipped {} invalid point-estimate waveform sample(s) during serialization.".format(skipped_samples))
+            with open(os.path.join(parameters['I/O']['outdir'], 'NR_sim.pkl'), 'wb') as f:
+                pickle.dump([NR_sim, model_samples, wf_model], f)
 
     #=========================#
     # Postprocessing section. #

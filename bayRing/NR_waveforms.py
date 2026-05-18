@@ -885,6 +885,9 @@ class NR_simulation():
         self.injection_model_parameters.setdefault('TEOB-quadratic-44', 0)
         self.injection_model_parameters.setdefault('TEOB-quadratic-44-window-start', 10.0)
         self.injection_model_parameters.setdefault('TEOB-quadratic-44-window-width', 15.0)
+        self.injection_model_parameters.setdefault('TEOB-quadratic-44-window-end', -1.0)
+        self.injection_model_parameters.setdefault('TEOB-quadratic-44-window-steepness', 1.0)
+        self.injection_model_parameters.setdefault('TEOB-quadratic-44-ratio-fit', 'khera-total')
         self.injection_model_parameters.setdefault('TEOB-tapered-overtone-44', 0)
         self.injection_model_parameters.setdefault('TEOB-tapered-overtone-44-window-start', 0.0)
         self.injection_model_parameters.setdefault('TEOB-tapered-overtone-44-window-width', 10.0)
@@ -968,6 +971,9 @@ class NR_simulation():
                 TEOB_quadratic_44         = self.injection_model_parameters['TEOB-quadratic-44'],
                 TEOB_quadratic_44_window_start = self.injection_model_parameters['TEOB-quadratic-44-window-start'],
                 TEOB_quadratic_44_window_width = self.injection_model_parameters['TEOB-quadratic-44-window-width'],
+                TEOB_quadratic_44_window_end = self.injection_model_parameters['TEOB-quadratic-44-window-end'],
+                TEOB_quadratic_44_window_steepness = self.injection_model_parameters['TEOB-quadratic-44-window-steepness'],
+                TEOB_quadratic_44_ratio_fit = self.injection_model_parameters['TEOB-quadratic-44-ratio-fit'],
                 TEOB_tapered_overtone_44  = self.injection_model_parameters['TEOB-tapered-overtone-44'],
                 TEOB_tapered_overtone_44_window_start = self.injection_model_parameters['TEOB-tapered-overtone-44-window-start'],
                 TEOB_tapered_overtone_44_window_width = self.injection_model_parameters['TEOB-tapered-overtone-44-window-width'],

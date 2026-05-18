@@ -173,7 +173,8 @@ def test_prepare_parser_defaults_to_mixed_higher_modes_and_sxs_id_subset(tmp_pat
 
     config = calib._config_from_args(args)
 
-    assert config.mode_mixing_modes == [(3, 2), (4, 3)]
+    assert config.mode_mixing_modes == [(3, 1), (3, 2), (4, 1), (4, 2), (4, 3)]
+    assert config.counter_rotating_modes == [(2, 1)]
     assert config.sxs_ids == ["SXS:BBH:0001", "SXS:BBH:0003"]
     assert config.random_fraction == 1.0
     assert config.t_start == 0.0
@@ -206,6 +207,42 @@ def test_seobnrv5_template_prior_text_is_available_for_primary_and_counter_modes
     assert "c2p_counter_2-1-min = 0.0001" in counter
     assert "c3p_counter_2-1-min = 0.1" in counter
     assert "c4p_counter_2-1-min" not in counter
+
+
+def test_generated_configs_enable_requested_new_mixed_modes_and_55_quadratic(tmp_path):
+    record = calib.normalise_catalog_entry(_catalog_rows()[0])
+    config = calib.CalibrationConfig(
+        family="nonspinning",
+        output_dir=str(tmp_path / "campaign"),
+        modes=[(3, 1), (4, 1), (4, 2), (5, 5)],
+        mode_mixing_modes=[(3, 1), (4, 1), (4, 2)],
+    )
+
+    paths = calib.generate_local_fit_configs([record], config)
+
+    texts = {path.name: path.read_text(encoding="utf-8") for path in paths}
+    assert "TEOB-mode-mixing = 1" in texts["SXS_BBH_0001_mode_31.ini"]
+    assert "TEOB-mode-mixing = 1" in texts["SXS_BBH_0001_mode_41.ini"]
+    assert "TEOB-mode-mixing = 1" in texts["SXS_BBH_0001_mode_42.ini"]
+    assert "TEOB-mode-mixing = 0" in texts["SXS_BBH_0001_mode_55.ini"]
+    assert "QQNM-modes = Px220x330" in texts["SXS_BBH_0001_mode_55.ini"]
+
+
+def test_generated_configs_enable_requested_counter_rotating_mode(tmp_path):
+    record = calib.normalise_catalog_entry(_catalog_rows()[0])
+    config = calib.CalibrationConfig(
+        family="nonspinning",
+        output_dir=str(tmp_path / "campaign"),
+        modes=[(3, 3)],
+        counter_rotating_modes=[(3, 3)],
+    )
+
+    [path] = calib.generate_local_fit_configs([record], config)
+    text = path.read_text(encoding="utf-8")
+
+    assert "TEOB-counter-rotating = 1" in text
+    assert "ln_A_counter_scale_3-3-min = -8" in text
+    assert "phi_mrg_counter_3-3-max = 6.283185307179586" in text
 
 
 def test_run_local_fit_job_invokes_bayring_and_writes_logs(tmp_path, monkeypatch):
@@ -369,6 +406,51 @@ def test_fill_higher_mode_inputs_adds_t_peak_and_parent_fixes(tmp_path):
     assert "t-peak-22 = 123.5" in text
     assert "fix-phi_mrg_22 = 1.2" in text
     assert "fix-c3A_22 = -0.40000000000000002" in text
+
+
+def test_fill_higher_mode_inputs_uses_21_and_22_as_new_mixed_mode_parents(tmp_path):
+    campaign_dir = tmp_path / "campaign"
+    config_dir = campaign_dir / "local_fit_configs"
+    config_dir.mkdir(parents=True)
+    jobs = [
+        calib.LocalFitJob("SXS:BBH:0001", "21", "training", str(config_dir / "21.ini"), str(campaign_dir / "out_21"), 1.0, 0.25, 0, 0, 0, 0, 0, 1),
+        calib.LocalFitJob("SXS:BBH:0001", "22", "training", str(config_dir / "22.ini"), str(campaign_dir / "out_22"), 1.0, 0.25, 0, 0, 0, 0, 0, 1),
+        calib.LocalFitJob("SXS:BBH:0001", "31", "training", str(config_dir / "31.ini"), str(campaign_dir / "out_31"), 1.0, 0.25, 0, 0, 0, 0, 0, 1),
+        calib.LocalFitJob("SXS:BBH:0001", "41", "training", str(config_dir / "41.ini"), str(campaign_dir / "out_41"), 1.0, 0.25, 0, 0, 0, 0, 0, 1),
+        calib.LocalFitJob("SXS:BBH:0001", "42", "training", str(config_dir / "42.ini"), str(campaign_dir / "out_42"), 1.0, 0.25, 0, 0, 0, 0, 0, 1),
+    ]
+    calib.write_local_fit_index(jobs, campaign_dir / "local_fit_index.csv")
+    for job in jobs:
+        Path(job.config_file).write_text("[NR-data]\nt-peak-22 = 0.0\n\n[Priors]\n", encoding="utf-8")
+    (campaign_dir / "out_22" / "Peak_quantities").mkdir(parents=True)
+    (campaign_dir / "out_22" / "Peak_quantities" / "Peak_time.txt").write_text("12.5\n", encoding="utf-8")
+    (campaign_dir / "out_21" / "Algorithm").mkdir(parents=True)
+    (campaign_dir / "out_22" / "Algorithm").mkdir(parents=True)
+    (campaign_dir / "out_21" / "Algorithm" / "point_estimates.dat").write_text(
+        "# parameter\tvalue\tsigma\n"
+        "phi_mrg_21\t1.2\t0.1\n"
+        "c3A_21\t-0.3\t0.1\n",
+        encoding="utf-8",
+    )
+    (campaign_dir / "out_22" / "Algorithm" / "point_estimates.dat").write_text(
+        "# parameter\tvalue\tsigma\n"
+        "phi_mrg_22\t2.2\t0.1\n"
+        "c3A_22\t-0.4\t0.1\n",
+        encoding="utf-8",
+    )
+
+    summary = calib.fill_higher_mode_inputs(campaign_dir, mode_mixing_modes=[(3, 1), (4, 1), (4, 2)])
+
+    mode31_text = (config_dir / "31.ini").read_text(encoding="utf-8")
+    mode41_text = (config_dir / "41.ini").read_text(encoding="utf-8")
+    mode42_text = (config_dir / "42.ini").read_text(encoding="utf-8")
+    assert "fix-phi_mrg_21 = 1.2" in mode31_text
+    assert "fix-c3A_21 = -0.29999999999999999" in mode31_text
+    assert "fix-phi_mrg_21 = 1.2" in mode41_text
+    assert "fix-c3A_21 = -0.29999999999999999" in mode41_text
+    assert "fix-phi_mrg_22 = 2.2" in mode42_text
+    assert "fix-c3A_22 = -0.40000000000000002" in mode42_text
+    assert summary["parent_fixes_added"] == 6
 
 
 def test_collect_local_fit_outputs_reads_estimates_mismatches_and_relative_phases(tmp_path):
@@ -574,6 +656,62 @@ def test_collect_local_fit_outputs_reads_sampler_posterior_when_point_estimate_m
     assert c3a_rows[0]["source"] == "posterior_median"
     assert abs(float(c3a_rows[0]["value"]) - 2.0) < 1.0e-12
     assert float(c3a_rows[0]["sigma"]) > 0.0
+
+
+def test_collect_and_global_fit_include_quadratic_44_window_targets(tmp_path):
+    campaign_dir = tmp_path / "campaign"
+    jobs = []
+    for index, (sxs_id, nu, delay, width, steepness) in enumerate([
+        ("SXS:BBH:0001", 0.20, 1.0, 20.0, 1.5),
+        ("SXS:BBH:0002", 0.25, 2.0, 25.0, 2.0),
+    ]):
+        outdir = campaign_dir / "local_fits" / sxs_id.replace(":", "_") / "mode_44"
+        (outdir / "Algorithm").mkdir(parents=True)
+        (outdir / "Algorithm" / "posterior.dat").write_text(
+            "quad44_window_delay\tquad44_window_width\tquad44_window_steepness\tlogL\tlogPrior\n"
+            f"{delay - 0.1}\t{width - 1.0}\t{steepness - 0.1}\t-5.0\t0.0\n"
+            f"{delay}\t{width}\t{steepness}\t-4.0\t0.0\n"
+            f"{delay + 0.1}\t{width + 1.0}\t{steepness + 0.1}\t-3.0\t0.0\n",
+            encoding="utf-8",
+        )
+        jobs.append(
+            calib.LocalFitJob(
+                sxs_id=sxs_id,
+                mode="44",
+                split="training",
+                config_file=str(campaign_dir / f"fit_{index}.ini"),
+                outdir=str(outdir),
+                q=1.0,
+                nu=nu,
+                chi1z=0.0,
+                chi2z=0.0,
+                chi_eff=0.0,
+                chi_a=0.0,
+                eccentricity=0.0,
+                quality_score=1.0,
+            )
+        )
+    calib.write_local_fit_index(jobs, campaign_dir / "local_fit_index.csv")
+
+    calib.collect_local_fit_outputs(campaign_dir)
+    rows = list(csv.DictReader((campaign_dir / "local_fit_summary.csv").open(encoding="utf-8")))
+    targets = {row["target"] for row in rows if row["mode"] == "44"}
+
+    assert "quad44_window_delay" in targets
+    assert "quad44_window_width" in targets
+    assert "quad44_window_steepness" in targets
+
+    payload = calib.construct_global_fit(
+        campaign_dir / "local_fit_summary.csv",
+        campaign_dir / "teobpm_global_fit.json",
+        "nonspinning",
+        template="HypTan",
+        max_polynomial_degree=1,
+    )
+
+    assert "quad44_window_delay" in payload["fits"]["44"]
+    assert "quad44_window_width" in payload["fits"]["44"]
+    assert "quad44_window_steepness" in payload["fits"]["44"]
 
 
 def test_collect_mismatch_rows_reads_compact_diagnostics_table(tmp_path):
@@ -1164,3 +1302,94 @@ def test_validate_global_fit_uses_explicit_evaluation_mismatch_table(tmp_path, m
 
     assert summary["mismatch_summary"]["rows"] == 1
     assert calls == [([evaluation_table], tmp_path / "validation_plots" / "mismatches", ["Global evaluation"], "nonspinning")]
+
+
+def test_plot_mismatch_histograms_writes_case_and_mode_combined_plots(tmp_path, monkeypatch):
+    root = tmp_path / "campaign_root"
+    table_a = root / "hyptan_ratexp_nr" / "nonspinning" / "mismatch_summary.csv"
+    table_b = root / "ratexp" / "generic_spinning" / "mismatch_summary.csv"
+    table_a.parent.mkdir(parents=True)
+    table_b.parent.mkdir(parents=True)
+    table_a.write_text(
+        "sxs_id,mode,CI,Strain_data,mismatch,split\n"
+        "SXS:BBH:0001,22,50,real,3e-6,training\n"
+        "SXS:BBH:0001,22,50,imag,4e-6,training\n"
+        "SXS:BBH:0002,33,50,real,2e-5,training\n",
+        encoding="utf-8",
+    )
+    table_b.write_text(
+        "sxs_id,mode,CI,Strain_data,mismatch,split\n"
+        "SXS:BBH:0003,22,50,real,6e-6,training\n"
+        "SXS:BBH:0003,22,50,imag,8e-6,training\n"
+        "SXS:BBH:0004,33,50,real,1e-4,training\n",
+        encoding="utf-8",
+    )
+    plot_calls = []
+
+    def fake_histogram(series, output_file, title, bins):
+        output_file = Path(output_file)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        output_file.write_text("", encoding="utf-8")
+        plot_calls.append((series, output_file, title, bins))
+        return output_file
+
+    monkeypatch.setattr(calib, "_plot_mismatch_histogram_series", fake_histogram)
+
+    def fake_cdf(series, output_file, title):
+        output_file = Path(output_file)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        output_file.write_text("", encoding="utf-8")
+        plot_calls.append((series, output_file, title, None))
+        return output_file
+
+    monkeypatch.setattr(calib, "_plot_mismatch_cdf_series", fake_cdf)
+
+    summary = calib.plot_mismatch_histograms(
+        None,
+        tmp_path / "histograms",
+        campaign_roots=[root],
+        bins=6,
+    )
+
+    assert summary["points"] == 4
+    assert sorted(summary["labels"]) == ["generic_spinning-ratexp", "nonspinning-hyptan_ratexp_nr"]
+    assert sorted(summary["modes"]) == ["22", "33"]
+    assert (tmp_path / "histograms" / "combined" / "mismatch_histogram_mode_22.png").exists()
+    assert (tmp_path / "histograms" / "combined" / "mismatch_histogram_mode_33.png").exists()
+    assert (tmp_path / "histograms" / "cdfs" / "combined" / "mismatch_cdf_mode_22.png").exists()
+    assert (tmp_path / "histograms" / "cdfs" / "combined" / "mismatch_cdf_mode_33.png").exists()
+    assert any(call[1].name == "mismatch_histogram_all_modes.png" for call in plot_calls)
+    assert any(call[1].name == "mismatch_cdf_all_modes.png" for call in plot_calls)
+    assert summary["cdf_plots"]
+    assert summary["histogram_plots"]
+    assert (
+        tmp_path
+        / "histograms"
+        / "cases"
+        / "nonspinning-hyptan_ratexp_nr"
+        / "modes"
+        / "mismatch_histogram_mode_22.png"
+    ).exists()
+
+    points = list(csv.DictReader((tmp_path / "histograms" / "mismatch_histogram_points.csv").open()))
+    mode_22_a = [
+        row for row in points
+        if row["label"] == "nonspinning-hyptan_ratexp_nr" and row["mode"] == "22"
+    ][0]
+    assert float(mode_22_a["mismatch"]) == pytest.approx(5.0e-6)
+
+
+def test_plot_mismatch_histograms_parser_accepts_campaign_root(tmp_path):
+    args = calib.build_parser().parse_args([
+        "plot-mismatch-histograms",
+        "--campaign-root",
+        str(tmp_path / "campaign_root"),
+        "--output-dir",
+        str(tmp_path / "plots"),
+        "--bins",
+        "12",
+    ])
+
+    assert args.command == "plot-mismatch-histograms"
+    assert args.campaign_root == [str(tmp_path / "campaign_root")]
+    assert args.bins == 12

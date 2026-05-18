@@ -304,7 +304,10 @@ def filter_catalog(df: pd.DataFrame, config: Config) -> tuple[pd.DataFrame, pd.D
                 reasons_by_id[sxs_id].append("insufficient_levs")
             else:
                 _, lev_high = _choose_levs(levs)
-                if lev_high is not None:
+                if lev_high is None:
+                    ok = False
+                    reasons_by_id[sxs_id].append("insufficient_levs")
+                elif config.filters.require_extrapolation_comparison:
                     discovered_orders = discover_available_extrapolation_orders(str(sxs_id), lev_high, config=config)
                     if discovered_orders is not None:
                         available_extrapolation_orders[sxs_id] = discovered_orders
@@ -332,9 +335,6 @@ def filter_catalog(df: pd.DataFrame, config: Config) -> tuple[pd.DataFrame, pd.D
                             available_extrapolation_orders[sxs_id] = [
                                 order for order, value in availability.items() if value is True
                             ]
-                else:
-                    ok = False
-                    reasons_by_id[sxs_id].append("insufficient_levs")
             passing[sxs_id] = ok
         record_filter("two_resolutions", passing)
         catalog["available_levs"] = [" ".join(str(lev) for lev in available_levs[sxs_id]) for sxs_id in catalog.index]

@@ -105,3 +105,34 @@ def test_catalog_filters_reject_missing_required_metadata():
     reasons = rejected.set_index("sxs_id")["rejection_reason"].to_dict()
     assert "missing_deprecated_metadata" in reasons["SXS:BBH:0100"]
     assert "missing_or_nonfinite_reference_eccentricity" in reasons["SXS:BBH:0101"]
+
+
+def test_catalog_filter_allows_missing_extrapolation_when_disabled(monkeypatch):
+    import scripts.ringdown_quality.catalog as catalog_module
+
+    df = pd.DataFrame(
+        [
+            {
+                "deprecated": False,
+                "reference_chi1_perp": 0.0,
+                "reference_chi2_perp": 0.0,
+                "reference_eccentricity": 1.0e-4,
+                "keywords": "",
+            }
+        ],
+        index=["SXS:BBH:0102"],
+    )
+    config = Config()
+    config.filters.require_extrapolation_comparison = False
+
+    monkeypatch.setattr(catalog_module, "discover_available_levs", lambda sxs_id, config=None: [3, 4])
+    monkeypatch.setattr(
+        catalog_module,
+        "discover_available_extrapolation_orders",
+        lambda sxs_id, lev, config=None: ["N2"],
+    )
+
+    candidates, rejected = filter_catalog(df, config)
+
+    assert list(candidates["sxs_id"]) == ["SXS:BBH:0102"]
+    assert rejected.empty

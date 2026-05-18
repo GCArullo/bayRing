@@ -896,7 +896,11 @@ def l2norm_residual_vs_nr(results_object, inference_model, NR_sim, outdir, metho
     NR_r, NR_i         = np.real(NR_sim.NR_cpx_cut)     , np.imag(NR_sim.NR_cpx_cut)
     t_cut = NR_sim.t_NR_cut
 
-    models_re_list, models_im_list = model_component_lists(results_object, inference_model, method)
+    try:
+        models_re_list, models_im_list = model_component_lists(results_object, inference_model, method)
+    except RuntimeError as e:
+        print("* Warning: {} Skipping L2 residual metric.".format(e))
+        return
 
     wf_r = np.percentile(np.array(models_re_list),[50], axis=0)[0]
     wf_i = np.percentile(np.array(models_im_list),[50], axis=0)[0]

@@ -1,3 +1,5 @@
+import itertools
+
 import numpy as np
 
 import cpnest.model
@@ -6,7 +8,14 @@ import pyRing.waveform as wf
 import pyRing.utils    as pyr_utils
 import bayRing.utils   as utils
 
-TEOB_MODE_MIXING_PARENTS = {(3, 2): (2, 2), (4, 3): (3, 3)}
+TEOB_MODE_MIXING_PARENTS = {
+    (3, 1): (2, 1),
+    (3, 2): (2, 2),
+    (4, 1): (2, 1),
+    (4, 2): (2, 2),
+    (4, 3): (3, 3),
+}
+TEOB_COUNTER_ROTATING_DEFAULT_MODES = {(2, 1)}
 TEOB_FIT_NONCIRCULAR_VARIABLES = {'ecc', 'e0', 'eccentricity', 'emrg', 'bmrg', 'jmrg'}
 TEOB_FIT_METADATA_KEYS = {
     'ecc': 'ecc',
@@ -28,11 +37,37 @@ TEOB_LOCAL_REFERENCE_PARAMETERS = (
     'c2A',
     'c2p',
 )
+TEOB_QUADRATIC_44_RATIO_FITS = ('khera-total', 'khera-r++', 'redondo-yuste')
+TEOB_QUADRATIC_44_WINDOW_PARAMETERS = (
+    'quad44_window_delay',
+    'quad44_window_width',
+    'quad44_window_steepness',
+)
+TEOB_QUADRATIC_44_KHERA_220_220_TO_44 = {
+    '++': {
+        'amplitude': (0.137, -0.00485, 0.0167, -0.2604, 0.8975, -1.617, 1.434, -0.5063),
+        'phase': (-0.08375, 0.09052, 0.1573, -0.947, 3.078, -5.277, 4.554, -1.574),
+    },
+    '+-': {
+        'amplitude': (0.01651, 0.0004883, -9.269e-05, -0.02175, 0.08652, -0.1513, 0.1265, -0.04002),
+        'phase': (0.05858, -0.1377, -0.1421, 1.362, -6.616, 13.41, -12.76, 4.635),
+    },
+}
 
 
 def _teob_mode_label(l, m):
 
     return '{}{}'.format(l, m)
+
+
+def _quadratic_mode_label(quad_term, child, parent_1, parent_2):
+
+    return '{}_{}{}{}_{}{}{}_{}{}{}'.format(
+        quad_term,
+        child[0], child[1], child[2],
+        parent_1[0], parent_1[1], parent_1[2],
+        parent_2[0], parent_2[1], parent_2[2],
+    )
 
 
 def _TEOBPM_parameter_is_available(container, name):
@@ -59,9 +94,121 @@ def _TEOBPM_apply_optional_reference_parameters(NR_fit_coeffs, mode, params, fix
             NR_fit_coeffs[mode][name] = utils.get_param_override(fixed_params, params, fullname)
 
 
+def _TEOBPM_optional_parameter_value(params, fixed_params, name, default):
+
+    if (_TEOBPM_parameter_is_available(fixed_params, name) or
+            _TEOBPM_parameter_is_available(params, name)):
+        return utils.get_param_override(fixed_params, params, name)
+
+    return default
+
+
+def _TEOBPM_fit_type_variables(fit_type):
+
+    tokens = [token for token in str(fit_type).lower().split('_') if token]
+    variables = []
+    index = 0
+    while index < len(tokens):
+        if index + 1 < len(tokens) and tokens[index] == 'chi' and tokens[index + 1] in ['eff', 'a']:
+            variables.append('chi_{}'.format(tokens[index + 1]))
+            index += 2
+        else:
+            variables.append(tokens[index])
+            index += 1
+
+    return variables
+
+
+def _TEOBPM_metadata_variable_value(metadata, variable):
+
+    if variable == 'nu':
+        return (metadata['m1']*metadata['m2'])/(metadata['m1'] + metadata['m2'])**2
+    if variable == 'q':
+        return metadata['m1']/metadata['m2']
+    if variable == 'chi_eff':
+        return (metadata['m1']*metadata['chi1z'] + metadata['m2']*metadata['chi2z'])/(metadata['m1'] + metadata['m2'])
+    if variable == 'chi_a':
+        return 0.5*(metadata['chi1z'] - metadata['chi2z'])
+    if variable in TEOB_FIT_METADATA_KEYS:
+        return metadata[TEOB_FIT_METADATA_KEYS[variable]]
+    if variable in metadata:
+        return metadata[variable]
+
+    raise KeyError(variable)
+
+
+def _TEOBPM_global_fit_target_value(fit_metadata, metadata, target):
+
+    if fit_metadata is None:
+        return None
+    if target in fit_metadata and fit_metadata[target] not in [None, '']:
+        return float(fit_metadata[target])
+
+    p0_key = '{}_p0'.format(target)
+    if p0_key not in fit_metadata:
+        return None
+
+    variables = _TEOBPM_fit_type_variables(fit_metadata.get('fit_type', ''))
+    values = []
+    for variable in variables:
+        raw_value = float(_TEOBPM_metadata_variable_value(metadata, variable))
+        norm_scale_key = 'norm_{}_scale'.format(variable)
+        norm_shift_key = 'norm_{}_shift'.format(variable)
+        raw_value = raw_value*float(fit_metadata.get(norm_scale_key, 1.0)) + float(fit_metadata.get(norm_shift_key, 0.0))
+        values.append(raw_value)
+
+    result = float(fit_metadata.get(p0_key, 0.0))
+    coefficient_index = 1
+    for degree in range(1, int(float(fit_metadata.get('fit_order', 0))) + 1):
+        for indices in itertools.combinations_with_replacement(range(len(values)), degree):
+            term = 1.0
+            for index in indices:
+                term *= values[index]
+            result += float(fit_metadata.get('{}_p{}'.format(target, coefficient_index), 0.0))*term
+            coefficient_index += 1
+
+    return result
+
+
+def _TEOBPM_polynomial(coefficients, x):
+
+    return sum(coefficient * x**index for index, coefficient in enumerate(coefficients))
+
+
+def _TEOBPM_khera_quadratic_ratio(af, channel):
+
+    af = float(np.clip(af, -0.99, 0.99))
+    fit = TEOB_QUADRATIC_44_KHERA_220_220_TO_44[channel]
+    amplitude = _TEOBPM_polynomial(fit['amplitude'], af)
+    phase = _TEOBPM_polynomial(fit['phase'], af)
+
+    return amplitude * np.exp(1j*phase)
+
+
+def _TEOBPM_redondo_yuste_quadratic_ratio(af):
+
+    af = float(np.clip(af, -0.999999999999, 0.999999999999))
+    surface_gravity = np.sqrt(1.0 - af**2)/(2.0*(1.0 + np.sqrt(1.0 - af**2)))
+
+    return 0.058 + surface_gravity**1.61
+
+
+def _TEOBPM_quadratic_44_ratio(af, ratio_fit):
+
+    if ratio_fit == 'khera-total':
+        return (_TEOBPM_khera_quadratic_ratio(af, '++') +
+                _TEOBPM_khera_quadratic_ratio(af, '+-'))
+    if ratio_fit == 'khera-r++':
+        return _TEOBPM_khera_quadratic_ratio(af, '++')
+    if ratio_fit == 'redondo-yuste':
+        return _TEOBPM_redondo_yuste_quadratic_ratio(af)
+
+    raise ValueError("Unknown TEOB quadratic 44 ratio fit: {}".format(ratio_fit))
+
+
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, N_ds_tails=0, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_template = 'RatExp', TEOB_calibration = 'qc', TEOB_merger_data = 1, TEOB_global_fit = 0, TEOB_mode_mixing = 0, TEOB_counter_rotating = 0, TEOB_quadratic_44 = 0, TEOB_quadratic_44_window_start = 10.0, TEOB_quadratic_44_window_width = 15.0, TEOB_tapered_overtone_44 = 0, TEOB_tapered_overtone_44_window_start = 0.0, TEOB_tapered_overtone_44_window_width = 10.0):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, N_ds_tails=0, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_template = 'RatExp', TEOB_calibration = 'qc', TEOB_merger_data = 1, TEOB_global_fit = 0, TEOB_mode_mixing = 0, TEOB_counter_rotating = 0, TEOB_quadratic_44 = 0, TEOB_quadratic_44_window_start = 10.0, TEOB_quadratic_44_window_width = 15.0, TEOB_quadratic_44_window_end = -1.0, TEOB_quadratic_44_window_steepness = 1.0, TEOB_quadratic_44_ratio_fit = 'khera-total', TEOB_tapered_overtone_44 = 0, TEOB_tapered_overtone_44_window_start = 0.0, TEOB_tapered_overtone_44_window_width = 10.0):
 
         self.t_NR                      = t_NR
         self.t_start                   = tM_start
@@ -90,6 +237,9 @@ class WaveformModel(cpnest.model.Model):
         self.TEOB_quadratic_44         = TEOB_quadratic_44
         self.TEOB_quadratic_44_window_start = TEOB_quadratic_44_window_start
         self.TEOB_quadratic_44_window_width = TEOB_quadratic_44_window_width
+        self.TEOB_quadratic_44_window_end = TEOB_quadratic_44_window_end
+        self.TEOB_quadratic_44_window_steepness = TEOB_quadratic_44_window_steepness
+        self.TEOB_quadratic_44_ratio_fit = TEOB_quadratic_44_ratio_fit
         self.TEOB_tapered_overtone_44  = TEOB_tapered_overtone_44
         self.TEOB_tapered_overtone_44_window_start = TEOB_tapered_overtone_44_window_start
         self.TEOB_tapered_overtone_44_window_width = TEOB_tapered_overtone_44_window_width
@@ -404,8 +554,10 @@ class WaveformModel(cpnest.model.Model):
         requested_mode = (self.l_NR, self.m_NR)
         modes          = [requested_mode]
         internal_modes = list(modes)
+        mode_mixing_parents = {}
         if self.TEOB_mode_mixing and requested_mode in TEOB_MODE_MIXING_PARENTS:
             parent_mode = TEOB_MODE_MIXING_PARENTS[requested_mode]
+            mode_mixing_parents[requested_mode] = parent_mode
             if parent_mode not in internal_modes:
                 internal_modes.append(parent_mode)
 
@@ -507,8 +659,8 @@ class WaveformModel(cpnest.model.Model):
             global_fit    = self.TEOB_global_fit,
             NR_fit_coeffs = NR_fit_coeffs,
         )
-        if self.TEOB_mode_mixing:
-            teob_kwargs['mode_mixing'] = self.TEOB_mode_mixing
+        if mode_mixing_parents:
+            teob_kwargs['mode_mixing'] = mode_mixing_parents
 
         ringdown_model = self._TEOBPM_model(merger_phases, modes, TGR_parameters, teob_kwargs)
         return ringdown_model
@@ -597,9 +749,12 @@ class WaveformModel(cpnest.model.Model):
 
         return np.exp(ln_A_scale) * np.conjugate(wf_r_counter + 1j*wf_i_counter)
 
-    def _TEOBPM_window(self, start, width):
+    def _TEOBPM_window(self, start, width, steepness=1.0):
 
         t_rel = np.asarray(self.t_NR) - self.t_peak
+        steepness = float(steepness)
+        if steepness <= 0.0:
+            raise ValueError("TEOBPM window steepness must be positive.")
 
         values = []
         for time_value in t_rel:
@@ -612,15 +767,100 @@ class WaveformModel(cpnest.model.Model):
             elif x >= 1.0:
                 values.append(1.0)
             else:
-                values.append(0.5*(1.0 - np.cos(np.pi*x)))
+                base = 0.5*(1.0 - np.cos(np.pi*x))
+                if steepness == 1.0:
+                    values.append(base)
+                else:
+                    left = base**steepness
+                    right = (1.0 - base)**steepness
+                    values.append(left/(left + right))
 
         return np.array(values)
 
-    def _TEOBPM_quadratic_44_window(self):
+    def _TEOBPM_quadratic_44_window_parameters(self, params, fixed_params):
+
+        global_delay = _TEOBPM_global_fit_target_value(
+            self.fit_metadata,
+            self.metadata,
+            'quad44_window_delay',
+        )
+        global_width = _TEOBPM_global_fit_target_value(
+            self.fit_metadata,
+            self.metadata,
+            'quad44_window_width',
+        )
+        global_steepness = _TEOBPM_global_fit_target_value(
+            self.fit_metadata,
+            self.metadata,
+            'quad44_window_steepness',
+        )
+
+        width_available = (
+            _TEOBPM_parameter_is_available(fixed_params, 'quad44_window_width') or
+            _TEOBPM_parameter_is_available(params, 'quad44_window_width')
+        )
+        fixed_end_enabled = float(self.TEOB_quadratic_44_window_end) >= 0.0
+        if fixed_end_enabled and (width_available or global_width is not None):
+            raise ValueError(
+                "TEOBPM quadratic 44 cannot use quad44_window_width when "
+                "TEOB-quadratic-44-window-end is enabled."
+            )
+
+        steepness = float(_TEOBPM_optional_parameter_value(
+            params,
+            fixed_params,
+            'quad44_window_steepness',
+            self.TEOB_quadratic_44_window_steepness if global_steepness is None else global_steepness,
+        ))
+
+        delay_available = (
+            _TEOBPM_parameter_is_available(fixed_params, 'quad44_window_delay') or
+            _TEOBPM_parameter_is_available(params, 'quad44_window_delay')
+        )
+        mode_label = _teob_mode_label(self.l_NR, self.m_NR)
+        delta_t = self.metadata.get('DeltaT_{}'.format(mode_label), self.metadata.get('DeltaT{}'.format(mode_label)))
+        if delay_available or global_delay is not None or fixed_end_enabled:
+            if delta_t is None:
+                raise ValueError(
+                    "TEOBPM quadratic 44 target-peak window parameterisation requires DeltaT_{} in the merger metadata."
+                    .format(mode_label)
+                )
+        if delay_available or global_delay is not None:
+            if delay_available:
+                delay = float(utils.get_param_override(fixed_params, params, 'quad44_window_delay'))
+            else:
+                delay = float(global_delay)
+            start = float(delta_t) + delay
+        else:
+            start = float(self.TEOB_quadratic_44_window_start)
+
+        if fixed_end_enabled:
+            end = float(delta_t) + float(self.TEOB_quadratic_44_window_end)
+            width = end - start
+        else:
+            width = float(_TEOBPM_optional_parameter_value(
+                params,
+                fixed_params,
+                'quad44_window_width',
+                self.TEOB_quadratic_44_window_width if global_width is None else global_width,
+            ))
+
+        if fixed_end_enabled and width <= 0.0:
+            raise ValueError(
+                "TEOBPM quadratic 44 window width must be positive. "
+                "Check quad44_window_delay and TEOB-quadratic-44-window-end."
+            )
+
+        return start, width, steepness
+
+    def _TEOBPM_quadratic_44_window(self, params, fixed_params):
+
+        start, width, steepness = self._TEOBPM_quadratic_44_window_parameters(params, fixed_params)
 
         return self._TEOBPM_window(
-            self.TEOB_quadratic_44_window_start,
-            self.TEOB_quadratic_44_window_width,
+            start,
+            width,
+            steepness,
         )
 
     def _TEOBPM_tapered_overtone_44_window(self):
@@ -635,23 +875,96 @@ class WaveformModel(cpnest.model.Model):
         if not((self.l_NR == 4) and (self.m_NR == 4)):
             raise ValueError("TEOBPM quadratic 44 is available only for the selected NR mode (4,4).")
 
-        qnm_key = (2, 2, 2, 0)
-        if qnm_key not in self.qnm_cached:
-            raise ValueError("TEOBPM quadratic 44 requires the cached 220 QNM frequency.")
+        parent_model = WaveformModel(
+            self.t_NR,
+            self.t_start,
+            self.t_peak,
+            self.wf_model,
+            self.N_ds_modes,
+            self.Kerr_modes,
+            self.metadata,
+            None,
+            self.qnm_cached,
+            2,
+            2,
+            N_ds_tails                = self.N_ds_tails,
+            tail                      = 0,
+            tail_modes                = None,
+            quadratic_modes           = None,
+            const_params              = None,
+            KerrBinary_version        = self.KerrBinary_version,
+            KerrBinary_amp_nc_version = self.KerrBinary_amp_nc_version,
+            TEOB_template             = self.TEOB_template,
+            TEOB_calibration          = self.TEOB_calibration,
+            TEOB_merger_data          = self.TEOB_merger_data,
+            TEOB_global_fit           = self.TEOB_global_fit,
+            TEOB_mode_mixing          = 0,
+            TEOB_counter_rotating     = 0,
+            TEOB_quadratic_44         = 0,
+            TEOB_quadratic_44_window_start = self.TEOB_quadratic_44_window_start,
+            TEOB_quadratic_44_window_width = self.TEOB_quadratic_44_window_width,
+            TEOB_quadratic_44_window_end = self.TEOB_quadratic_44_window_end,
+            TEOB_quadratic_44_window_steepness = self.TEOB_quadratic_44_window_steepness,
+            TEOB_quadratic_44_ratio_fit = self.TEOB_quadratic_44_ratio_fit,
+            TEOB_tapered_overtone_44  = 0,
+            TEOB_tapered_overtone_44_window_start = self.TEOB_tapered_overtone_44_window_start,
+            TEOB_tapered_overtone_44_window_width = self.TEOB_tapered_overtone_44_window_width,
+        )
 
-        ln_A = utils.get_param_override(fixed_params, params, 'ln_A_sum_440_220_220')
-        phi  = utils.get_param_override(fixed_params, params, 'phi_sum_440_220_220')
+        try:
+            parent_22 = parent_model.waveform(params, fixed_params)
+        except KeyError as exc:
+            raise ValueError(
+                "TEOBPM quadratic 44 with h_22(t)^2 requires the parent 22 TEOBPM "
+                "parameter `{}`. Provide it as a fixed prior from a 22 fit, e.g. "
+                "`fix-{}` in the [Priors] section.".format(exc.args[0], exc.args[0])
+            ) from exc
 
-        f_220   = self.qnm_cached[qnm_key]['f']
-        tau_220 = self.qnm_cached[qnm_key]['tau']
-        t_rel   = np.asarray(self.t_NR) - self.t_peak
-        window  = self._TEOBPM_quadratic_44_window()
+        window = self._TEOBPM_quadratic_44_window(params, fixed_params)
+        ratio = _TEOBPM_quadratic_44_ratio(self.af, self.TEOB_quadratic_44_ratio_fit)
 
-        f_quad   = 2.0*f_220
-        tau_quad = 0.5*tau_220
-        basis    = np.exp(-t_rel/tau_quad) * np.exp(-1j*2.0*np.pi*f_quad*t_rel)
+        return ratio * window * parent_22**2
 
-        return np.exp(ln_A) * np.exp(1j*phi) * window * basis
+    def TEOBPM_quadratic_waveform(self, params, fixed_params):
+
+        waveform = np.zeros(len(self.t_NR), dtype=np.complex128)
+        if self.quadratic_modes is None:
+            return waveform
+
+        t_rel = np.asarray(self.t_NR) - self.t_peak
+        selected_mode = (self.l_NR, self.m_NR)
+        for quad_term, modes in self.quadratic_modes.items():
+            for child, parent_1, parent_2 in modes:
+                if child[:2] != selected_mode:
+                    continue
+                qnm_parent_1 = (2, parent_1[0], parent_1[1], parent_1[2])
+                qnm_parent_2 = (2, parent_2[0], parent_2[1], parent_2[2])
+                if qnm_parent_1 not in self.qnm_cached:
+                    raise ValueError("TEOBPM quadratic mode requires cached parent QNM {}.".format(qnm_parent_1))
+                if qnm_parent_2 not in self.qnm_cached:
+                    raise ValueError("TEOBPM quadratic mode requires cached parent QNM {}.".format(qnm_parent_2))
+
+                label = _quadratic_mode_label(quad_term, child, parent_1, parent_2)
+                ln_A = utils.get_param_override(fixed_params, params, 'ln_A_{}'.format(label))
+                phi  = utils.get_param_override(fixed_params, params, 'phi_{}'.format(label))
+
+                freq_1 = self.qnm_cached[qnm_parent_1]['f']
+                tau_1  = self.qnm_cached[qnm_parent_1]['tau']
+                freq_2 = self.qnm_cached[qnm_parent_2]['f']
+                tau_2  = self.qnm_cached[qnm_parent_2]['tau']
+
+                tau = (tau_1 * tau_2)/(tau_1 + tau_2)
+                if quad_term == 'sum':
+                    freq = freq_1 + freq_2
+                elif quad_term == 'diff':
+                    freq = freq_1 - freq_2
+                else:
+                    raise ValueError("Invalid TEOBPM quadratic term selected: {}".format(quad_term))
+
+                basis = np.exp(-t_rel/tau) * np.exp(-1j*2.0*np.pi*freq*t_rel)
+                waveform += np.exp(ln_A) * np.exp(1j*phi) * basis
+
+        return waveform
 
     def TEOBPM_tapered_overtone_44_waveform(self, params, fixed_params):
 
@@ -722,6 +1035,11 @@ class WaveformModel(cpnest.model.Model):
             quadratic_44 = self.TEOBPM_quadratic_44_waveform(params, fixed_params)
             self.wf_r = self.wf_r + np.real(quadratic_44)
             self.wf_i = self.wf_i + np.imag(quadratic_44)
+
+        if self.wf_model=='TEOBPM' and self.quadratic_modes is not None:
+            quadratic_modes = self.TEOBPM_quadratic_waveform(params, fixed_params)
+            self.wf_r = self.wf_r + np.real(quadratic_modes)
+            self.wf_i = self.wf_i + np.imag(quadratic_modes)
 
         if self.wf_model=='TEOBPM' and self.TEOB_tapered_overtone_44:
             overtone_44 = self.TEOBPM_tapered_overtone_44_waveform(params, fixed_params)

@@ -199,7 +199,7 @@ fixed values or minimization start values.
        multipole instead of pyRing's built-in quasi-circular peak fits.
    * - ``TEOB-quadratic-44``
      - ``0``
-     - Add an opt-in tapered ``220x220`` quadratic QNM contribution to the
+     - Add an opt-in tapered ``k(af) * h_22(t)^2`` QQNM contribution to the
        TEOBPM ``(4,4)`` mode.
    * - ``TEOB-quadratic-44-window-start``
      - ``10.0``
@@ -207,6 +207,20 @@ fixed values or minimization start values.
    * - ``TEOB-quadratic-44-window-width``
      - ``15.0``
      - Half-cosine taper width, in ``M``. Non-positive values use a step.
+   * - ``TEOB-quadratic-44-window-end``
+     - ``-1.0``
+     - If non-negative, fix the taper end relative to the target ``(4,4)``
+       peak and derive the width from ``quad44_window_delay``. Do not sample
+       ``quad44_window_width`` when this is enabled.
+   * - ``TEOB-quadratic-44-window-steepness``
+     - ``1.0``
+     - Taper shape parameter. ``1`` gives the half-cosine window; larger
+       values make the central turn-on steeper while preserving the start and
+       end points.
+   * - ``TEOB-quadratic-44-ratio-fit``
+     - ``khera-total``
+     - Perturbative ratio fit for ``k(af)``. Options are ``khera-total``,
+       ``khera-r++`` and ``redondo-yuste``.
    * - ``TEOB-tapered-overtone-44``
      - ``0``
      - Add an opt-in tapered ``441`` QNM contribution to the TEOBPM

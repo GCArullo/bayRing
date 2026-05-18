@@ -263,7 +263,7 @@ def test_teobpm_waveform_passes_mode_mixing_parent_inputs(monkeypatch):
     result = model.TEOBPM_waveform(params, fixed)
 
     assert result == "teob-mixed"
-    assert captured["mode_mixing"] == 1
+    assert captured["mode_mixing"] == {(3, 2): (2, 2)}
     assert captured["args"][9] == [(3, 2)]
     assert captured["args"][5][(3, 2)] == 0.4
     assert captured["args"][5][(2, 2)] == 0.2
@@ -282,30 +282,46 @@ def test_teobpm_waveform_passes_mode_mixing_parent_inputs(monkeypatch):
     assert captured["NR_fit_coeffs"][(2, 2)]["c3A"] == -0.5
 
 
-def test_teobpm_quadratic_44_uses_tapered_220x220_basis():
+def test_teobpm_quadratic_44_uses_parent_22_template_and_qqnm_ratio(monkeypatch):
     model = _build_model(
         wf_model="TEOBPM",
         l_NR=4,
         m_NR=4,
         t_NR=_array([0.0, 1.0, 2.0]),
         tM_peak=0.0,
-        qnm_cached={(2, 2, 2, 0): {"f": 0.1, "tau": 10.0}},
+        metadata_overrides={"af": 0.0},
+        qnm_cached={},
+        TEOB_template="HypTan",
+        TEOB_global_fit=0,
+        TEOB_merger_data=0,
         TEOB_quadratic_44=1,
         TEOB_quadratic_44_window_start=0.0,
         TEOB_quadratic_44_window_width=0.0,
+        TEOB_quadratic_44_ratio_fit="khera-total",
     )
 
-    params = {
-        "ln_A_sum_440_220_220": math.log(2.0),
-        "phi_sum_440_220_220": 0.3,
+    class FakeTEOBPM:
+        def waveform(self, times):
+            return None, None, None, -np.array([1.0, 2.0, 3.0]), np.array([0.0, 0.0, 0.0])
+
+    monkeypatch.setattr(template_waveforms.wf, "TEOBPM", lambda *args, **kwargs: FakeTEOBPM(), raising=False)
+
+    params = {}
+    fixed = {
+        "phi_mrg_22": 0.1,
+        "c3A_22": -0.2,
+        "c3p_22": 3.0,
+        "c4p_22": 2.0,
     }
 
-    waveform = model.TEOBPM_quadratic_44_waveform(params, {})
-    t_rel = np.array([0.0, 1.0, 2.0])
-    expected = 2.0*np.exp(1j*0.3)*np.exp(-t_rel/5.0)*np.exp(-1j*2.0*np.pi*0.2*t_rel)
+    waveform = model.TEOBPM_quadratic_44_waveform(params, fixed)
+    ratio = (
+        0.137 * np.exp(-1j * 0.08375)
+        + 0.01651 * np.exp(1j * 0.05858)
+    )
+    expected = ratio * np.array([1.0, 2.0, 3.0])**2
 
-    for value, expected_value in zip(waveform, expected):
-        assert abs(value - expected_value) < 1.0e-12
+    np.testing.assert_allclose(waveform, expected)
 
 
 def test_teobpm_quadratic_44_rejects_other_modes():
@@ -319,6 +335,144 @@ def test_teobpm_quadratic_44_rejects_other_modes():
 
     with pytest.raises(ValueError, match="selected NR mode"):
         model.TEOBPM_quadratic_44_waveform({}, {})
+
+
+def test_teobpm_quadratic_44_samples_target_peak_window_parameters():
+    model = _build_model(
+        wf_model="TEOBPM",
+        l_NR=4,
+        m_NR=4,
+        t_NR=_array([10.0, 13.0, 15.0, 17.0]),
+        tM_peak=10.0,
+        metadata_overrides={"DeltaT_44": 2.0},
+        qnm_cached={},
+        TEOB_quadratic_44=1,
+        TEOB_quadratic_44_window_start=0.0,
+        TEOB_quadratic_44_window_width=10.0,
+        TEOB_quadratic_44_window_steepness=1.0,
+    )
+
+    params = {
+        "quad44_window_delay": 1.0,
+        "quad44_window_width": 4.0,
+        "quad44_window_steepness": 2.0,
+    }
+
+    start, width, steepness = model._TEOBPM_quadratic_44_window_parameters(params, {})
+    window = model._TEOBPM_quadratic_44_window(params, {})
+
+    assert start == 3.0
+    assert width == 4.0
+    assert steepness == 2.0
+    np.testing.assert_allclose(window, [0.0, 0.0, 0.5, 1.0])
+
+
+def test_teobpm_quadratic_44_window_uses_global_fit_metadata():
+    model = _build_model(
+        wf_model="TEOBPM",
+        l_NR=4,
+        m_NR=4,
+        t_NR=_array([10.0, 12.0, 14.0, 16.0]),
+        tM_peak=10.0,
+        metadata_overrides={
+            "DeltaT_44": 2.0,
+            "chi1z": 0.2,
+            "chi2z": -0.1,
+        },
+        fit_metadata={
+            "fit_type": "nu_chi_eff",
+            "fit_order": "1",
+            "quad44_window_delay_p0": "1.0",
+            "quad44_window_delay_p1": "2.0",
+            "quad44_window_delay_p2": "3.0",
+            "quad44_window_width": "4.0",
+            "quad44_window_steepness": "2.0",
+        },
+        qnm_cached={},
+        TEOB_global_fit=1,
+        TEOB_quadratic_44=1,
+        TEOB_quadratic_44_window_start=0.0,
+        TEOB_quadratic_44_window_width=10.0,
+        TEOB_quadratic_44_window_steepness=1.0,
+    )
+
+    start, width, steepness = model._TEOBPM_quadratic_44_window_parameters({}, {})
+    nu = (30.0*20.0)/(30.0 + 20.0)**2
+    chi_eff = (30.0*0.2 + 20.0*(-0.1))/(30.0 + 20.0)
+
+    assert start == pytest.approx(2.0 + 1.0 + 2.0*nu + 3.0*chi_eff)
+    assert width == 4.0
+    assert steepness == 2.0
+
+
+def test_teobpm_quadratic_44_fixed_window_end_derives_width_from_delay():
+    model = _build_model(
+        wf_model="TEOBPM",
+        l_NR=4,
+        m_NR=4,
+        t_NR=_array([10.0, 15.0, 20.0, 25.0, 30.0]),
+        tM_peak=10.0,
+        metadata_overrides={"DeltaT_44": 2.0},
+        qnm_cached={},
+        TEOB_quadratic_44=1,
+        TEOB_quadratic_44_window_start=0.0,
+        TEOB_quadratic_44_window_width=10.0,
+        TEOB_quadratic_44_window_end=20.0,
+        TEOB_quadratic_44_window_steepness=1.0,
+    )
+
+    start, width, steepness = model._TEOBPM_quadratic_44_window_parameters(
+        {"quad44_window_delay": 5.0, "quad44_window_steepness": 2.0},
+        {},
+    )
+
+    assert start == 7.0
+    assert width == 15.0
+    assert steepness == 2.0
+
+
+def test_teobpm_quadratic_44_fixed_window_end_rejects_width_parameter():
+    model = _build_model(
+        wf_model="TEOBPM",
+        l_NR=4,
+        m_NR=4,
+        t_NR=_array([10.0, 15.0, 20.0]),
+        tM_peak=10.0,
+        metadata_overrides={"DeltaT_44": 2.0},
+        qnm_cached={},
+        TEOB_quadratic_44=1,
+        TEOB_quadratic_44_window_end=20.0,
+    )
+
+    with pytest.raises(ValueError, match="quad44_window_width"):
+        model._TEOBPM_quadratic_44_window_parameters(
+            {"quad44_window_delay": 5.0, "quad44_window_width": 10.0},
+            {},
+        )
+
+
+def test_teobpm_quadratic_waveform_uses_selected_qqnm_term():
+    model = _build_model(
+        wf_model="TEOBPM",
+        l_NR=5,
+        m_NR=5,
+        t_NR=_array([0.0, 1.0]),
+        tM_peak=0.0,
+        quadratic_modes={"sum": [((5, 5, 0), (2, 2, 0), (3, 3, 0))], "diff": []},
+        qnm_cached={
+            (2, 2, 2, 0): {"f": 0.10, "tau": 10.0},
+            (2, 3, 3, 0): {"f": 0.15, "tau": 15.0},
+        },
+    )
+
+    waveform = model.TEOBPM_quadratic_waveform(
+        {"ln_A_sum_550_220_330": math.log(2.0), "phi_sum_550_220_330": 0.3},
+        {},
+    )
+
+    tau = (10.0 * 15.0)/(10.0 + 15.0)
+    expected = 2.0*np.exp(1j*0.3)*np.exp(-model.t_NR/tau)*np.exp(-1j*2.0*np.pi*0.25*model.t_NR)
+    np.testing.assert_allclose(waveform, expected)
 
 
 def test_teobpm_tapered_overtone_44_uses_441_basis():

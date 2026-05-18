@@ -443,6 +443,9 @@ def read_config(Config):
         'TEOB-quadratic-44'                : 0            ,
         'TEOB-quadratic-44-window-start'   : 10.0         ,
         'TEOB-quadratic-44-window-width'   : 15.0         ,
+        'TEOB-quadratic-44-window-end'     : -1.0         ,
+        'TEOB-quadratic-44-window-steepness': 1.0         ,
+        'TEOB-quadratic-44-ratio-fit'      : 'khera-total',
         'TEOB-tapered-overtone-44'         : 0            ,
         'TEOB-tapered-overtone-44-window-start': 0.0      ,
         'TEOB-tapered-overtone-44-window-width': 10.0     ,
@@ -660,6 +663,36 @@ def read_config(Config):
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4  or parameters['NR-data']['l-NR']==5): raise ValueError("The TEOBPM template is only available for l=2,3,4,5")
         if parameters['Model']['TEOB-quadratic-44'] and not((parameters['NR-data']['l-NR']==4) and (parameters['NR-data']['m']==4)):
             raise ValueError("TEOB-quadratic-44 can be enabled only when fitting the NR (4,4) mode.")
+        if parameters['Model']['TEOB-quadratic-44-window-end'] >= 0.0:
+            if parameters['Model']['TEOB-quadratic-44-window-end'] <= 0.0:
+                raise ValueError("TEOB-quadratic-44-window-end must be positive when enabled.")
+            if (
+                Config.has_option('Priors', 'fix-quad44_window_width') or
+                Config.has_option('Priors', 'quad44_window_width-min') or
+                Config.has_option('Priors', 'quad44_window_width-max')
+            ):
+                raise ValueError(
+                    "quad44_window_width cannot be fixed or sampled when "
+                    "TEOB-quadratic-44-window-end is enabled."
+                )
+            if Config.has_option('Priors', 'quad44_window_delay-max'):
+                quad44_window_delay_max = float(Config.get('Priors', 'quad44_window_delay-max'))
+                if quad44_window_delay_max >= parameters['Model']['TEOB-quadratic-44-window-end']:
+                    raise ValueError(
+                        "quad44_window_delay-max must be smaller than "
+                        "TEOB-quadratic-44-window-end when the window end is fixed."
+                    )
+            if Config.has_option('Priors', 'fix-quad44_window_delay'):
+                quad44_window_delay = float(Config.get('Priors', 'fix-quad44_window_delay'))
+                if quad44_window_delay >= parameters['Model']['TEOB-quadratic-44-window-end']:
+                    raise ValueError(
+                        "fix-quad44_window_delay must be smaller than "
+                        "TEOB-quadratic-44-window-end when the window end is fixed."
+                    )
+        if parameters['Model']['TEOB-quadratic-44-window-steepness'] <= 0.0:
+            raise ValueError("TEOB-quadratic-44-window-steepness must be positive.")
+        if parameters['Model']['TEOB-quadratic-44-ratio-fit'] not in ['khera-total', 'khera-r++', 'redondo-yuste']:
+            raise ValueError("Unknown TEOB-quadratic-44-ratio-fit: {}".format(parameters['Model']['TEOB-quadratic-44-ratio-fit']))
         if parameters['Model']['TEOB-tapered-overtone-44'] and not((parameters['NR-data']['l-NR']==4) and (parameters['NR-data']['m']==4)):
             raise ValueError("TEOB-tapered-overtone-44 can be enabled only when fitting the NR (4,4) mode.")
         
@@ -824,12 +857,24 @@ A dot is present at the end of each description line and is not to be intended a
                                           spherical mode. For a 21 fit, the extra 2-1 parameters are ln_A_counter_scale_2-1,
                                           phi_mrg_counter_2-1, c3A_counter_2-1, c3p_counter_2-1 and c4p_counter_2-1.                  Default: 0.
 
-        TEOB-quadratic-44                 Boolean to add a tapered 220x220 quadratic QNM contribution to TEOBPM (4,4).
-                                          The sampled parameters are ln_A_sum_440_220_220 and phi_sum_440_220_220.                    Default: 0.
+        TEOB-quadratic-44                 Boolean to add k(af) * W(t) * h_22(t)^2 to TEOBPM (4,4), where h_22(t) is the TEOBPM
+                                          parent-mode template and k(af) is a fitted perturbative QQNM ratio.                       Default: 0.
 
         TEOB-quadratic-44-window-start    Time after the 22 peak where the early-time taper starts, in M.                             Default: 10.0.
 
         TEOB-quadratic-44-window-width    Half-cosine taper width for TEOB-quadratic-44, in M. A non-positive value gives a step.     Default: 15.0.
+
+        TEOB-quadratic-44-window-end      If non-negative, fix the taper end relative to the target (4,4) peak and derive the width
+                                          from quad44_window_delay. Do not sample quad44_window_width when this is enabled.            Default: -1.0.
+
+        TEOB-quadratic-44-window-steepness
+                                          Shape parameter for the quadratic-44 taper. A value of 1 gives the half-cosine window.
+                                          Larger values make the central turn-on steeper while preserving the start and end points.
+                                                                                                                                      Default: 1.0.
+
+        TEOB-quadratic-44-ratio-fit       Fit for the perturbative ratio k(af). Available options:
+                                          'khera-total' uses the nonprecessing total complex polynomial ratio, 'khera-r++' uses the
+                                          ++ channel only, and 'redondo-yuste' uses the real surface-gravity power-law magnitude.     Default: khera-total.
 
         TEOB-tapered-overtone-44          Boolean to add a tapered 441 QNM contribution to TEOBPM (4,4).
                                           The sampled parameters are ln_A_tapered_441 and phi_tapered_441.                            Default: 0.
