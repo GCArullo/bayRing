@@ -120,6 +120,12 @@ Carullo2024 metadata variables. ``fits-file`` supplies fit coefficients for cali
 templates such as some ``TEOBPM`` workflows. Empty strings are treated as no
 file supplied.
 
+For ``TEOBPM``, these files are calibration-workflow inputs. The intended
+production model is a stand-alone pyRing post-merger TEOB waveform for
+real-data parameter estimation, so any NR-derived quantity read from these
+files during local SXS fits must either be calibration-only or become available
+from an internal pyRing global fit before it is used in final real-data runs.
+
 Multipole Selection
 ~~~~~~~~~~~~~~~~~~~
 
@@ -185,14 +191,6 @@ the complex NR multipole. It then finds a peak time:
 * for Teukolsky linear perturbations, ``dt-scd`` can shift the peak to a
   secondary reference time;
 * a nonzero ``t-peak-22`` overrides those choices.
-
-The TEOBPM calibration workflow follows pyRing's current convention: the
-``(2,2)`` peak is the reference time, and higher-mode local fits start at
-``t_peak_22 + DeltaT_lm`` by writing pyRing's ``DeltaT_lm`` as ``t-start``.
-After local coefficients are constructed, TEOBPM evaluation mismatch
-comparisons for local-fit plots and global-fit checks should instead start from
-the ``(2,2)`` peak with ``t-start = 0`` and ``tref = peak22``; higher modes can
-be zero until their internal ``DeltaT_lm`` start.
 
 The fit interval is:
 

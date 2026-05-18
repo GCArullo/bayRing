@@ -315,11 +315,10 @@ TEOBPM
    [Model]
    template = TEOBPM
    TEOB-template = HypTan
-   TEOB-calibration = qc
    TEOB-global-fit = 1
    TEOB-merger-data = 0
 
-``TEOB-template`` selects the amplitude ansatz:
+``TEOB-template`` selects the post-merger template branch:
 
 .. list-table::
    :header-rows: 1
@@ -332,20 +331,11 @@ TEOBPM
    * - ``RatExp``
      - Rational-exponential amplitude template.
 
-``TEOB-calibration`` selects the calibration family independently of the
-amplitude ansatz:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 20 60
-
-   * - Value
-     - Meaning
-   * - ``qc``
-     - Noneccentric/quasi-circular global-fit variables.
-   * - ``noncirc``
-     - Noncircular/eccentric global-fit variables. The corresponding NR
-       metadata, for example ``bmrg``, ``Emrg`` or ``Jmrg``, must be supplied.
+The production target for ``TEOBPM`` is a stand-alone post-merger TEOB model
+usable by pyRing parameter estimation on real detector data with no NR inputs.
+NR files may be used while calibrating the model against simulations, but every
+NR-derived quantity that affects the runtime waveform must ultimately be
+provided by an internal or packaged pyRing global fit.
 
 ``TEOB-global-fit`` controls whether TEOB calibration coefficients come from
 global fits or are sampled locally:
@@ -357,11 +347,12 @@ global fits or are sampled locally:
    * - Value
      - Meaning
    * - ``1``
-     - Use calibrated global fits. If ``[NR-data] fits-file`` is present,
-       those coefficients are evaluated using ``TEOB-calibration``; otherwise
-       the internal quasi-circular pyRing fits are used where available.
+     - Use calibrated global fits. For ``HypTan``, this selects the internal
+       quasi-circular pyRing fits. For ``RatExp``, provide global-fit
+       coefficients through ``[NR-data] fits-file``.
    * - ``0``
      - Sample local amplitude and phase calibration coefficients.
+       This is a calibration mode, not the intended final real-data PE path.
 
 ``TEOB-merger-data`` controls the peak quantities used by TEOBPM:
 
@@ -377,41 +368,9 @@ global fits or are sampled locally:
      - Use NR merger peak quantities from ``[NR-data] properties-file``.
        ``RatExp`` runs require this option and the corresponding NR merger
        peak metadata, because the ansatz uses the second derivative of the
-       peak amplitude. This flag is not the qc/noncirc calibration selector.
-
-``TEOB-quadratic-44`` adds a narrow opt-in nonlinear term to TEOBPM ``(4,4)``
-fits. The term is a ``220x220`` sum-frequency QNM with a half-cosine early-time
-taper:
-
-.. code-block:: ini
-
-   TEOB-quadratic-44 = 1
-   TEOB-quadratic-44-window-start = 10.0
-   TEOB-quadratic-44-window-width = 15.0
-
-The sampled complex amplitude uses the same naming convention as Kerr
-quadratic terms:
-
-.. code-block:: text
-
-   ln_A_sum_440_220_220
-   phi_sum_440_220_220
-
-``TEOB-tapered-overtone-44`` adds an opt-in ``441`` QNM contribution with its
-own half-cosine early-time taper:
-
-.. code-block:: ini
-
-   TEOB-tapered-overtone-44 = 1
-   TEOB-tapered-overtone-44-window-start = 0.0
-   TEOB-tapered-overtone-44-window-width = 10.0
-
-The sampled amplitude parameters are:
-
-.. code-block:: text
-
-   ln_A_tapered_441
-   phi_tapered_441
+       peak amplitude. This is acceptable for SXS local fits that generate
+       calibration labels; a final real-data pyRing run must obtain the needed
+       peak quantities from global fits instead of an NR properties table.
 
 For all TEOBPM runs, the merger phase for the fitted multipole is sampled:
 

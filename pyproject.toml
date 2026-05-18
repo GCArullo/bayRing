@@ -30,7 +30,6 @@ license = "MIT"
 
 [project.scripts]
 bayRing = "bayRing.bayRing:main"
-bayRing-teobpm-calibrate = "scripts.teobpm_calibration.teobpm_calibration:main"
 ringdown-quality = "scripts.ringdown_quality.cli:main"
 
 [project.optional-dependencies]

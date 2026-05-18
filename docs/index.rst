@@ -45,7 +45,6 @@ incorporating time-dependent numerical relativity uncertainties.
    inference_methods
    configuration_reference
    mismatch_snr
-   teobpm_calibration
 
 .. toctree::
    :maxdepth: 1

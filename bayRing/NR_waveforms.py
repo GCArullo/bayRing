@@ -812,16 +812,8 @@ class NR_simulation():
         self.injection_model_parameters.setdefault('KerrBinary-final-state-nc-version', '')
         self.injection_model_parameters.setdefault('KerrBinary-amplitudes-nc-version', '')
         self.injection_model_parameters.setdefault('TEOB-template', 'HypTan')
-        self.injection_model_parameters.setdefault('TEOB-calibration', 'qc')
         self.injection_model_parameters.setdefault('TEOB-global-fit', 1)
         self.injection_model_parameters.setdefault('TEOB-merger-data', 0)
-        self.injection_model_parameters.setdefault('TEOB-mode-mixing', 0)
-        self.injection_model_parameters.setdefault('TEOB-quadratic-44', 0)
-        self.injection_model_parameters.setdefault('TEOB-quadratic-44-window-start', 10.0)
-        self.injection_model_parameters.setdefault('TEOB-quadratic-44-window-width', 15.0)
-        self.injection_model_parameters.setdefault('TEOB-tapered-overtone-44', 0)
-        self.injection_model_parameters.setdefault('TEOB-tapered-overtone-44-window-start', 0.0)
-        self.injection_model_parameters.setdefault('TEOB-tapered-overtone-44-window-width', 10.0)
         self.injection_model_parameters.setdefault('charge', 0)
         self.injection_truths         = None
         self.injection_metadata       = {}
@@ -895,16 +887,8 @@ class NR_simulation():
                 KerrBinary_version        = self.injection_model_parameters['KerrBinary-version'],
                 KerrBinary_amp_nc_version = self.injection_model_parameters['KerrBinary-amplitudes-nc-version'],
                 TEOB_template             = self.injection_model_parameters['TEOB-template'],
-                TEOB_calibration          = self.injection_model_parameters['TEOB-calibration'],
                 TEOB_global_fit           = self.injection_model_parameters['TEOB-global-fit'],
                 TEOB_merger_data          = self.injection_model_parameters['TEOB-merger-data'],
-                TEOB_mode_mixing          = self.injection_model_parameters['TEOB-mode-mixing'],
-                TEOB_quadratic_44         = self.injection_model_parameters['TEOB-quadratic-44'],
-                TEOB_quadratic_44_window_start = self.injection_model_parameters['TEOB-quadratic-44-window-start'],
-                TEOB_quadratic_44_window_width = self.injection_model_parameters['TEOB-quadratic-44-window-width'],
-                TEOB_tapered_overtone_44  = self.injection_model_parameters['TEOB-tapered-overtone-44'],
-                TEOB_tapered_overtone_44_window_start = self.injection_model_parameters['TEOB-tapered-overtone-44-window-start'],
-                TEOB_tapered_overtone_44_window_width = self.injection_model_parameters['TEOB-tapered-overtone-44-window-width'],
             )
 
             try:

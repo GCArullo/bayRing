@@ -183,40 +183,18 @@ fixed values or minimization start values.
      - Carullo2024 amplitude-correction variables.
    * - ``TEOB-template``
      - ``HypTan``
-     - TEOB post-merger amplitude ansatz, either ``HypTan`` or ``RatExp``.
-   * - ``TEOB-calibration``
-     - ``qc``
-     - TEOB calibration family, either ``qc`` for noneccentric/quasi-circular
-       fits or ``noncirc`` for fits whose variables include noncircular
-       metadata such as ``bmrg``, ``Emrg`` or ``Jmrg``.
+     - TEOB post-merger template branch, either ``HypTan`` or ``RatExp``.
    * - ``TEOB-global-fit``
      - ``1``
      - Use calibrated TEOB global fits. If ``0``, sample local TEOB
-       calibration coefficients.
+       calibration coefficients. Local sampling is intended for calibration
+       campaigns, not final real-data ``TEOBPM`` parameter estimation.
    * - ``TEOB-merger-data``
      - ``0``
      - If ``1``, use NR merger peak quantities from ``properties-file``
-       instead of the quasi-circular peak fits.
-   * - ``TEOB-quadratic-44``
-     - ``0``
-     - Add an opt-in tapered ``220x220`` quadratic QNM contribution to the
-       TEOBPM ``(4,4)`` mode.
-   * - ``TEOB-quadratic-44-window-start``
-     - ``10.0``
-     - Taper start time after the ``(2,2)`` peak, in ``M``.
-   * - ``TEOB-quadratic-44-window-width``
-     - ``15.0``
-     - Half-cosine taper width, in ``M``. Non-positive values use a step.
-   * - ``TEOB-tapered-overtone-44``
-     - ``0``
-     - Add an opt-in tapered ``441`` QNM contribution to the TEOBPM
-       ``(4,4)`` mode.
-   * - ``TEOB-tapered-overtone-44-window-start``
-     - ``0.0``
-     - Taper start time after the ``(2,2)`` peak, in ``M``.
-   * - ``TEOB-tapered-overtone-44-window-width``
-     - ``10.0``
-     - Half-cosine taper width, in ``M``. Non-positive values use a step.
+       instead of the quasi-circular peak fits. Any such NR-derived input must
+       be replaced by a pyRing global fit before ``TEOBPM`` is treated as a
+       stand-alone real-data model.
 
 Some templates override ``QNM-modes`` internally. For example ``KerrBinary``
 and ``TEOBPM`` set their calibrated mode lists based on the selected template
