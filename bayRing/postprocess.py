@@ -249,6 +249,19 @@ def _toeplitz_whitened_norm(acf, waveform):
     whitened = sl.solve_toeplitz(acf, waveform, check_finite=False)
     return whitened, np.sqrt(abs(np.dot(waveform, whitened)))
 
+def _time_domain_mismatch(acf, reference, comparison):
+
+    whitened_reference, reference_norm = _toeplitz_whitened_norm(acf, reference)
+    _, comparison_norm = _toeplitz_whitened_norm(acf, comparison)
+
+    if(reference_norm == 0.0 or comparison_norm == 0.0):
+        raise ValueError("Cannot compute mismatch for a waveform with zero norm.")
+
+    match = abs(np.dot(comparison, whitened_reference)) / (reference_norm * comparison_norm)
+    match = np.minimum(1 - abs(1 - match), match)
+
+    return 1 - match
+
 def _format_diagnostic_value(value):
     if value is None:
         return ''
@@ -1424,6 +1437,237 @@ def compute_mismatch_hplus_hcross(NR_sim, results, inference_model, outdir, meth
             except Exception as e:
                 print(f"Error processing mismatch for {perc}% CI and {NR_quant}: {e}")
                 continue
+
+    return
+
+def _nr_waveform_payload(label, time, real, imag, **metadata):
+
+    payload = {
+        'label': label,
+        'time': np.asarray(time),
+        'real': np.asarray(real),
+        'imag': np.asarray(imag),
+    }
+    payload.update(metadata)
+
+    return payload
+
+def _try_read_sxs_waveform(NR_sim, extrap_order, res_level):
+
+    try:
+        time, real, imag = NR_sim.read_waveform_lm_from_SXS(extrap_order, res_level)
+    except Exception:
+        return None
+
+    return _nr_waveform_payload(
+        'Lev{}_N{}'.format(res_level, extrap_order),
+        time,
+        real,
+        imag,
+        res_level=res_level,
+        extrap_order=extrap_order,
+    )
+
+def _try_read_rwz_waveform(NR_sim, extrap_order, res_level):
+
+    try:
+        time, real, imag = NR_sim.read_waveform_lm_from_RWZ(
+            res_level, extrap_order, allow_simple_fallback=False
+        )
+    except Exception:
+        return None
+
+    return _nr_waveform_payload(
+        'RL{}_EP{}'.format(res_level, extrap_order),
+        time,
+        real,
+        imag,
+        res_level=res_level,
+        extrap_order=extrap_order,
+    )
+
+def _int_value_or_none(value):
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+def _sxs_nr_comparison_pairs(NR_sim):
+
+    pairs = []
+    extrap_order = _int_value_or_none(getattr(NR_sim, 'extrap_order', None))
+    if(extrap_order is None):
+        return pairs
+
+    resolution_waveforms = []
+    for res_level in [6, 5, 4, 3, 2, 1]:
+        waveform = _try_read_sxs_waveform(NR_sim, extrap_order, res_level)
+        if(waveform is None):
+            continue
+        resolution_waveforms.append(waveform)
+        if(len(resolution_waveforms) == 2):
+            break
+
+    extrapolation_res_level = _int_value_or_none(getattr(NR_sim, 'res_level', None))
+    if(len(resolution_waveforms) == 2):
+        high, low = resolution_waveforms
+        pairs.append((
+            'nr_resolution_Lev{}_vs_Lev{}'.format(high['res_level'], low['res_level']),
+            'NR resolution',
+            high,
+            low,
+        ))
+        extrapolation_res_level = high['res_level']
+
+    if(extrapolation_res_level is not None):
+        base = _try_read_sxs_waveform(NR_sim, extrap_order, extrapolation_res_level)
+        next_extrap = _try_read_sxs_waveform(NR_sim, extrap_order + 1, extrapolation_res_level)
+        if(base is not None and next_extrap is not None):
+            pairs.append((
+                'nr_extrapolation_N{}_vs_N{}'.format(extrap_order, extrap_order + 1),
+                'NR extrapolation',
+                base,
+                next_extrap,
+            ))
+
+    return pairs
+
+def _rwz_nr_comparison_pairs(NR_sim):
+
+    pairs = []
+    extrap_order = _int_value_or_none(getattr(NR_sim, 'extrap_order', None))
+    if(extrap_order is None):
+        return pairs
+
+    try:
+        resolution_levels = NR_sim.available_RWZ_resolution_levels(extrap_order)
+    except Exception:
+        resolution_levels = []
+
+    extrapolation_res_level = _int_value_or_none(getattr(NR_sim, 'res_level', None))
+    if(len(resolution_levels) >= 2):
+        high_res, low_res = resolution_levels[-1], resolution_levels[-2]
+        high = _try_read_rwz_waveform(NR_sim, extrap_order, high_res)
+        low = _try_read_rwz_waveform(NR_sim, extrap_order, low_res)
+        if(high is not None and low is not None):
+            pairs.append((
+                'nr_resolution_RL{}_vs_RL{}'.format(high_res, low_res),
+                'NR resolution',
+                high,
+                low,
+            ))
+            extrapolation_res_level = high_res
+
+    if(extrapolation_res_level is not None):
+        base = _try_read_rwz_waveform(NR_sim, extrap_order, extrapolation_res_level)
+        next_extrap = _try_read_rwz_waveform(NR_sim, extrap_order + 1, extrapolation_res_level)
+        if(base is not None and next_extrap is not None):
+            pairs.append((
+                'nr_extrapolation_EP{}_vs_EP{}'.format(extrap_order, extrap_order + 1),
+                'NR extrapolation',
+                base,
+                next_extrap,
+            ))
+
+    return pairs
+
+def _teukolsky_nr_comparison_pairs(NR_sim):
+
+    res_level = _int_value_or_none(getattr(NR_sim, 'res_level', None))
+    if(res_level is None):
+        return []
+
+    high = None
+    low = None
+    try:
+        time, real, imag = NR_sim.read_waveform_lm_from_Teukolsky(res_level)
+        high = _nr_waveform_payload(
+            'Lev{}'.format(res_level), time, real, imag, res_level=res_level
+        )
+        time, real, imag = NR_sim.read_waveform_lm_from_Teukolsky(res_level - 1)
+        low = _nr_waveform_payload(
+            'Lev{}'.format(res_level - 1), time, real, imag, res_level=res_level - 1
+        )
+    except Exception:
+        return []
+
+    return [(
+        'nr_resolution_Lev{}_vs_Lev{}'.format(res_level, res_level - 1),
+        'NR resolution',
+        high,
+        low,
+    )]
+
+def _nr_comparison_pairs(NR_sim):
+
+    cache_key = '_bayring_nr_comparison_pairs'
+    cached_pairs = getattr(NR_sim, cache_key, None)
+    if(cached_pairs is not None):
+        return cached_pairs
+
+    catalog = getattr(NR_sim, 'NR_catalog', None)
+    if(catalog == 'SXS'):
+        pairs = _sxs_nr_comparison_pairs(NR_sim)
+    elif(catalog == 'RWZ-env'):
+        pairs = _rwz_nr_comparison_pairs(NR_sim)
+    elif(catalog == 'Teukolsky'):
+        pairs = _teukolsky_nr_comparison_pairs(NR_sim)
+    else:
+        pairs = []
+
+    setattr(NR_sim, cache_key, pairs)
+
+    return pairs
+
+def _normalise_nr_time_to_analysis_grid(time, analysis_time):
+
+    time = np.asarray(time)
+    if(len(time) == 0 or len(analysis_time) == 0):
+        return time
+    if(analysis_time[0] >= 0.0 and time[0] < 0.0):
+        return time - time[0]
+
+    return time
+
+def _interpolate_nr_waveform_component(waveform, component, analysis_time):
+
+    time = _normalise_nr_time_to_analysis_grid(waveform['time'], analysis_time)
+    if(len(time) == 0):
+        raise ValueError("comparison waveform has an empty time array")
+    if(time[0] > analysis_time[0] or time[-1] < analysis_time[-1]):
+        raise ValueError("comparison waveform does not cover the analysis interval")
+
+    return interp1d(time, waveform[component], bounds_error=False, fill_value=0.0)(analysis_time)
+
+def compute_nr_comparison_mismatches(NR_sim, outdir, acf, N_FFT, M, dL, t_start_g,
+                                     window_size_DX, window_size_SX, k,
+                                     saturation_DX, saturation_SX, direction=None):
+
+    pairs = _nr_comparison_pairs(NR_sim)
+    if(len(pairs) == 0):
+        return
+
+    analysis_time = np.asarray(NR_sim.t_NR_cut)
+    scale = _physical_strain_scale(M, dL)
+
+    for diagnostic_type, print_label, reference_waveform, comparison_waveform in pairs:
+        pair_label = '{} vs {}'.format(reference_waveform['label'], comparison_waveform['label'])
+        for component in strain_components:
+            try:
+                reference = _interpolate_nr_waveform_component(reference_waveform, component, analysis_time) * scale
+                comparison = _interpolate_nr_waveform_component(comparison_waveform, component, analysis_time) * scale
+                mismatch = _time_domain_mismatch(acf, reference, comparison)
+            except Exception as exc:
+                print("* Skipping {} mismatch ({}, h {}): {}".format(print_label, pair_label, component, exc))
+                continue
+
+            print("* {} mismatch ({}, h {}): {}".format(print_label, pair_label, component, mismatch))
+            _record_mismatch_diagnostic(
+                outdir, diagnostic_type, M, dL, t_start_g, N_FFT,
+                window_size_DX, window_size_SX, k, saturation_DX, saturation_SX,
+                direction=direction, strain_data=component, mismatch=mismatch
+            )
 
     return
 
@@ -3432,6 +3676,11 @@ def run_mismatch_and_SNR_computation(NR_sim, results_object, inference_model, pa
                 compute_mismatch_hplus_hcross(
                     *common_args, t_start_g_true, f_min, f_max, asd_path,
                     *window_args, mismatch_print_flag, compare_TD_FD, direction=direction
+                )
+
+                compute_nr_comparison_mismatches(
+                    NR_sim, outdir, ACF_truncated_NR, N_fft, M, dL,
+                    t_start_g_true, *window_args, direction=direction
                 )
 
                 compute_optimal_SNR(
