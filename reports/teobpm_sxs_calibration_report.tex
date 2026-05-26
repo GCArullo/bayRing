@@ -1,0 +1,73 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{siunitx}
+\title{TEOBPM Calibration Against SXS Ringdown Injections}
+\author{bayRing automatic calibration workflow}
+\date{\today}
+\begin{document}
+\maketitle
+
+\section{Scope}
+This report records a TEOBPM calibration campaign for non-eccentric,
+non-precessing SXS simulations. The campaign family is
+\texttt{unspecified}; aligned-spin campaigns are
+constructed hierarchically from a nonspinning baseline.
+
+\section{Dataset}
+\begin{tabular}{lr}
+\toprule
+Training simulations & 0\\
+Validation simulations & 0\\
+Validation fraction & n/a\\
+Maximum eccentricity & n/a\\
+\bottomrule
+\end{tabular}
+
+\section{Local Fits}
+Local TEOBPM fits are generated under \texttt{local\_fit\_configs/} and are
+intended to estimate peak quantities, post-peak TEOBPM coefficients, and
+relative merger phases mode by mode.
+
+\begin{tabular}{lr}
+\toprule
+Indexed jobs & n/a\\
+Completed jobs & n/a\\
+Failed jobs & n/a\\
+Collected coefficient rows & n/a\\
+Collection failures & n/a\\
+\bottomrule
+\end{tabular}
+
+\section{Global Fits}
+The global-fit file is versioned with schema \texttt{bayRing.teobpm.global-fit.v1}. The
+selection rule is the lowest Bayesian information criterion among hierarchical
+candidate bases, with the aligned-spin basis restricted to spin corrections on
+top of the nonspinning layer.
+
+\begin{tabular}{lr}
+\toprule
+Modes with fitted targets & 0\\
+Fitted mode-target pairs & 0\\
+\bottomrule
+\end{tabular}
+
+\section{Validation}
+\begin{tabular}{lr}
+\toprule
+Validated coefficients & 0\\
+Median absolute residual & n/a\\
+Maximum absolute residual & n/a\\
+\bottomrule
+\end{tabular}
+
+No validation figures were available when this report was rendered.
+
+\section{Open Production Steps}
+The workflow is ready to run the expensive SXS downloads and local fits. A final
+science report should add the generated mismatch figures after the validation
+table has been produced from the completed local-fit campaign.
+
+\end{document}
