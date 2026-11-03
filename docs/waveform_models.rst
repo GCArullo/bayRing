@@ -43,8 +43,12 @@ Model Selection Summary
      - Numerically calibrated QNM amplitudes superpositions.
      - NR-calibrated ringdown comparisons.
    * - ``TEOBPM``
-     - Merger phase, and optionally NR calibration coefficients.
+     - Merger phase, and optionally NR calibration coefficients and
+       additional linear and quadratic terms.
      - Post-merger model studies.
+   * - ``SEOBNRv5HM``
+     - Overall phase.
+     - Comparison with an inspiral-merger-ringdown model.
 
 Damped Sinusoids
 ~~~~~~~~~~~~~~~~
@@ -404,7 +408,101 @@ bounds are:
 Development controls ``TEOB-NR-fit``, ``sigmoid-flag`` and
 ``quadratic-fits`` remain available with the ``HypTan``/``RatExp`` template
 selection. They add sampled NR-calibration and TEOB correction parameters on
-top of the standard TEOBPM path.
+top of the standard TEOBPM path, and require the pyRing ``TEOBPM`` with the
+optional additional terms:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 60
+
+   * - Option
+     - Effect
+   * - ``TEOB-NR-fit = 1``
+     - Sample ``c3A_lm``, ``c3p_lm``, ``c4p_lm`` (and ``c2A_lm``, ``c2p_lm``
+       for ``RatExp``), passed to pyRing as local coefficients
+       (``global_fit = 0``).
+   * - ``quadratic-fits = 1``
+     - Add the quadratic terms of ``QQNM-modes`` to the multipole, with
+       frequency the sum of the exact Kerr frequencies of the parents
+       (counter-rotating modes for ``af < 0``) and parameters
+       ``ln_A_<quad>``, ``phi_<quad>``, ``dphi_<quad>``; for example
+       ``<quad> = sum_440_220_220`` for ``QQNM-modes = Px220x220`` in the
+       ``(4,4)`` mode.
+   * - ``sigmoid-flag = 1``
+     - Activate the additional terms through sigmoids, with parameters
+       ``t_sigmoid`` and ``width_sigmoid`` [Mf]: each term is multiplied by
+       :math:`S\,e^{i\,\delta\phi\,S}`, with
+       :math:`S=\frac{1}{2}[1+\tanh((\tau-t_{\rm sigmoid})/w_{\rm sigmoid})]`
+       and :math:`\tau` measured from the first data sample.
+
+With a development fit, ``QNM-modes`` lists additional linear Kerr modes, with
+the same parameters as the quadratic terms (none if not given).
+
+Optional parameters, included only if they appear in ``[Priors]`` (fixed, or
+with a bound):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 56
+
+   * - Parameter
+     - Meaning
+   * - ``c4A_lm``
+     - With ``TEOB-NR-fit`` and ``HypTan``: replaces the peak-amplitude
+       condition on ``c4A``. Sentinel values: ``3e30``, standard condition;
+       ``-1.5e30``, ``c4A = c1c4A - c1A`` with ``fix-c1c4A_lm`` the
+       asymptotic amplitude ``c1A + c4A``; ``-3e30``, ``c1A`` and ``c4A``
+       fixed by ``fix-c1c4A_lm`` and by the amplitude of the complete
+       multipole (TEOBPM plus quadratic terms) at its peak, with
+       ``fix-tenv0_lm`` [M] the time of the first data sample.
+   * - ``ln_A_constant_lm``, ``phi_constant_lm``
+     - Complex constant added to the multipole.
+   * - ``fix-phirel_<quad>``
+     - Fixed relative phase of a quadratic term with respect to TEOBPM:
+       ``phi_<quad> = phirel - phi_mrg_lm``, so that only ``phi_mrg_lm`` is
+       free.
+
+Example: the local fits of the ``(4,4)`` mode with the quadratic
+``(2,2,0)x(2,2,0)`` mode of Crescimbeni and Carullo:
+
+.. code-block:: ini
+
+   [Model]
+   template = TEOBPM
+   TEOB-NR-fit = 1
+   sigmoid-flag = 1
+   quadratic-fits = 1
+   QNM-modes =
+   QQNM-modes = Px220x220
+
+   [Priors]
+   fix-c3A_44 = 0
+   fix-c4p_44 = 0
+   fix-c4A_44 = -3e30
+   fix-c1c4A_44 = 0.27
+   fix-tenv0_44 = 3.0
+   fix-ln_A_sum_440_220_220 = -0.70
+
+SEOBNRv5HM
+~~~~~~~~~~
+
+``SEOBNRv5HM`` compares the data with a mode of the SEOBNRv5HM
+inspiral-merger-ringdown model, for the binary parameters of the NR metadata:
+
+.. code-block:: ini
+
+   [Model]
+   template = SEOBNRv5HM
+   SEOB-modes-file = seob_modes.npz
+
+As for ``TEOBPM`` and ``KerrBinary``, the time origin is the peak of the
+``(2,2)`` mode (of the NR simulation for the data, of SEOBNRv5HM for the
+template), no time shift is fitted, and the only free parameter is the overall
+phase ``phi``. ``SEOB-modes-file`` is an npz with ``t`` (in ``M``, measured from
+the peak of the SEOBNRv5HM ``(2,2)`` mode), ``ID`` (NR simulation IDs) and
+``h<l><m>`` (complex modes, one row per ID); if empty, the mode is generated
+with ``pyseobnr``, which has to be installed. Available modes: ``(2,2)``,
+``(2,1)``, ``(3,3)``, ``(3,2)``, ``(4,4)``, ``(4,3)``, ``(5,5)``.
 
 Constant Offset
 ~~~~~~~~~~~~~~~

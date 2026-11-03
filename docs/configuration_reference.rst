@@ -153,7 +153,9 @@ fixed values or minimization start values.
      - Meaning
    * - ``template``
      - ``Kerr``
-     - Waveform family.
+     - Waveform family: ``Damped-sinusoids``, ``Kerr``,
+       ``Kerr-Damped-sinusoids``, ``KerrBinary``, ``TEOBPM`` or
+       ``SEOBNRv5HM``.
    * - ``N-DS-modes``
      - ``1``
      - Number of damped-sinusoid modes.
@@ -162,7 +164,8 @@ fixed values or minimization start values.
      - Number of tail factors added to ``Damped-sinusoids``.
    * - ``QNM-modes``
      - ``220,221,320``
-     - Linear Kerr QNM list.
+     - Linear Kerr QNM list (can be empty). For ``TEOBPM`` with a development
+       fit, additional linear modes (none if not given).
    * - ``QQNM-modes``
      - empty string
      - Quadratic QNM coupling list.
@@ -197,20 +200,28 @@ fixed values or minimization start values.
        stand-alone real-data model.
    * - ``TEOB-NR-fit``
      - ``0``
-     - Development flag to sample TEOB NR calibration coefficients.
+     - Development flag to sample TEOB NR calibration coefficients, passed to
+       pyRing as local coefficients.
    * - ``sigmoid-flag``
      - ``0``
-     - Development flag for TEOB sigmoid corrections.
+     - Development flag to activate the additional TEOBPM terms through
+       sigmoids.
    * - ``quadratic-fits``
      - ``0``
-     - Development flag for TEOB quadratic fits.
+     - Development flag to include in TEOBPM the quadratic terms of
+       ``QQNM-modes``.
+   * - ``SEOB-modes-file``
+     - empty string
+     - Precomputed modes for the ``SEOBNRv5HM`` template; if empty, they are
+       generated with ``pyseobnr``.
    * - ``TEOB-qc-fit-type``
      - ``equal-mass``
      - Development fit type: ``equal-mass`` or ``non-spinning``.
 
 Some templates override ``QNM-modes`` internally. For example ``KerrBinary``
-and ``TEOBPM`` set their calibrated mode lists based on the selected template
-version.
+and the standard ``TEOBPM`` set their calibrated mode lists based on the
+selected template version. See :doc:`waveform_models` for the ``TEOBPM``
+development options and their optional ``[Priors]`` parameters.
 
 [Inference]
 ~~~~~~~~~~~
@@ -248,6 +259,15 @@ version.
    * - ``nensemble``
      - ``1``
      - Number of raynest ensemble processes.
+   * - ``checkpoint-interval``
+     - ``900``
+     - Seconds between cpnest checkpoints (the resume pickle can be several
+       GB).
+   * - ``verbose``
+     - ``3``
+     - cpnest verbosity (0-3). ``3`` also keeps every internal MCMC sample in
+       memory and writes it at the end, which for long ringdown fits can take
+       hours and tens of GB; ``2`` skips that.
    * - ``n-start-time-workers``
      - ``1``
      - Number of start-time fits to run in parallel when ``t-start``

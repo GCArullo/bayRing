@@ -784,12 +784,18 @@ A dot is present at the end of each description line and is not to be intended a
         N-DS-modes                       Number of free modes in the ringdown model if 'Damped-sinusoids' in template. Otherwise, ignored.                                Default: 1.
         
         QNM-modes                        List of modes of the ringdown model, if 'Kerr' in template. Otherwise, ignored. \
-                                         Example format: '220,221,320'.                                                                                                   Default: '220,221,320'.
+                                         Example format: '220,221,320'. Empty entries and spaces are ignored, and the list can be empty. \
+                                         For TEOBPM with TEOB-NR-fit, sigmoid-flag or quadratic-fits: additional linear Kerr modes added to the TEOBPM multipole, \
+                                         with sampled ln_A_lmn, phi_lmn, dphi_lmn (and t_sigmoid_lmn, width_sigmoid_lmn with sigmoid-flag); if not given, none. \
+                                         For the standard TEOBPM, it is set internally to the TEOBPM multipoles.                                                          Default: '220,221,320'.
         
         QQNM-modes                       List of quadratic modes of the ringdown model if 'Kerr' in template. Otherwise, ignored. \
                                          Example format: '--QQNM-modes ``Px220x321,Px220x221', i.e. (child_term x parent1 x parent2), \
                                          where the child mode is assumed to be equal to the selected (l_NR,m) multipole and child_term=P,M \
-                                         (parent frequencies sum or difference).                                                                                          Default: ''.
+                                         (parent frequencies sum or difference). Also used by TEOBPM with quadratic-fits = 1: each term is added to the TEOBPM \
+                                         multipole, with frequency the sum of the exact Kerr frequencies of the parents (counter-rotating modes for af < 0) and \
+                                         parameters ln_A_<quad>, phi_<quad>, dphi_<quad> (and t_sigmoid_<quad>, width_sigmoid_<quad> with sigmoid-flag), \
+                                         <quad> = sum_440_220_220 for 'Px220x220' in the (4,4) mode.                                                                     Default: ''.
         
         Kerr-tail                        Boolean to add a tail factor to the Kerr template.                                                                               Default: 0.
         
@@ -826,11 +832,15 @@ A dot is present at the end of each description line and is not to be intended a
                                          by the NR merger data (TEOB-merger-data = 1, to be provided in [NR-data][properties-file]) or by the quasi-circular fits \
                                          (TEOB-merger-data = 0).                                                                                                          Default: 0.
 
-        TEOB-NR-fit                      Development flag to sample TEOB NR calibration coefficients while keeping the HypTan/RatExp template selection.                  Default: 0.
+        TEOB-NR-fit                      Development flag to sample TEOB NR calibration coefficients while keeping the HypTan/RatExp template selection: \
+                                         c3A_lm, c3p_lm, c4p_lm (and c2A_lm, c2p_lm for RatExp), passed to pyRing as local coefficients (global_fit = 0). \
+                                         With HypTan, c4A_lm can also be given in [Priors] (see below).                                                                   Default: 0.
 
-        sigmoid-flag                     Development flag to include sigmoid corrections for additional TEOB Kerr modes.                                                   Default: 0.
+        sigmoid-flag                     Development flag to activate the additional TEOBPM terms (QNM-modes, QQNM-modes with quadratic-fits) through sigmoids: \
+                                         each term is multiplied by S exp(i dphi S), with S = [1 + tanh((tau - t_sigmoid)/width_sigmoid)]/2 and tau [Mf] measured \
+                                         from the first data sample.                                                                                                      Default: 0.
 
-        quadratic-fits                   Development flag to include quadratic TEOB fits.                                                                                  Default: 0.
+        quadratic-fits                   Development flag to include in TEOBPM the quadratic terms of QQNM-modes, with their parameters (see QQNM-modes).              Default: 0.
 
         TEOB-qc-fit-type                 Development fit type. Available options: ['non-spinning', 'equal-mass'].                                                          Default: 'equal-mass'.
 
@@ -930,6 +940,18 @@ A dot is present at the end of each description line and is not to be intended a
         Parameters can be fixed by adding 'fix-param=value' to this section, where `param` is the name of the parameter under consideration.
 
         User-controlled starting values for the minimization can be set by adding`'param-start=value` to the [Priors] section, where `param` is the name of the parameter under consideration. User-defined starting values overrun the `seeding` option for that parameter.
+
+        TEOBPM optional parameters, included only if they appear in this section (fixed, or with a bound):
+
+        c4A_lm                  With TEOB-NR-fit and HypTan: c4A, replacing the peak-amplitude condition. Sentinel values (pyRing TEOBPM):
+                                fix-c4A_lm = 3e30: standard condition c4A = A_peak - c1A tanh(c3A);
+                                fix-c4A_lm = -1.5e30: c4A = c1c4A - c1A, with fix-c1c4A_lm the asymptotic amplitude c1A + c4A;
+                                fix-c4A_lm = -3e30: c1A and c4A fixed by fix-c1c4A_lm and by the amplitude A_peak of the complete multipole (TEOBPM +
+                                quadratic terms) at its peak, with fix-tenv0_lm [M] the time of the first data sample after the peak of the (2,2) mode.
+                                Default bounds: [-10, 10].
+        ln_A_constant_lm        Complex constant added to the multipole, with phase phi_constant_lm.                  Default bounds: [log(1e-9), log(1e-4)], [0, 2pi].
+        fix-phirel_<quad>       Fixed relative phase of a quadratic term with respect to TEOBPM: phi_<quad> = phirel - phi_mrg_lm, so that the
+                                relative phase (invariant under a rotation of the binary) is fixed and only phi_mrg_lm is free.
         
     *******************************************************************
     * Parameters to be passed to the [Mismatch-PSD-settings] section. *
