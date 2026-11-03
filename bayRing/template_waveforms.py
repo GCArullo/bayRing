@@ -8,7 +8,7 @@ import bayRing.utils   as utils
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, N_ds_tails=0, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_template = 'RatExp', TEOB_merger_data = 1, TEOB_global_fit = 0, TEOB_NR_fit = 0, TEOB_qc_fit_type = None, sigmoid_flag=0, quadratic_fits=0):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, N_ds_tails=0, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_template = 'RatExp', TEOB_merger_data = 1, TEOB_global_fit = 0, TEOB_NR_fit = 0, TEOB_qc_fit_type = None, sigmoid_flag=0, quadratic_fits=0, SEOB_modes_file='', NR_ID=None):
 
         self.t_NR                      = t_NR
         self.t_start                   = tM_start
@@ -35,6 +35,9 @@ class WaveformModel(cpnest.model.Model):
         self.TEOB_qc_fit_type          = TEOB_qc_fit_type
         self.sigmoid_flag              = sigmoid_flag
         self.quadratic_fits            = quadratic_fits
+        self.SEOB_modes_file           = SEOB_modes_file
+        self.NR_ID                     = NR_ID
+        self._SEOB_mode                = None
 
         if not(const_params==None):
             self.const_r = [const_params[0]*np.cos(const_params[1])]
@@ -95,7 +98,8 @@ class WaveformModel(cpnest.model.Model):
             wf_i = wf_i + self.const_i
 
         # UNDERSTAND WHY!!!!
-        if not(self.wf_model=='KerrBinary'): wf_r = -wf_r
+        # (SEOBNRv5HM: the mode is already in the convention of the NR data.)
+        if not(self.wf_model=='KerrBinary' or self.wf_model=='SEOBNRv5HM'): wf_r = -wf_r
 
         return wf_r, wf_i
 
@@ -289,13 +293,16 @@ class WaveformModel(cpnest.model.Model):
             NR_fit_coeffs = {(self.l_NR,self.m_NR): {}}
 
         if not(self.TEOB_global_fit) or self.TEOB_NR_fit:
-            NR_fit_coeffs[(self.l_NR,self.m_NR)]['c3A'] = params['c3A_{}{}'.format(self.l_NR,self.m_NR)]
-            NR_fit_coeffs[(self.l_NR,self.m_NR)]['c3p'] = params['c3p_{}{}'.format(self.l_NR,self.m_NR)]
-            NR_fit_coeffs[(self.l_NR,self.m_NR)]['c4p'] = params['c4p_{}{}'.format(self.l_NR,self.m_NR)]
-
-            if(self.TEOB_template=='RatExp'):
-                NR_fit_coeffs[(self.l_NR,self.m_NR)]['c2A'] = params['c2A_{}{}'.format(self.l_NR,self.m_NR)]
-                NR_fit_coeffs[(self.l_NR,self.m_NR)]['c2p'] = params['c2p_{}{}'.format(self.l_NR,self.m_NR)]
+            lm = '{}{}'.format(self.l_NR,self.m_NR)
+            for coefficient in (['c3A', 'c3p', 'c4p'] + (['c2A', 'c2p'] if self.TEOB_template=='RatExp' else [])):
+                NR_fit_coeffs[(self.l_NR,self.m_NR)][coefficient] = utils.get_param_override(fixed_params,params,'{}_{}'.format(coefficient, lm))
+            # Optional c4A (HypTan), replacing the peak-amplitude condition, with the pyRing sentinels (see pyRing TEOBPM):
+            # its inputs, the asymptotic amplitude c1c4A = c1A + c4A and the origin tenv0 of the sigmoids, are fixed parameters.
+            if(self._has_param(params, fixed_params, 'c4A_'+lm)):
+                NR_fit_coeffs[(self.l_NR,self.m_NR)]['c4A'] = utils.get_param_override(fixed_params,params,'c4A_'+lm)
+            for extra in ('c1c4A', 'tenv0'):
+                if(('{}_{}'.format(extra, lm)) in fixed_params):
+                    NR_fit_coeffs[(self.l_NR,self.m_NR)][extra] = fixed_params['{}_{}'.format(extra, lm)]
         else:
             NR_fit_coeffs['ecc'] = self.metadata['ecc']
             NR_fit_coeffs['bmrg'] = self.metadata['bmrg']
@@ -358,6 +365,7 @@ class WaveformModel(cpnest.model.Model):
 
                         quad_amp_value = utils.get_param_override(fixed_params,params,'ln_A_{}'.format(quad_string))
                         quad_phi_value = utils.get_param_override(fixed_params,params,'phi_{}'.format(quad_string))
+                        quad_phi_value = self._relative_quad_phase(fixed_params, params, quad_string, quad_phi_value)
                         quad_dphi_value = utils.get_param_override(fixed_params,params,'dphi_{}'.format(quad_string))
 
                         quad_amps[quad_term][quad_key] = np.exp(quad_amp_value) * np.exp(1j*(quad_phi_value))
@@ -367,73 +375,39 @@ class WaveformModel(cpnest.model.Model):
                             quad_t_sigmoids[quad_term][quad_key] = utils.get_param_override(fixed_params,params,'t_sigmoid_{}'.format(quad_string))
                             quad_width_sigmoids[quad_term][quad_key] = utils.get_param_override(fixed_params,params,'width_sigmoid_{}'.format(quad_string))
 
-            if(self.TEOB_qc_fit_type=='non-spinning'):
-                order_nu = 111 if self.TEOB_template == 'HypTan' else 11111
-                order_S_hat = 0
-            elif(self.TEOB_qc_fit_type=='equal-mass'):
-                order_nu = 0
-                order_S_hat = 342 if self.TEOB_template == 'HypTan' else 33333
-            else:
-                order_nu = 0
-                order_S_hat = 0
+            # Optional complex constant added to the multipole (ln_A_constant_lm, phi_constant_lm)
+            constant_amps = {}
+            lm = '{}{}'.format(self.l_NR,self.m_NR)
+            if(self._has_param(params, fixed_params, 'ln_A_constant_'+lm)):
+                constant_amps[(self.l_NR,self.m_NR)] = np.exp(utils.get_param_override(fixed_params,params,'ln_A_constant_'+lm)) * np.exp(1j*utils.get_param_override(fixed_params,params,'phi_constant_'+lm))
 
-            try:
-                return wf.TEOBPM(self.t_peak                  ,
-                                 self.metadata['m1']          ,
-                                 self.metadata['m2']          ,
-                                 self.metadata['chi1']        ,
-                                 self.metadata['chi2']        ,
-                                 merger_phases                ,
-                                 amps                         ,
-                                 dphis                        ,
-                                 t_sigmoids                   ,
-                                 width_sigmoids               ,
-                                 quad_amps                    ,
-                                 quad_dphis                   ,
-                                 quad_t_sigmoids              ,
-                                 quad_width_sigmoids          ,
-                                 1.0                          ,
-                                 0.0                          ,
-                                 0.0                          ,
-                                 modes                        ,
-                                 TGR_parameters               ,
-                                 geom            = 1          ,
-                                 ecc_par         = ecc_par    ,
-                                 template        = template_index,
-                                 merger_data     = self.TEOB_merger_data,
-                                 global_fit      = self.TEOB_global_fit,
-                                 order_nu        = order_nu   ,
-                                 order_S_hat     = order_S_hat,
-                                 sigmoid_flag    = self.sigmoid_flag,
-                                 quadratic_fits  = self.quadratic_fits,
-                                 NR_fit_coeffs   = NR_fit_coeffs)
-            except TypeError:
-                return wf.TEOBPM(self.t_peak                  ,
-                                 self.metadata['m1']          ,
-                                 self.metadata['m2']          ,
-                                 self.metadata['chi1']        ,
-                                 self.metadata['chi2']        ,
-                                 merger_phases                ,
-                                 amps                         ,
-                                 dphis                        ,
-                                 t_sigmoids                   ,
-                                 width_sigmoids               ,
-                                 quad_amps                    ,
-                                 quad_dphis                   ,
-                                 quad_t_sigmoids              ,
-                                 quad_width_sigmoids          ,
-                                 1.0                          ,
-                                 0.0                          ,
-                                 0.0                          ,
-                                 modes                        ,
-                                 TGR_parameters               ,
-                                 geom            = 1          ,
-                                 ecc_par         = ecc_par    ,
-                                 order_nu        = order_nu   ,
-                                 order_S_hat     = order_S_hat,
-                                 sigmoid_flag    = self.sigmoid_flag,
-                                 quadratic_fits  = self.quadratic_fits,
-                                 NR_fit_coeffs   = NR_fit_coeffs)
+            # Local NR-calibrated coefficients (TEOB-NR-fit=1) are used by pyRing only with global_fit=0.
+            return wf.TEOBPM(self.t_peak                  ,
+                             self.metadata['m1']          ,
+                             self.metadata['m2']          ,
+                             self.metadata['chi1']        ,
+                             self.metadata['chi2']        ,
+                             merger_phases                ,
+                             1.0                          , # distance     , dummy with geom=1
+                             0.0                          , # inclination  , dummy with geom=1
+                             0.0                          , # orbital phase, dummy with geom=1
+                             modes                        ,
+                             TGR_parameters               ,
+                             geom                = 1                                                ,
+                             template            = self.TEOB_template                               ,
+                             merger_data         = self.TEOB_merger_data                            ,
+                             global_fit          = int(bool(self.TEOB_global_fit) and not(self.TEOB_NR_fit)),
+                             NR_fit_coeffs       = NR_fit_coeffs                                    ,
+                             amps                = amps                                             ,
+                             dphis               = dphis                                            ,
+                             t_sigmoids          = t_sigmoids                                       ,
+                             width_sigmoids      = width_sigmoids                                   ,
+                             quad_amps           = quad_amps                                        ,
+                             quad_dphis          = quad_dphis                                       ,
+                             quad_t_sigmoids     = quad_t_sigmoids                                  ,
+                             quad_width_sigmoids = quad_width_sigmoids                              ,
+                             sigmoid_flag        = self.sigmoid_flag                                ,
+                             constant_amps       = constant_amps                                    )
 
         try:
             ringdown_model = wf.TEOBPM(self.t_peak                  ,
@@ -470,6 +444,76 @@ class WaveformModel(cpnest.model.Model):
                                        NR_fit_coeffs = NR_fit_coeffs)
         return ringdown_model
 
+    @staticmethod
+    def _has_param(params, fixed_params, name):
+
+        """True if `name` is a sampled (params: dict or cpnest LivePoint) or a fixed parameter."""
+
+        return (name in fixed_params) or (name in (params.names if hasattr(params, 'names') else params))
+
+    def _relative_quad_phase(self, fixed_params, params, quad_string, quad_phi_value):
+
+        """
+            If `fix-phirel_<quad>` is given, the phase of the quadratic term is phirel - phi_mrg_lm: only the overall phase phi_mrg is free,
+            and the relative phase between the quadratic term and TEOBPM (invariant under a rotation of the binary) is fixed.
+        """
+
+        key = 'phirel_{}'.format(quad_string)
+        if key in fixed_params:
+            return fixed_params[key] - utils.get_param_override(fixed_params, params, 'phi_mrg_{}{}'.format(self.l_NR, self.m_NR))
+        return quad_phi_value
+
+    def _load_SEOBNRv5HM_mode(self):
+
+        """
+            SEOBNRv5HM (l_NR, m_NR) mode on the NR time grid, with the time origin at the peak of the SEOBNRv5HM (2,2) mode.
+            The mode has no sampled intrinsic parameter (masses and spins are the ones of the NR metadata), hence it is computed only once.
+
+            If `SEOB-modes-file` is given, the mode is read from that file: an npz with `t` (in units of M, measured from the peak of |h22|),
+            `ID` (NR simulation IDs) and `h<l><m>` (complex modes, one row per ID). Otherwise it is generated with `pyseobnr`, which has to be
+            installed in the same environment.
+        """
+
+        mode_string = '{}{}'.format(self.l_NR, self.m_NR)
+
+        if(self.SEOB_modes_file):
+            data = np.load(self.SEOB_modes_file, allow_pickle=True)
+            IDs  = [str(x) for x in data['ID']]
+            if not(str(self.NR_ID) in IDs)         : raise ValueError("SEOBNRv5HM template: simulation {} is not in {}".format(self.NR_ID, self.SEOB_modes_file))
+            if not('h'+mode_string in data.files)  : raise ValueError("SEOBNRv5HM template: mode h{} is not in {}".format(mode_string, self.SEOB_modes_file))
+            t_SEOB = np.asarray(data['t'], dtype=float)
+            h_SEOB = np.asarray(data['h'+mode_string][IDs.index(str(self.NR_ID))], dtype=complex)
+        else:
+            try               : from pyseobnr.generate_waveform import generate_modes_opt
+            except ImportError: raise ImportError("SEOBNRv5HM template: `pyseobnr` is not installed in this environment. Either install it, or pass precomputed modes through the `SEOB-modes-file` option.")
+            m1, m2, chi1, chi2 = self.metadata['m1'], self.metadata['m2'], self.metadata['chi1'], self.metadata['chi2']
+            # pyseobnr requires q>=1; exchanging the labels of the two bodies leaves the even-m modes unchanged.
+            if(m1 < m2): m1, m2, chi1, chi2 = m2, m1, chi2, chi1
+            t_SEOB, modes = generate_modes_opt(m1/m2, chi1, chi2, 0.02, approximant="SEOBNRv5HM")
+            t_SEOB        = np.asarray(t_SEOB, dtype=float)
+            h22, h_SEOB   = np.asarray(modes['2,2'], dtype=complex), np.asarray(modes['{},{}'.format(self.l_NR, self.m_NR)], dtype=complex)
+            # Time origin at the peak of |h22|, located on a grid finer than the SEOB one.
+            t_guess       = t_SEOB[np.argmax(np.abs(h22))]
+            t_fine        = np.arange(t_guess - 2.0, t_guess + 2.0, 0.001)
+            t_SEOB        = t_SEOB - t_fine[np.argmax(np.interp(t_fine, t_SEOB, np.abs(h22)))]
+
+        # NR times measured from the peak of the NR (2,2) mode. Outside of the SEOB time span the template is zero.
+        tau = np.asarray(self.t_NR, dtype=float) - self.t_peak
+
+        return np.interp(tau, t_SEOB, h_SEOB.real, left=0.0, right=0.0) + 1j * np.interp(tau, t_SEOB, h_SEOB.imag, left=0.0, right=0.0)
+
+    def SEOBNRv5HM_waveform(self, params, fixed_params):
+
+        """
+            SEOBNRv5HM template, treated as TEOBPM and KerrBinary: binary parameters from the NR metadata, time origin at the peak of the (2,2)
+            mode (of the NR simulation for the data, of SEOBNRv5HM for the template; no time shift is fitted), and a free overall phase `phi`.
+        """
+
+        if(self._SEOB_mode is None): self._SEOB_mode = self._load_SEOBNRv5HM_mode()
+        phi_value = utils.get_param_override(fixed_params,params,'phi')
+
+        return self._SEOB_mode * np.exp(1j*phi_value)
+
     def waveform(self, params, fixed_params):
 
         if (self.wf_model=='Kerr'):
@@ -503,6 +547,11 @@ class WaveformModel(cpnest.model.Model):
             
             ringdown_model                = self.TEOBPM_waveform(params, fixed_params)
             _, _, _, self.wf_r, self.wf_i = ringdown_model.waveform(self.t_NR)
+
+        elif (self.wf_model=='SEOBNRv5HM'):
+
+            ringdown_model       = self.SEOBNRv5HM_waveform(params, fixed_params)
+            self.wf_r, self.wf_i = np.real(ringdown_model), np.imag(ringdown_model)
             
         else:
             raise ValueError("Unknown template selected: {}".format(self.wf_model))

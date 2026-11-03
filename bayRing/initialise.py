@@ -441,6 +441,7 @@ def read_config(Config):
         'TEOB-qc-fit-type'                 : 'equal-mass' ,
         'sigmoid-flag'                     : 0            ,
         'quadratic-fits'                   : 0            ,
+        'SEOB-modes-file'                  : ''           ,
         },
 
         'Inference':
@@ -453,6 +454,8 @@ def read_config(Config):
         'seed'             : 1234            ,
         'nnest'            : 1               ,
         'nensemble'        : 1               ,
+        'checkpoint-interval': 900           ,
+        'verbose'          : 3               ,
         'n-start-time-workers': 1            ,
         'n-mode-workers'   : 1               ,
 
@@ -631,7 +634,7 @@ def read_config(Config):
     else:
         parameters['Injection-data']['parameters'] = None
 
-    if ((parameters['Model']['template']=='KerrBinary' or parameters['Model']['template']=='TEOBPM') and not(parameters['NR-data']['l-NR']==2 and parameters['NR-data']['m']==2) and parameters['NR-data']['t-peak-22']==0.0): raise ValueError("The time of the peak of the 22 mode must be provided for the KerrBinary and TEOBPM models when fitting the HMs, to correctly rescale the NR-calibrated quantities.")
+    if ((parameters['Model']['template']=='KerrBinary' or parameters['Model']['template']=='TEOBPM' or parameters['Model']['template']=='SEOBNRv5HM') and not(parameters['NR-data']['l-NR']==2 and parameters['NR-data']['m']==2) and parameters['NR-data']['t-peak-22']==0.0): raise ValueError("The time of the peak of the 22 mode must be provided for the KerrBinary and TEOBPM models when fitting the HMs, to correctly rescale the NR-calibrated quantities.")
 
     if  (parameters['Model']['template']=='Damped-sinusoids'): 
         parameters['Model']['QNM-modes'] = '{}{}0'.format(parameters['NR-data']['l-NR'], parameters['NR-data']['m']) 
@@ -651,10 +654,17 @@ def read_config(Config):
             if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4): raise ValueError("The KerrBinary-Carullo2024 template is only available for l=2,3")
     
     elif(parameters['Model']['template']=='TEOBPM'      ):
-        parameters['Model']['QNM-modes']     = '220,221,210,211,330,331,320,321,310,311,440,441,430,431,420,421,410,411,550,551'
+        # With a development fit (TEOB-NR-fit, sigmoid-flag or quadratic-fits), QNM-modes lists the additional linear Kerr modes, whose
+        # parameters are sampled: the user input is kept (none if not given). Otherwise, the full list of the TEOBPM multipoles.
+        if(parameters['Model']['TEOB-NR-fit'] or parameters['Model']['sigmoid-flag'] or parameters['Model']['quadratic-fits']):
+            if not(Config.has_option('Model', 'QNM-modes')): parameters['Model']['QNM-modes'] = ''
+        else:
+            parameters['Model']['QNM-modes'] = '220,221,210,211,330,331,320,321,310,311,440,441,430,431,420,421,410,411,550,551'
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4  or parameters['NR-data']['l-NR']==5): raise ValueError("The TEOBPM template is only available for l=2,3,4,5")
         if(parameters['Model']['TEOB-template']=='qc'): parameters['Model']['TEOB-template'] = 'HypTan'
         if(parameters['Model']['TEOB-template']=='nc'): parameters['Model']['TEOB-template'] = 'RatExp'
+    elif(parameters['Model']['template']=='SEOBNRv5HM'  ):
+        if not((parameters['NR-data']['l-NR'], parameters['NR-data']['m']) in [(2,2), (2,1), (3,3), (3,2), (4,4), (4,3), (5,5)]): raise ValueError("The SEOBNRv5HM template is only available for the (l,m) modes (2,2), (2,1), (3,3), (3,2), (4,4), (4,3), (5,5)")
         
     print('\n\n\nFIXME: print updated vars\n\n\n')
 
@@ -769,7 +779,7 @@ A dot is present at the end of each description line and is not to be intended a
     ***************************************************
     
         template                         Fitting template. Available options: ['Damped-sinusoids', 'Kerr', 'Kerr-Damped-sinusoids',\
-              'KerrBinary', 'TEOBPM'].                                                                                                                                  Default: 'Kerr'.
+              'KerrBinary', 'TEOBPM', 'SEOBNRv5HM'].                                                                                                                                  Default: 'Kerr'.
         
         N-DS-modes                       Number of free modes in the ringdown model if 'Damped-sinusoids' in template. Otherwise, ignored.                                Default: 1.
         
@@ -802,6 +812,9 @@ A dot is present at the end of each description line and is not to be intended a
                                          to be provided in [NR-data][properties-file].                                                                                    Default: 'HypTan'.
 
         N-DS-tails                       Number of free tails in the ringdown model if 'Damped-sinusoids' in template. Otherwise, ignored.                                Default: 0.
+
+        SEOB-modes-file                  File with precomputed SEOBNRv5HM modes, used by the 'SEOBNRv5HM' template: an npz with `t` (in M, from the peak of |h22|), \
+                                         `ID` (NR simulation IDs) and `h<l><m>` (complex modes, one row per ID). If empty, the modes are generated with pyseobnr.        Default: ''.
 
         TEOB-global-fit                  Boolean to use the NR-calibrated global fits of the TEOB model.
                                          If 1:
@@ -858,6 +871,11 @@ A dot is present at the end of each description line and is not to be intended a
         nensemble        Total number of ensemble processes running. nensemble = nnest * N_ev, where N_ev is the number \
                          of live points being substituted at each NS step. Requires N_ev << nlive. \
                          Also n_cpu = nnest+nensemble.                                                                       Default: 1.
+
+        checkpoint-interval  Seconds between cpnest checkpoints (the resume pickle can be several GB).                       Default: 900.
+        verbose              cpnest verbosity (0-3). verbose=3 also keeps every internal MCMC sample in memory and
+                             dumps them to disk at the end, which for long ringdown fits can take hours and tens of GB;
+                             verbose=2 skips that and is recommended unless the MCMC chain diagnostics are needed.  Default: 3.
 
         n-start-time-workers
                          Number of start-time fits to run in parallel when `t-start` supplies multiple values. \

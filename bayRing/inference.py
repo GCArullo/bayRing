@@ -221,6 +221,7 @@ def read_default_bounds(wf_model, TEOB_template='', TEOB_development_fit=False, 
     elif(wf_model=='Kerr'                 ): default_bounds = default_bounds_Kerr
     elif(wf_model=='Kerr-tail'            ): default_bounds = default_bounds_Kerr_tail
     elif(wf_model=='KerrBinary'           ): default_bounds = {'phi': [0.0, twopi]}
+    elif(wf_model=='SEOBNRv5HM'           ): default_bounds = {'phi': [0.0, twopi]}
     elif(wf_model=='TEOBPM'               ): default_bounds = default_bounds_TEOBPM
 
     return default_bounds
@@ -662,7 +663,7 @@ def Dynamic_InferenceModel(base):
                         self.names.append(fullname)
                         self.bounds.append(single_bounds)
 
-            elif(self.wf_model.wf_model=='KerrBinary'):
+            elif(self.wf_model.wf_model=='KerrBinary' or self.wf_model.wf_model=='SEOBNRv5HM'):
 
                 default_bounds = read_default_bounds(self.wf_model.wf_model)   
                 for name in default_bounds.keys():
@@ -719,6 +720,31 @@ def Dynamic_InferenceModel(base):
                         single_bounds = read_parameter_bounds(Config, configparser, name, fullname, default_bounds_TEOBPM)
                         self.names.append(fullname)
                         self.bounds.append(single_bounds)
+
+                # Optional parameters, included only if they appear in [Priors] (fixed, or with a bound): c4A, replacing the
+                # peak-amplitude condition (with TEOB-NR-fit; pyRing sentinels: fix-c4A_lm = 3e30, -1e30, -2e30), and a complex
+                # constant added to the multipole (ln_A_constant_lm, with its phase phi_constant_lm).
+                lm = '{}{}'.format(self.wf_model.l_NR, self.wf_model.m_NR)
+                optional_bounds = {'c4A': [-10.0, 10.0], 'ln_A_constant': [np.log(1e-9), np.log(1e-4)], 'phi_constant': [0.0, twopi]}
+                given = lambda fullname: any(self.Config.has_option("Priors", option) for option in ('fix-'+fullname, fullname+'-min', fullname+'-max'))
+                for name in optional_bounds:
+                    fullname = '{}_{}'.format(name, lm)
+                    if not(given(fullname) or (name=='phi_constant' and given('ln_A_constant_'+lm))): continue
+                    if(name=='c4A' and not self.TEOB_NR_fit): continue
+                    if self.Config.has_option("Priors", 'fix-'+fullname):
+                        self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
+                    else:
+                        single_bounds = read_parameter_bounds(Config, configparser, name, fullname, optional_bounds)
+                        self.names.append(fullname)
+                        self.bounds.append(single_bounds)
+                # Fixed inputs of the c4A sentinels (asymptotic amplitude c1A + c4A, origin tenv0 [M] of the sigmoids), and fixed
+                # relative phase of the quadratic terms (fix-phirel_<quad>: phi_<quad> = phirel - phi_mrg).
+                for extra in ('c1c4A', 'tenv0'):
+                    if self.Config.has_option("Priors", 'fix-{}_{}'.format(extra, lm)):
+                        self.fixed_params['{}_{}'.format(extra, lm)] = self.Config.getfloat("Priors", 'fix-{}_{}'.format(extra, lm))
+                for option in self.Config.options("Priors"):
+                    if option.startswith('fix-phirel_'):
+                        self.fixed_params[option[len('fix-'):]] = self.Config.getfloat("Priors", option)
 
             else:
                 raise ValueError("Unknown template selected: {}".format(self.wf_model.wf_model))
@@ -1361,13 +1387,14 @@ def run_inference(parameters, inference_model):
             print('* The sampling output appears in the `{}/Algorithm/cpnest.log` file.\n'.format( parameters['I/O']['outdir']))
 
             job = cpnest.CPNest(inference_model                                                  ,
-                                verbose  = 3                                                     ,
+                                verbose  = parameters['Inference']['verbose']                    ,
                                 nlive    = parameters['Inference']['nlive']                      ,
                                 maxmcmc  = parameters['Inference']['maxmcmc']                    ,
                                 seed     = parameters['Inference']['seed']                       , 
                                 poolsize = 128                                                   ,
                                 nthreads = 1                                                     ,
                                 output   = os.path.join( parameters['I/O']['outdir'],'Algorithm'),
+                                periodic_checkpoint_interval = parameters['Inference']['checkpoint-interval'],
                                 resume   = 1                                                     )
             job.run()
 

@@ -54,7 +54,7 @@ def read_quad_modes(QQNM_modes, l_NR, m):
 
     """
 
-    quad_modes_list = QQNM_modes.split(',')
+    quad_modes_list = [mode.strip() for mode in QQNM_modes.split(',') if mode.strip()]
 
     quad_modes        = {'sum': [], 'diff': []}
     for i in range(len(quad_modes_list)):
@@ -156,7 +156,7 @@ def read_linear_modes(modes_input, l_NR, m):
 
     """
 
-    modes_list   = modes_input.split(',')
+    modes_list   = [mode.strip() for mode in modes_input.split(',') if mode.strip()]
     modes        = []
     for i in range(len(modes_list)):
         if('-' in modes_list[i]): l_ring,m_ring,n = int(modes_list[i][0]), -int(modes_list[i][2]), int(modes_list[i][3])
@@ -223,7 +223,7 @@ def read_Kerr_modes(
     linear_modes = read_linear_modes(modes_input, l_NR, m)
 
     # Quadratic modes
-    if not(QQNM_modes==''): quad_modes = read_quad_modes(QQNM_modes, l_NR, m)
+    if QQNM_modes is not None and QQNM_modes.strip(): quad_modes = read_quad_modes(QQNM_modes, l_NR, m)
     else                  : quad_modes = None
 
     modes_full = construct_full_modes(linear_modes, quad_modes)
@@ -253,10 +253,21 @@ def read_Kerr_modes(
 
             else      :
 
-                omega, _, _ = qnm.modes_cache(s=-2,l=l_cache,m=m_cache,n=n_cache)(a=np.abs(NR_metadata['af']))
+                # Remnant spin anti-aligned with the orbital angular momentum (af < 0): the (l,m) harmonic is counter-rotating with
+                # respect to the black hole, i.e. the mode (l,-m,n) at |af| (branch continuous through af = 0). With
+                # cache_negative_m_qnms both labels are cached as they are, and the branch is chosen by pyRing.
+                m_qnm       = -m_cache if (NR_metadata['af'] < 0 and not(cache_negative_m_qnms)) else m_cache
+                omega, _, _ = qnm.modes_cache(s=-2,l=l_cache,m=m_qnm,n=n_cache)(a=np.abs(NR_metadata['af']))
                 freq        = (np.real(omega) / NR_metadata['Mf']) * (1./twopi)
                 tau         = -1./(np.imag(omega)) * NR_metadata['Mf']
                 qnm_cached[(2, l_cache, m_cache, n_cache)] = {'f': freq, 'tau': tau}
+
+    # The fundamental mode of the fitted harmonic is always cached (used by the post-processing plots), also when it is not
+    # among the fitted modes (e.g. TEOBPM with no additional linear modes, or SEOBNRv5HM).
+    if not(charge) and not((2, l_NR, m, 0) in qnm_cached):
+        m_qnm       = -m if (NR_metadata['af'] < 0 and not(cache_negative_m_qnms)) else m
+        omega, _, _ = qnm.modes_cache(s=-2,l=l_NR,m=m_qnm,n=0)(a=np.abs(NR_metadata['af']))
+        qnm_cached[(2, l_NR, m, 0)] = {'f': (np.real(omega) / NR_metadata['Mf']) * (1./twopi), 'tau': -1./(np.imag(omega)) * NR_metadata['Mf']}
 
     return linear_modes, quad_modes, qnm_cached
 
@@ -333,7 +344,7 @@ def read_tail_modes(modes_input):
 
     """
 
-    modes_list   = modes_input.split(',')
+    modes_list   = [mode.strip() for mode in modes_input.split(',') if mode.strip()]
     modes        = []
     for i in range(len(modes_list)):
         if('-' in modes_list[i]): l_ring,m_ring = int(modes_list[i][0]), -int(modes_list[i][2])
