@@ -199,6 +199,7 @@ def _run_single_start(Config, parameters, config_file):
                                                 TEOB_qc_fit_type          = parameters['Model']['TEOB-qc-fit-type']                ,
                                                 sigmoid_flag              = parameters['Model']['sigmoid-flag']                    ,
                                                 quadratic_fits            = parameters['Model']['quadratic-fits']                  ,
+                                                TEOB_quadratic_model      = parameters['Model']['TEOB-quadratic-model']            ,
                                                 SEOB_modes_file           = parameters['Model']['SEOB-modes-file']                 ,
                                                 NR_ID                     = parameters['NR-data']['ID']                            ,
                                                 )

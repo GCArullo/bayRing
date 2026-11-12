@@ -8,7 +8,7 @@ import bayRing.utils   as utils
 
 class WaveformModel(cpnest.model.Model):
     
-    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, N_ds_tails=0, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_template = 'RatExp', TEOB_merger_data = 1, TEOB_global_fit = 0, TEOB_NR_fit = 0, TEOB_qc_fit_type = None, sigmoid_flag=0, quadratic_fits=0, SEOB_modes_file='', NR_ID=None):
+    def __init__(self, t_NR, tM_start, tM_peak, wf_model, N_ds_modes, Kerr_modes, metadata, fit_metadata, qnm_cached, l_NR, m_NR, N_ds_tails=0, tail=0, tail_modes=None, quadratic_modes=None, const_params=None, KerrBinary_version = 'London2018', KerrBinary_amp_nc_version = 'bmrg-Jmrg', TEOB_template = 'RatExp', TEOB_merger_data = 1, TEOB_global_fit = 0, TEOB_NR_fit = 0, TEOB_qc_fit_type = None, sigmoid_flag=0, quadratic_fits=0, TEOB_quadratic_model=0, SEOB_modes_file='', NR_ID=None):
 
         self.t_NR                      = t_NR
         self.t_start                   = tM_start
@@ -35,6 +35,7 @@ class WaveformModel(cpnest.model.Model):
         self.TEOB_qc_fit_type          = TEOB_qc_fit_type
         self.sigmoid_flag              = sigmoid_flag
         self.quadratic_fits            = quadratic_fits
+        self.TEOB_quadratic_model      = TEOB_quadratic_model
         self.SEOB_modes_file           = SEOB_modes_file
         self.NR_ID                     = NR_ID
         self._SEOB_mode                = None
@@ -296,13 +297,11 @@ class WaveformModel(cpnest.model.Model):
             lm = '{}{}'.format(self.l_NR,self.m_NR)
             for coefficient in (['c3A', 'c3p', 'c4p'] + (['c2A', 'c2p'] if self.TEOB_template=='RatExp' else [])):
                 NR_fit_coeffs[(self.l_NR,self.m_NR)][coefficient] = utils.get_param_override(fixed_params,params,'{}_{}'.format(coefficient, lm))
-            # Optional c4A (HypTan), replacing the peak-amplitude condition, with the pyRing sentinels (see pyRing TEOBPM):
-            # its inputs, the asymptotic amplitude c1c4A = c1A + c4A and the origin tenv0 of the sigmoids, are fixed parameters.
-            if(self._has_param(params, fixed_params, 'c4A_'+lm)):
-                NR_fit_coeffs[(self.l_NR,self.m_NR)]['c4A'] = utils.get_param_override(fixed_params,params,'c4A_'+lm)
-            for extra in ('c1c4A', 'tenv0'):
-                if(('{}_{}'.format(extra, lm)) in fixed_params):
-                    NR_fit_coeffs[(self.l_NR,self.m_NR)][extra] = fixed_params['{}_{}'.format(extra, lm)]
+            # Optional asymptotic amplitude c1A + c4A of the multipole (HypTan, local fits): with it, pyRing replaces the two amplitude conditions
+            # at the peak with the asymptote and the peak amplitude of the complete multipole, TEOBPM + quadratic terms (eqs. 18-19 of
+            # Crescimbeni and Carullo).
+            if(self._has_param(params, fixed_params, 'A_asymptote_'+lm)):
+                NR_fit_coeffs[(self.l_NR,self.m_NR)]['A_asymptote_over_nu'] = utils.get_param_override(fixed_params,params,'A_asymptote_'+lm)
         else:
             NR_fit_coeffs['ecc'] = self.metadata['ecc']
             NR_fit_coeffs['bmrg'] = self.metadata['bmrg']
@@ -375,11 +374,8 @@ class WaveformModel(cpnest.model.Model):
                             quad_t_sigmoids[quad_term][quad_key] = utils.get_param_override(fixed_params,params,'t_sigmoid_{}'.format(quad_string))
                             quad_width_sigmoids[quad_term][quad_key] = utils.get_param_override(fixed_params,params,'width_sigmoid_{}'.format(quad_string))
 
-            # Optional complex constant added to the multipole (ln_A_constant_lm, phi_constant_lm)
-            constant_amps = {}
-            lm = '{}{}'.format(self.l_NR,self.m_NR)
-            if(self._has_param(params, fixed_params, 'ln_A_constant_'+lm)):
-                constant_amps[(self.l_NR,self.m_NR)] = np.exp(utils.get_param_override(fixed_params,params,'ln_A_constant_'+lm)) * np.exp(1j*utils.get_param_override(fixed_params,params,'phi_constant_'+lm))
+            if(amps):
+                raise ValueError("TEOBPM: additional linear Kerr modes (QNM-modes with a development fit) are no longer available in the pyRing TEOBPM.")
 
             # Local NR-calibrated coefficients (TEOB-NR-fit=1) are used by pyRing only with global_fit=0.
             return wf.TEOBPM(self.t_peak                  ,
@@ -398,16 +394,31 @@ class WaveformModel(cpnest.model.Model):
                              merger_data         = self.TEOB_merger_data                            ,
                              global_fit          = int(bool(self.TEOB_global_fit) and not(self.TEOB_NR_fit)),
                              NR_fit_coeffs       = NR_fit_coeffs                                    ,
-                             amps                = amps                                             ,
-                             dphis               = dphis                                            ,
-                             t_sigmoids          = t_sigmoids                                       ,
-                             width_sigmoids      = width_sigmoids                                   ,
                              quad_amps           = quad_amps                                        ,
                              quad_dphis          = quad_dphis                                       ,
                              quad_t_sigmoids     = quad_t_sigmoids                                  ,
                              quad_width_sigmoids = quad_width_sigmoids                              ,
-                             sigmoid_flag        = self.sigmoid_flag                                ,
-                             constant_amps       = constant_amps                                    )
+                             sigmoid_flag        = self.sigmoid_flag                                )
+
+        if(self.TEOB_quadratic_model):
+            # Global model of the quadratic mode of Crescimbeni and Carullo, frozen in pyRing: only phi_mrg is free.
+            return wf.TEOBPM(self.t_peak                  ,
+                             self.metadata['m1']          ,
+                             self.metadata['m2']          ,
+                             self.metadata['chi1']        ,
+                             self.metadata['chi2']        ,
+                             merger_phases                ,
+                             1.0                          , # distance     , dummy with geom=1
+                             0.0                          , # inclination  , dummy with geom=1
+                             0.0                          , # orbital phase, dummy with geom=1
+                             modes                        ,
+                             TGR_parameters               ,
+                             geom            = 1                     ,
+                             template        = self.TEOB_template    ,
+                             merger_data     = self.TEOB_merger_data ,
+                             global_fit      = 1                     ,
+                             NR_fit_coeffs   = NR_fit_coeffs         ,
+                             quadratic_model = 1                     )
 
         try:
             ringdown_model = wf.TEOBPM(self.t_peak                  ,

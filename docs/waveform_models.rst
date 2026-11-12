@@ -433,10 +433,10 @@ optional additional terms:
        ``t_sigmoid`` and ``width_sigmoid`` [Mf]: each term is multiplied by
        :math:`S\,e^{i\,\delta\phi\,S}`, with
        :math:`S=\frac{1}{2}[1+\tanh((\tau-t_{\rm sigmoid})/w_{\rm sigmoid})]`
-       and :math:`\tau` measured from the first data sample.
+       and :math:`\tau` measured from the peak of the multipole.
 
-With a development fit, ``QNM-modes`` lists additional linear Kerr modes, with
-the same parameters as the quadratic terms (none if not given).
+With a development fit, ``QNM-modes`` must be empty: additional linear Kerr
+modes are not available in the pyRing TEOBPM.
 
 Optional parameters, included only if they appear in ``[Priors]`` (fixed, or
 with a bound):
@@ -447,16 +447,12 @@ with a bound):
 
    * - Parameter
      - Meaning
-   * - ``c4A_lm``
-     - With ``TEOB-NR-fit`` and ``HypTan``: replaces the peak-amplitude
-       condition on ``c4A``. Sentinel values: ``3e30``, standard condition;
-       ``-1.5e30``, ``c4A = c1c4A - c1A`` with ``fix-c1c4A_lm`` the
-       asymptotic amplitude ``c1A + c4A``; ``-3e30``, ``c1A`` and ``c4A``
-       fixed by ``fix-c1c4A_lm`` and by the amplitude of the complete
-       multipole (TEOBPM plus quadratic terms) at its peak, with
-       ``fix-tenv0_lm`` [M] the time of the first data sample.
-   * - ``ln_A_constant_lm``, ``phi_constant_lm``
-     - Complex constant added to the multipole.
+   * - ``A_asymptote_lm``
+     - With ``TEOB-NR-fit`` and ``HypTan``: the asymptotic amplitude
+       ``c1A + c4A``. ``c1A`` and ``c4A`` are then fixed by it and by the
+       amplitude of the complete multipole (TEOBPM plus quadratic terms) at its
+       peak; samples without a solution are rejected. It replaces the old
+       ``c4A`` sentinels with ``c1c4A_lm`` and ``tenv0_lm``.
    * - ``fix-phirel_<quad>``
      - Fixed relative phase of a quadratic term with respect to TEOBPM:
        ``phi_<quad> = phirel - phi_mrg_lm``, so that only ``phi_mrg_lm`` is
@@ -478,10 +474,19 @@ Example: the local fits of the ``(4,4)`` mode with the quadratic
    [Priors]
    fix-c3A_44 = 0
    fix-c4p_44 = 0
-   fix-c4A_44 = -3e30
-   fix-c1c4A_44 = 0.27
-   fix-tenv0_44 = 3.0
+   fix-A_asymptote_44 = 0.27
    fix-ln_A_sum_440_220_220 = -0.70
+
+Global model of the quadratic mode: with ``TEOB-quadratic-model = 1`` the
+``(4,4)`` multipole is the model of Crescimbeni and Carullo with every quantity
+given by its global fit, frozen in pyRing (``TEOBPM(..., quadratic_model=1)``,
+see the pyRing documentation); only ``phi_mrg_44`` is sampled:
+
+.. code-block:: ini
+
+   [Model]
+   template = TEOBPM
+   TEOB-quadratic-model = 1
 
 SEOBNRv5HM
 ~~~~~~~~~~

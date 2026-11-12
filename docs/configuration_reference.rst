@@ -165,7 +165,7 @@ fixed values or minimization start values.
    * - ``QNM-modes``
      - ``220,221,320``
      - Linear Kerr QNM list (can be empty). For ``TEOBPM`` with a development
-       fit, additional linear modes (none if not given).
+       fit it must be empty.
    * - ``QQNM-modes``
      - empty string
      - Quadratic QNM coupling list.
@@ -210,6 +210,10 @@ fixed values or minimization start values.
      - ``0``
      - Development flag to include in TEOBPM the quadratic terms of
        ``QQNM-modes``.
+   * - ``TEOB-quadratic-model``
+     - ``0``
+     - Use the global model of the quadratic mode in the ``(4,4)`` multipole
+       of TEOBPM, frozen in pyRing: only ``phi_mrg_44`` is sampled.
    * - ``SEOB-modes-file``
      - empty string
      - Precomputed modes for the ``SEOBNRv5HM`` template; if empty, they are

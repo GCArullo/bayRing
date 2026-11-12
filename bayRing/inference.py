@@ -721,27 +721,25 @@ def Dynamic_InferenceModel(base):
                         self.names.append(fullname)
                         self.bounds.append(single_bounds)
 
-                # Optional parameters, included only if they appear in [Priors] (fixed, or with a bound): c4A, replacing the
-                # peak-amplitude condition (with TEOB-NR-fit; pyRing sentinels: fix-c4A_lm = 3e30, -1e30, -2e30), and a complex
-                # constant added to the multipole (ln_A_constant_lm, with its phase phi_constant_lm).
+                # Optional asymptotic amplitude c1A + c4A of the multipole (HypTan, TEOB-NR-fit), included only if it appears in [Priors]
+                # (fixed, or with a bound): A_asymptote_lm, with the peak condition of the complete multipole (pyRing, eqs. 18-19 of Crescimbeni
+                # and Carullo).  The inputs of the old c4A sentinels and the complex constant are no longer available.
                 lm = '{}{}'.format(self.wf_model.l_NR, self.wf_model.m_NR)
-                optional_bounds = {'c4A': [-10.0, 10.0], 'ln_A_constant': [np.log(1e-9), np.log(1e-4)], 'phi_constant': [0.0, twopi]}
                 given = lambda fullname: any(self.Config.has_option("Priors", option) for option in ('fix-'+fullname, fullname+'-min', fullname+'-max'))
-                for name in optional_bounds:
-                    fullname = '{}_{}'.format(name, lm)
-                    if not(given(fullname) or (name=='phi_constant' and given('ln_A_constant_'+lm))): continue
-                    if(name=='c4A' and not self.TEOB_NR_fit): continue
+                for old in ('c4A', 'c1c4A', 'tenv0', 'ln_A_constant', 'phi_constant'):
+                    if given('{}_{}'.format(old, lm)):
+                        raise ValueError("TEOBPM: '{}_{}' is no longer available: the c4A sentinels are replaced by A_asymptote_{} (the value of the old "
+                                         "c1c4A_{}, with the sigmoid origin at the peak of the multipole instead of tenv0), and the complex constant by "
+                                         "[NR-data] add-const.".format(old, lm, lm, lm))
+                fullname = 'A_asymptote_{}'.format(lm)
+                if(given(fullname) and self.TEOB_NR_fit):
                     if self.Config.has_option("Priors", 'fix-'+fullname):
                         self.fixed_params[fullname] = self.Config.getfloat("Priors",'fix-'+fullname)
                     else:
-                        single_bounds = read_parameter_bounds(Config, configparser, name, fullname, optional_bounds)
+                        single_bounds = read_parameter_bounds(Config, configparser, 'A_asymptote', fullname, {'A_asymptote': [0.0, 2.0]})
                         self.names.append(fullname)
                         self.bounds.append(single_bounds)
-                # Fixed inputs of the c4A sentinels (asymptotic amplitude c1A + c4A, origin tenv0 [M] of the sigmoids), and fixed
-                # relative phase of the quadratic terms (fix-phirel_<quad>: phi_<quad> = phirel - phi_mrg).
-                for extra in ('c1c4A', 'tenv0'):
-                    if self.Config.has_option("Priors", 'fix-{}_{}'.format(extra, lm)):
-                        self.fixed_params['{}_{}'.format(extra, lm)] = self.Config.getfloat("Priors", 'fix-{}_{}'.format(extra, lm))
+                # Fixed relative phase of the quadratic terms (fix-phirel_<quad>: phi_<quad> = phirel - phi_mrg).
                 for option in self.Config.options("Priors"):
                     if option.startswith('fix-phirel_'):
                         self.fixed_params[option[len('fix-'):]] = self.Config.getfloat("Priors", option)
@@ -838,14 +836,21 @@ def Dynamic_InferenceModel(base):
 
             """
             
+            try:
+                model = self.model(x)
+            except ValueError:
+                # TEOBPM with quadratic terms: the peak condition of the multipole has no solution for this sample.
+                if(self.wf_model.wf_model=='TEOBPM'): return -np.inf
+                raise
+
             if(self.kind=='gaussian'):
                 err = 1e-16
-                lh_r = -0.5 * np.sum(((np.real(self.data)-np.real(self.model(x)))/(np.real(self.error)+err))**2)
-                lh_i = -0.5 * np.sum(((np.imag(self.data)-np.imag(self.model(x)))/(np.imag(self.error)+err))**2)
+                lh_r = -0.5 * np.sum(((np.real(self.data)-np.real(model))/(np.real(self.error)+err))**2)
+                lh_i = -0.5 * np.sum(((np.imag(self.data)-np.imag(model))/(np.imag(self.error)+err))**2)
             #WARNING: needs testing!
             elif(self.kind=='laplace'):
-                lh_r = -0.5 * np.sum(np.abs((np.real(self.data)-np.real(self.model(x)))/np.real(self.error)))
-                lh_i = -0.5 * np.sum(np.abs((np.imag(self.data)-np.imag(self.model(x)))/np.imag(self.error)))
+                lh_r = -0.5 * np.sum(np.abs((np.real(self.data)-np.real(model))/np.real(self.error)))
+                lh_i = -0.5 * np.sum(np.abs((np.imag(self.data)-np.imag(model))/np.imag(self.error)))
 
             return lh_r + lh_i
         

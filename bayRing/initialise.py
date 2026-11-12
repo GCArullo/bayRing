@@ -441,6 +441,7 @@ def read_config(Config):
         'TEOB-qc-fit-type'                 : 'equal-mass' ,
         'sigmoid-flag'                     : 0            ,
         'quadratic-fits'                   : 0            ,
+        'TEOB-quadratic-model'             : 0            ,
         'SEOB-modes-file'                  : ''           ,
         },
 
@@ -663,7 +664,11 @@ def read_config(Config):
         if not(parameters['NR-data']['l-NR']==2 or parameters['NR-data']['l-NR']==3 or parameters['NR-data']['l-NR']==4  or parameters['NR-data']['l-NR']==5): raise ValueError("The TEOBPM template is only available for l=2,3,4,5")
         if(parameters['Model']['TEOB-template']=='qc'): parameters['Model']['TEOB-template'] = 'HypTan'
         if(parameters['Model']['TEOB-template']=='nc'): parameters['Model']['TEOB-template'] = 'RatExp'
-    elif(parameters['Model']['template']=='SEOBNRv5HM'  ):
+    if(parameters['Model']['TEOB-quadratic-model']):
+        if not(parameters['Model']['template']=='TEOBPM' and (parameters['NR-data']['l-NR'], parameters['NR-data']['m'])==(4,4)): raise ValueError("TEOB-quadratic-model requires the TEOBPM template and the (4,4) mode.")
+        if not(parameters['Model']['TEOB-template']=='HypTan' and parameters['Model']['TEOB-global-fit']==1): raise ValueError("TEOB-quadratic-model requires TEOB-template = HypTan and TEOB-global-fit = 1.")
+        if(parameters['Model']['TEOB-NR-fit'] or parameters['Model']['sigmoid-flag'] or parameters['Model']['quadratic-fits']): raise ValueError("TEOB-quadratic-model cannot be combined with TEOB-NR-fit, sigmoid-flag or quadratic-fits: every quantity of the quadratic mode is given by the global model.")
+    if(parameters['Model']['template']=='SEOBNRv5HM'  ):
         if not((parameters['NR-data']['l-NR'], parameters['NR-data']['m']) in [(2,2), (2,1), (3,3), (3,2), (4,4), (4,3), (5,5)]): raise ValueError("The SEOBNRv5HM template is only available for the (l,m) modes (2,2), (2,1), (3,3), (3,2), (4,4), (4,3), (5,5)")
         
     print('\n\n\nFIXME: print updated vars\n\n\n')
@@ -785,9 +790,8 @@ A dot is present at the end of each description line and is not to be intended a
         
         QNM-modes                        List of modes of the ringdown model, if 'Kerr' in template. Otherwise, ignored. \
                                          Example format: '220,221,320'. Empty entries and spaces are ignored, and the list can be empty. \
-                                         For TEOBPM with TEOB-NR-fit, sigmoid-flag or quadratic-fits: additional linear Kerr modes added to the TEOBPM multipole, \
-                                         with sampled ln_A_lmn, phi_lmn, dphi_lmn (and t_sigmoid_lmn, width_sigmoid_lmn with sigmoid-flag); if not given, none. \
-                                         For the standard TEOBPM, it is set internally to the TEOBPM multipoles.                                                          Default: '220,221,320'.
+                                         For TEOBPM with TEOB-NR-fit, sigmoid-flag or quadratic-fits it must be empty (additional linear modes are not available \
+                                         in the pyRing TEOBPM); for the standard TEOBPM, it is set internally to the TEOBPM multipoles.                                    Default: '220,221,320'.
         
         QQNM-modes                       List of quadratic modes of the ringdown model if 'Kerr' in template. Otherwise, ignored. \
                                          Example format: '--QQNM-modes ``Px220x321,Px220x221', i.e. (child_term x parent1 x parent2), \
@@ -834,11 +838,15 @@ A dot is present at the end of each description line and is not to be intended a
 
         TEOB-NR-fit                      Development flag to sample TEOB NR calibration coefficients while keeping the HypTan/RatExp template selection: \
                                          c3A_lm, c3p_lm, c4p_lm (and c2A_lm, c2p_lm for RatExp), passed to pyRing as local coefficients (global_fit = 0). \
-                                         With HypTan, c4A_lm can also be given in [Priors] (see below).                                                                   Default: 0.
+                                         With HypTan, A_asymptote_lm can also be given in [Priors] (see below).                                                           Default: 0.
 
         sigmoid-flag                     Development flag to activate the additional TEOBPM terms (QNM-modes, QQNM-modes with quadratic-fits) through sigmoids: \
                                          each term is multiplied by S exp(i dphi S), with S = [1 + tanh((tau - t_sigmoid)/width_sigmoid)]/2 and tau [Mf] measured \
-                                         from the first data sample.                                                                                                      Default: 0.
+                                         from the peak of the multipole.                                                                                                  Default: 0.
+
+        TEOB-quadratic-model             Flag to use, in the (4,4) mode of TEOBPM, the global model of the quadratic (2,2,0)x(2,2,0) mode of Crescimbeni and Carullo, \
+                                         frozen in pyRing (TEOBPM quadratic_model=1): every quantity of the multipole is given by its global fit and only phi_mrg_44 \
+                                         is sampled. Requires TEOB-template = HypTan and TEOB-global-fit = 1, without TEOB-NR-fit, sigmoid-flag, quadratic-fits.       Default: 0.
 
         quadratic-fits                   Development flag to include in TEOBPM the quadratic terms of QQNM-modes, with their parameters (see QQNM-modes).              Default: 0.
 
@@ -943,13 +951,10 @@ A dot is present at the end of each description line and is not to be intended a
 
         TEOBPM optional parameters, included only if they appear in this section (fixed, or with a bound):
 
-        c4A_lm                  With TEOB-NR-fit and HypTan: c4A, replacing the peak-amplitude condition. Sentinel values (pyRing TEOBPM):
-                                fix-c4A_lm = 3e30: standard condition c4A = A_peak - c1A tanh(c3A);
-                                fix-c4A_lm = -1.5e30: c4A = c1c4A - c1A, with fix-c1c4A_lm the asymptotic amplitude c1A + c4A;
-                                fix-c4A_lm = -3e30: c1A and c4A fixed by fix-c1c4A_lm and by the amplitude A_peak of the complete multipole (TEOBPM +
-                                quadratic terms) at its peak, with fix-tenv0_lm [M] the time of the first data sample after the peak of the (2,2) mode.
-                                Default bounds: [-10, 10].
-        ln_A_constant_lm        Complex constant added to the multipole, with phase phi_constant_lm.                  Default bounds: [log(1e-9), log(1e-4)], [0, 2pi].
+        A_asymptote_lm          With TEOB-NR-fit and HypTan: the asymptotic amplitude c1A + c4A of the multipole. c1A and c4A are then fixed by it and by
+                                the amplitude A_peak of the complete multipole (TEOBPM + quadratic terms) at its peak (eqs. 18-19 of Crescimbeni and
+                                Carullo); samples for which this condition has no solution are rejected.                Default bounds: [0, 2].
+                                (It replaces the c4A sentinels with c1c4A_lm and tenv0_lm, which raise an error.)
         fix-phirel_<quad>       Fixed relative phase of a quadratic term with respect to TEOBPM: phi_<quad> = phirel - phi_mrg_lm, so that the
                                 relative phase (invariant under a rotation of the binary) is fixed and only phi_mrg_lm is free.
         
